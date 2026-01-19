@@ -4,9 +4,9 @@ A Clojure-based personal website inspired by [Simon Willison's blog](https://sim
 
 ## Overview
 
-**Core Philosophy**: Start simple, grow organically. The system reads markdown files from disk, parses frontmatter for metadata, and serves them through a clean date-based URL structure.
+**Core Philosophy**: Start simple, grow organically. The system reads markdown files from disk, parses EDN frontmatter for metadata, and serves them through a clean date-based URL structure.
 
-**Content Authoring**: All content lives as markdown files in a `content/` directory, making it easy to author with Obsidian or any text editor.
+**Content Authoring**: Content lives in a **separate repository** as markdown files, keeping content completely decoupled from code. This makes authoring with Obsidian seamless — just open the content repo as a vault.
 
 ---
 
@@ -24,39 +24,51 @@ Three content types, unified by shared metadata:
 
 ### Frontmatter Schema
 
-All entries share a common frontmatter structure:
+All entries use **EDN frontmatter** (delimited by `;;;`) — no YAML. Clean, readable, and native to Clojure:
 
-```yaml
----
-type: post | note | link          # Required
-title: "My Post Title"            # Optional for notes
-date: 2025-01-15                  # Required, ISO format
-tags: [clojure, web, personal]    # Optional
-draft: false                      # Optional, default false
-link_url: https://example.com     # Required for type: link
-link_via: https://source.com      # Optional, for links
----
+```markdown
+;;;
+{:type :post
+ :title "My Post Title"
+ :tags [:clojure :web :personal]
+ :slug "custom-slug"              ; Optional, overrides filename
+ :draft false                     ; Optional, default false
+ :link-url "https://example.com"  ; Required for :link type
+ :link-via "https://source.com"}  ; Optional, for links
+;;;
 
 Content body in markdown...
 ```
 
+**Note**: The date is derived from the file path (`YYYY/MM/DD/`), not stored in frontmatter. This avoids duplication and ensures the filesystem is the source of truth for dates.
+
 ### File Organization
 
+Content lives in a **separate repository**, structured to mirror URLs exactly:
+
 ```
-content/
+my-content/                       # Separate repo, opened in Obsidian
 ├── 2025/
 │   ├── 01/
-│   │   ├── my-first-post.md
-│   │   ├── interesting-link.md
-│   │   └── quick-note.md
+│   │   ├── 15/
+│   │   │   ├── my-first-post.md
+│   │   │   └── interesting-link.md
+│   │   └── 16/
+│   │       └── quick-note.md
 │   └── 02/
-│       └── february-thoughts.md
+│       └── 03/
+│           └── february-thoughts.md
 └── 2024/
     └── 12/
-        └── year-in-review.md
+        └── 31/
+            └── year-in-review.md
 ```
 
-The file path encodes the date (`YYYY/MM/`), and the filename becomes the slug. This mirrors the URL structure and makes content easy to locate.
+**Path structure**: `YYYY/MM/DD/filename.md`
+
+- The **date** comes from the directory path
+- The **slug** defaults to the filename (without `.md`), but can be overridden via `:slug` in frontmatter
+- Multiple entries on the same day are supported (multiple files in the same `DD/` folder)
 
 ---
 
@@ -110,11 +122,13 @@ The file path encodes the date (`YYYY/MM/`), and the filename becomes the slug. 
 | **Web Server** | [Ring](https://github.com/ring-clojure/ring) | Clojure's standard HTTP abstraction |
 | **Routing** | [Reitit](https://github.com/metosin/reitit) | Fast, data-driven routing with great composability |
 | **HTML** | [Hiccup](https://github.com/weavejester/hiccup) | Clojure data structures as HTML |
-| **Markdown** | [markdown-clj](https://github.com/yogthos/markdown-clj) | Pure Clojure markdown parser |
-| **YAML** | [clj-yaml](https://github.com/clj-commons/clj-yaml) | For frontmatter parsing |
+| **Markdown** | [nextjournal/markdown](https://github.com/nextjournal/markdown) | Well-maintained, produces Hiccup-compatible AST |
+| **Frontmatter** | `clojure.edn/read-string` | Native EDN — no extra dependency |
 | **Dev Server** | [ring-refresh](https://github.com/weavejester/ring-refresh) or similar | Auto-reload during development |
 
 ### Project Structure
+
+**Code repository** (this repo):
 
 ```
 website-v2/
@@ -122,6 +136,7 @@ website-v2/
 ├── src/
 │   └── site/
 │       ├── core.clj            # Entry point, server setup
+│       ├── config.clj          # Configuration (content path, etc.)
 │       ├── routes.clj          # Route definitions
 │       ├── handlers.clj        # Request handlers
 │       ├── content.clj         # Content loading & parsing
@@ -137,19 +152,34 @@ website-v2/
 │       ├── css/
 │       │   └── style.css       # Styles
 │       └── images/             # Static images
-├── content/                    # Markdown content (see above)
 └── test/
     └── site/
         └── content_test.clj    # Tests
 ```
+
+**Content repository** (separate repo, Obsidian vault):
+
+```
+my-content/
+├── .obsidian/                  # Obsidian config (gitignored or not)
+├── 2025/
+│   └── 01/
+│       └── 15/
+│           └── my-post.md
+└── pages/                      # Static pages (about, etc.)
+    └── about.md
+```
+
+The code repo references the content repo path via configuration (env var or config file).
 
 ### Core Data Flow
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
 │  Markdown   │────▶│   Parser    │────▶│   Content   │
-│   Files     │     │ (frontmatter│     │    Maps     │
-│             │     │  + body)    │     │             │
+│   Files     │     │ (EDN front- │     │    Maps     │
+│ (separate   │     │  matter +   │     │             │
+│   repo)     │     │  markdown)  │     │             │
 └─────────────┘     └─────────────┘     └─────────────┘
                                                │
                                                ▼
@@ -175,14 +205,15 @@ website-v2/
 
 ### Phase 2: Content System
 
-**Goal**: Load and display markdown content
+**Goal**: Load and display markdown content from the external content repo
 
-1. Implement frontmatter parser (YAML extraction)
-2. Create content loading functions
-   - `load-entry` - single file → entry map
-   - `load-all-entries` - directory → sorted entries
-3. Build entry index (in-memory, rebuilt on startup)
-4. Create single entry view
+1. Implement EDN frontmatter parser (extract `;;;` delimited block)
+2. Integrate nextjournal/markdown for body parsing
+3. Create content loading functions
+   - `load-entry` - single file → entry map (date from path, slug from filename or frontmatter)
+   - `load-all-entries` - walk content directory → sorted entries
+4. Build entry index (in-memory, rebuilt on startup)
+5. Create single entry view
 
 ### Phase 3: Archives & Navigation
 
@@ -226,22 +257,24 @@ website-v2/
 
 ### 1. In-Memory Content Index
 
-Content is loaded into memory at startup and optionally refreshed. For a personal blog with hundreds of entries, this is simple and fast. No database needed.
+Content is loaded from the external content repo into memory at startup and optionally refreshed. For a personal blog with hundreds of entries, this is simple and fast. No database needed.
 
 ```clojure
 ;; Content index structure (conceptual)
-{:entries [{:slug "my-post"
+{:entries [{:slug "my-post"              ; From filename or :slug in frontmatter
             :type :post
             :title "My Post"
-            :date #inst "2025-01-15"
+            :date {:year 2025 :month 1 :day 15}  ; Derived from file path
             :tags #{:clojure :web}
-            :body-html "<p>...</p>"
+            :body "<hiccup AST>"         ; From nextjournal/markdown
             :path "/2025/jan/15/my-post"}
            ...]
- :by-slug {"my-post" <entry>}
+ :by-path {"/2025/jan/15/my-post" <entry>}
  :by-tag {:clojure [<entry> ...]
           :web [<entry> ...]}
  :by-year {2025 [<entry> ...]}
+ :by-month {[2025 1] [<entry> ...]}
+ :by-day {[2025 1 15] [<entry> ...]}
  :by-type {:post [<entry> ...]
            :note [<entry> ...]
            :link [<entry> ...]}}
@@ -305,20 +338,21 @@ The design leaves room for future additions:
   ;; HTML
   hiccup/hiccup {:mvn/version "2.0.0-RC3"}
 
-  ;; Content
-  markdown-clj/markdown-clj {:mvn/version "1.12.1"}
-  clj-commons/clj-yaml {:mvn/version "1.0.27"}
+  ;; Markdown (produces hiccup-compatible AST)
+  io.github.nextjournal/markdown {:mvn/version "0.6.157"}
 
   ;; Utilities
   tick/tick {:mvn/version "0.7.5"}}  ; Date/time handling
 
- :paths ["src" "resources" "content"]
+ :paths ["src" "resources"]
 
  :aliases
  {:dev {:extra-paths ["dev"]
         :extra-deps {ring/ring-devel {:mvn/version "1.12.1"}}}
   :run {:main-opts ["-m" "site.core"]}}}
 ```
+
+**Note**: EDN frontmatter parsing uses `clojure.edn/read-string` — no extra dependency needed.
 
 ---
 
@@ -334,6 +368,7 @@ The design leaves room for future additions:
 ## References
 
 - [Simon Willison's Blog Source](https://github.com/simonw/simonwillisonblog) - Inspiration for content model
+- [nextjournal/markdown](https://github.com/nextjournal/markdown) - Markdown parser
 - [Reitit Documentation](https://cljdoc.org/d/metosin/reitit/)
 - [Ring Concepts](https://github.com/ring-clojure/ring/wiki/Concepts)
 - [Hiccup Syntax](https://github.com/weavejester/hiccup)
