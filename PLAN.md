@@ -149,15 +149,15 @@ Draft status is determined by **location, not a flag** — a file is a draft bec
 
 | Layer | Choice | Rationale |
 |-------|--------|-----------|
-| **HTTP abstraction** | [Ring](https://github.com/ring-clojure/ring) | The standard interface — handlers are pure functions of request → response. Not a server itself |
-| **HTTP server** | [http-kit](https://github.com/http-kit/http-kit) | Fast, tiny, zero-dependency Ring server. Also built into babashka |
-| **Routing** | [Reitit](https://github.com/metosin/reitit) | Fast, data-driven routing with great composability |
-| **HTML** | [Hiccup](https://github.com/weavejester/hiccup) | Clojure data structures as HTML |
-| **Markdown** | [nextjournal/markdown](https://github.com/nextjournal/markdown) | Well-maintained, produces Hiccup-compatible AST |
-| **Frontmatter** | `clojure.edn/read-string` | Native EDN — no extra dependency |
-| **Storage/Index** | In-memory Clojure data (start) | Files are the source of truth; index is derived. [Datalevin](https://github.com/juji-io/datalevin) is the designated upgrade path — see Design Decisions |
-| **Caching** | CDN (e.g. Cloudflare) + cache headers | Survive traffic spikes without touching the JVM |
-| **Task runner** | [babashka](https://babashka.org) | Every dev/build/publish workflow is a `bb` task — instant startup, no JVM wait |
+| **Runtime** | [babashka](https://babashka.org) | The whole site runs under bb — server, tasks, tests. Instant startup, tiny footprint, one runtime for everything. No JVM |
+| **HTTP server** | http-kit (built into bb) | Fast, tiny, Ring-style request/response handlers out of the box |
+| **Routing** | Hand-rolled (~50 lines) | Our URL space is small and perfectly regular — split path into segments, match on shape. Routes stay data, dispatch stays a pure function. (Reitit's Java trie router doesn't run under bb, and is overkill here anyway) |
+| **HTML** | Hiccup (built into bb) | Clojure data structures as HTML |
+| **Markdown** | [nextjournal/markdown](https://github.com/nextjournal/markdown) | Pure Clojure (0.6+), bb-compatible, produces Hiccup-compatible AST |
+| **Frontmatter** | `clojure.edn/read-string` | Native EDN — built in |
+| **Dates** | `java.time` interop (built into bb) | We only parse ints from paths and format month names — no date library needed |
+| **Storage/Index** | In-memory Clojure data (start) | Files are the source of truth; index is derived. [Datalevin](https://github.com/juji-io/datalevin) via its babashka pod is the designated upgrade path — see Design Decisions |
+| **Caching** | CDN (e.g. Cloudflare) + cache headers | Survive traffic spikes without touching the server |
 
 ### Project Structure
 
@@ -165,8 +165,7 @@ Draft status is determined by **location, not a flag** — a file is a draft bec
 
 ```
 website-v2/
-├── deps.edn                    # Dependencies
-├── bb.edn                      # babashka tasks — the dev entry point
+├── bb.edn                      # Deps + tasks — the single entry point
 ├── src/
 │   └── site/
 │       ├── core.clj            # Entry point, server setup
@@ -234,11 +233,12 @@ The code repo references the content repo path via configuration (env var or con
 
 **Goal**: Serve a single hardcoded entry
 
-1. Set up `deps.edn` (Ring, http-kit, Reitit, Hiccup) and `bb.edn` (dev/test tasks)
-2. Create minimal http-kit server in `core.clj`, started via `bb dev`
-3. Define basic route structure
-4. Create base HTML layout
-5. Serve a "Hello World" page
+1. **Smoke test bb compatibility** (five minutes, before anything else): nextjournal/markdown parses under bb; check whether `clojure.data.xml` (for RSS later) is bundled or needs to be a dep
+2. Set up `bb.edn` — deps (nextjournal/markdown) and tasks (dev/test)
+3. Create minimal http-kit server in `core.clj`, started via `bb dev`
+4. Write the hand-rolled router (path segments → handler match)
+5. Create base HTML layout
+6. Serve a "Hello World" page
 
 ### Phase 2: Content System
 
@@ -279,7 +279,7 @@ The code repo references the content repo path via configuration (env var or con
 1. Build simple in-memory search index (tokenized inverted index)
 2. Create search handler and view
 3. Highlight matches in results
-4. If/when this outgrows itself: swap the derived index to Datalevin (built-in full-text search + Datalog queries) — the files remain the source of truth
+4. If/when this outgrows itself: swap the derived index to Datalevin via its babashka pod (native full-text search + Datalog queries) — the files remain the source of truth
 
 ### Phase 6: Polish & Deploy
 
@@ -302,7 +302,7 @@ There is no database *of record*. The markdown files are canonical, and every in
 
 **Start**: plain in-memory Clojure data structures, loaded at startup and refreshed on publish. For a personal blog with hundreds of entries, `filter`/`group-by` over vectors is instant.
 
-**Upgrade path**: [Datalevin](https://github.com/juji-io/datalevin) — embedded (no server process), Datalog queries, and a built-in full-text search engine. It slots in as the derived index behind the same content-loading interface when search/filtering needs outgrow in-memory scans. Because it's rebuilt from files on startup, it stays as stateless as the in-memory version. (Postgres-style external databases are explicitly out: too much operational weight for a single-author site whose real data is a folder of text files.)
+**Upgrade path**: [Datalevin](https://github.com/juji-io/datalevin) via its babashka pod — embedded (no server process), Datalog queries, and a built-in full-text search engine that runs in native code. It slots in as the derived index behind the same content-loading interface when search/filtering needs outgrow in-memory scans. Because it's rebuilt from files on startup, it stays as stateless as the in-memory version. (Postgres-style external databases are explicitly out: too much operational weight for a single-author site whose real data is a folder of text files.)
 
 This also resolves the static-vs-dynamic tension: the site is dynamic (so search and filtering can be genuinely flexible) but behaves like a static site for caching purposes, because content only changes on publish — see Decision 5.
 
@@ -339,23 +339,24 @@ Views are pure functions: `(data) → hiccup`. No side effects, easy to test.
    [:div.content (:body-html entry)]])
 ```
 
-### 3. Developer Experience Runs Through Babashka
+### 3. Everything Runs Under Babashka — No JVM
 
-`bb.edn` is the single entry point for every workflow — no memorizing `clojure -M:...` incantations:
+The entire site is bb-native: server, tasks, tests, tooling. One runtime, one `bb.edn` holding both deps and tasks. What this buys:
 
-```clojure
-{:tasks
- {dev     {:doc "Start dev server with code reload + content watching"}
-  test    {:doc "Run the test suite"}
-  publish {:doc "Move a draft into the date tree, commit, push"}
-  new     {:doc "Scaffold a new draft from a type template"}}}
-```
+- **~10ms startup everywhere.** Dev "reload" is just restarting the process — no reload machinery, no stale state. A file watcher restarts the server on code changes; content changes only trigger a reindex.
+- **Tiny footprint.** Tens of MB instead of a JVM heap — runs comfortably on the smallest cloud instance.
+- **Zero task/site split.** Tasks call site functions directly — `bb publish` uses the same frontmatter parser the server does.
+- **One-binary deploys.** The bb static binary plus the code; nothing else to install.
+- **REPL-driven development still works** — bb ships an nREPL server (`bb nrepl-server`).
 
-Tasks use **bb-native libraries where possible** for instant startup: `babashka.fs` for file work, built-in http-kit/hiccup/edn for anything servery, `babashka.process` to launch the JVM only when actually needed (e.g. `bb dev` starting the site). Utility tasks like `publish` and `new` run entirely in bb — no JVM, no wait.
+The stack makes this nearly free: http-kit, Hiccup, `clojure.edn`, and `java.time` are built into bb; nextjournal/markdown (0.6+) is pure Clojure; Datalevin ships a babashka pod — and its full-text search runs in native code, so the eventual search hotspot isn't interpreted.
 
-A deliberate bonus: nearly the whole site stack is bb-compatible — http-kit, Hiccup, and `clojure.edn` are built into babashka, nextjournal/markdown (0.6+) is pure Clojure and runs under bb, and Datalevin ships a babashka pod. That means bb scripts can *reuse site code directly* (e.g. the frontmatter parser in a validation task). Reitit is the one JVM-bound piece (Java trie router); if we ever wanted to run the entire site under bb, it's the only swap required.
+**The honest costs, and why they're acceptable:**
 
-Plus the usual: file watcher rebuilds the content index on markdown changes, code reloads in dev, REPL-driven view development.
+- bb interprets code (SCI), roughly 10–100× slower than the JVM on hot loops. Irrelevant here: page renders are trivial and CDN-cached, and naive in-memory search over hundreds of entries is low-milliseconds even interpreted.
+- Future libraries must be pure Clojure or available as a pod.
+
+**The escape hatch runs both directions**: with Reitit gone, every line we write is runtime-portable plain Clojure. If we ever hit bb's ceiling, migrating to the JVM is "add a deps.edn" — not a rewrite.
 
 ### 4. Live Server, Static Discipline
 
@@ -372,7 +373,7 @@ Because views are pure functions of data, rendering the site to static files sta
 
 ### 5. Cache Like a Static Site (Spike-Proofing)
 
-Front-page-of-HN traffic must never reach the JVM in volume. Since content only changes on publish:
+Front-page-of-HN traffic must never reach the server in volume. Since content only changes on publish:
 
 - Every public page gets `Cache-Control` + `ETag` headers
 - A CDN (Cloudflare free tier) sits in front and absorbs read traffic
@@ -405,44 +406,32 @@ The design leaves room for future additions:
 
 ---
 
-## Dependencies (deps.edn)
+## Dependencies (bb.edn)
+
+There is no `deps.edn` — babashka is the only runtime, and `bb.edn` holds everything:
 
 ```clojure
-{:deps
- {org.clojure/clojure {:mvn/version "1.12.0"}
+{:paths ["src" "resources"]
 
-  ;; Web
-  ring/ring-core {:mvn/version "1.12.1"}
-  http-kit/http-kit {:mvn/version "2.8.0"}
-  metosin/reitit {:mvn/version "0.7.2"}
+ :deps
+ {;; Markdown — pure Clojure, bb-compatible, hiccup-compatible AST
+  io.github.nextjournal/markdown {:mvn/version "0.6.157"}}
 
-  ;; HTML
-  hiccup/hiccup {:mvn/version "2.0.0-RC3"}
-
-  ;; Markdown (produces hiccup-compatible AST)
-  io.github.nextjournal/markdown {:mvn/version "0.6.157"}
-
-  ;; Utilities
-  tick/tick {:mvn/version "0.7.5"}}  ; Date/time handling
-
- :paths ["src" "resources"]
-
- :aliases
- {:dev {:extra-paths ["dev"]
-        :extra-deps {ring/ring-devel {:mvn/version "1.12.1"}}}
-  :run {:main-opts ["-m" "site.core"]}}}
+ :tasks
+ {dev     {:doc "Start dev server with file watching"}
+  test    {:doc "Run the test suite"}
+  publish {:doc "Move a draft into the date tree, commit, push"}
+  new     {:doc "Scaffold a new draft from a type template"}}}
 ```
 
-**Notes**:
-- EDN frontmatter parsing uses `clojure.edn/read-string` — no extra dependency needed
-- All workflows run through `bb.edn` tasks (see Design Decision 3); `bb dev`, `bb test`, `bb publish`, `bb new`
+Everything else is built into bb: http-kit (server), Hiccup (HTML), `clojure.edn` (frontmatter), `java.time` (dates), `babashka.fs` (walking the content tree), `babashka.process`. The Phase 1 smoke test confirms nextjournal/markdown and checks whether `clojure.data.xml` (RSS feed) is bundled or needs adding to `:deps`. Datalevin arrives later as a pod, if/when search outgrows the in-memory index.
 
 ---
 
 ## Next Steps
 
 1. **Confirm this plan** - Any adjustments to content types, URL structure, or tech choices?
-2. **Scaffold the project** - Create directory structure and deps.edn
+2. **Scaffold the project** - Create directory structure and bb.edn
 3. **Build Phase 1** - Get a minimal server running
 4. **Iterate** - Build each phase, testing as we go
 
@@ -451,7 +440,7 @@ The design leaves room for future additions:
 ## References
 
 - [Simon Willison's Blog Source](https://github.com/simonw/simonwillisonblog) - Inspiration for content model
+- [Babashka Book](https://book.babashka.org/) - Runtime, tasks, built-in libraries
 - [nextjournal/markdown](https://github.com/nextjournal/markdown) - Markdown parser
-- [Reitit Documentation](https://cljdoc.org/d/metosin/reitit/)
-- [Ring Concepts](https://github.com/ring-clojure/ring/wiki/Concepts)
+- [http-kit server API](https://http-kit.github.io/) - Built into bb
 - [Hiccup Syntax](https://github.com/weavejester/hiccup)
