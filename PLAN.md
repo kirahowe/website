@@ -149,14 +149,15 @@ Draft status is determined by **location, not a flag** — a file is a draft bec
 
 | Layer | Choice | Rationale |
 |-------|--------|-----------|
-| **Web Server** | [Ring](https://github.com/ring-clojure/ring) | Clojure's standard HTTP abstraction |
+| **HTTP abstraction** | [Ring](https://github.com/ring-clojure/ring) | The standard interface — handlers are pure functions of request → response. Not a server itself |
+| **HTTP server** | [http-kit](https://github.com/http-kit/http-kit) | Fast, tiny, zero-dependency Ring server. Also built into babashka |
 | **Routing** | [Reitit](https://github.com/metosin/reitit) | Fast, data-driven routing with great composability |
 | **HTML** | [Hiccup](https://github.com/weavejester/hiccup) | Clojure data structures as HTML |
 | **Markdown** | [nextjournal/markdown](https://github.com/nextjournal/markdown) | Well-maintained, produces Hiccup-compatible AST |
 | **Frontmatter** | `clojure.edn/read-string` | Native EDN — no extra dependency |
 | **Storage/Index** | In-memory Clojure data (start) | Files are the source of truth; index is derived. [Datalevin](https://github.com/juji-io/datalevin) is the designated upgrade path — see Design Decisions |
 | **Caching** | CDN (e.g. Cloudflare) + cache headers | Survive traffic spikes without touching the JVM |
-| **Dev Server** | [ring-refresh](https://github.com/weavejester/ring-refresh) or similar | Auto-reload during development |
+| **Task runner** | [babashka](https://babashka.org) | Every dev/build/publish workflow is a `bb` task — instant startup, no JVM wait |
 
 ### Project Structure
 
@@ -165,6 +166,7 @@ Draft status is determined by **location, not a flag** — a file is a draft bec
 ```
 website-v2/
 ├── deps.edn                    # Dependencies
+├── bb.edn                      # babashka tasks — the dev entry point
 ├── src/
 │   └── site/
 │       ├── core.clj            # Entry point, server setup
@@ -232,8 +234,8 @@ The code repo references the content repo path via configuration (env var or con
 
 **Goal**: Serve a single hardcoded entry
 
-1. Set up `deps.edn` with Ring, Reitit, Hiccup
-2. Create minimal server in `core.clj`
+1. Set up `deps.edn` (Ring, http-kit, Reitit, Hiccup) and `bb.edn` (dev/test tasks)
+2. Create minimal http-kit server in `core.clj`, started via `bb dev`
 3. Define basic route structure
 4. Create base HTML layout
 5. Serve a "Hello World" page
@@ -337,19 +339,37 @@ Views are pure functions: `(data) → hiccup`. No side effects, easy to test.
    [:div.content (:body-html entry)]])
 ```
 
-### 3. Development Workflow
+### 3. Developer Experience Runs Through Babashka
 
-- **File watcher**: Rebuild content index when markdown files change
-- **Ring middleware**: Auto-reload code changes
-- **REPL-driven**: Evaluate views instantly
+`bb.edn` is the single entry point for every workflow — no memorizing `clojure -M:...` incantations:
 
-### 4. Static Generation Option (Future)
+```clojure
+{:tasks
+ {dev     {:doc "Start dev server with code reload + content watching"}
+  test    {:doc "Run the test suite"}
+  publish {:doc "Move a draft into the date tree, commit, push"}
+  new     {:doc "Scaffold a new draft from a type template"}
+  render-static {:doc "Render the whole site to disk (escape hatch)"}}}
+```
 
-The architecture supports both:
-- **Dynamic**: Ring server renders on request
-- **Static**: Generate HTML files to disk for CDN hosting
+Tasks use **bb-native libraries where possible** for instant startup: `babashka.fs` for file work, built-in http-kit/hiccup/edn for anything servery, `babashka.process` to launch the JVM only when actually needed (e.g. `bb dev` starting the site). Utility tasks like `publish` and `new` run entirely in bb — no JVM, no wait.
 
-Same view functions work for both modes.
+A deliberate bonus: nearly the whole site stack is bb-compatible — http-kit, Hiccup, and `clojure.edn` are built into babashka, nextjournal/markdown (0.6+) is pure Clojure and runs under bb, and Datalevin ships a babashka pod. That means bb scripts can *reuse site code directly* (e.g. the frontmatter parser in a validation task). Reitit is the one JVM-bound piece (Java trie router); if we ever wanted to run the entire site under bb, it's the only swap required.
+
+Plus the usual: file watcher rebuilds the content index on markdown changes, code reloads in dev, REPL-driven view development.
+
+### 4. Live Server, Static Discipline
+
+The content is entirely static files — so why not a static site generator? Because the features that matter here need a process at request time:
+
+- **Search** — genuinely dynamic; a pre-built client-side index (Lunr-style) degrades as content grows and caps filtering flexibility
+- **Draft previews** — token-gated rendering of unpublished content doesn't fit a public static build
+- **Push-to-publish** — `git pull` + reindex in milliseconds, vs. a full rebuild + redeploy on every published note
+- **Future dynamic features** — webmentions, API endpoints, comments all want a server anyway
+
+The trade is nearly free because of Decision 5: every page except search is CDN-cached, so the site *behaves* like a static site under load while *being* dynamic where it counts.
+
+**Escape hatch**: views are pure functions, so a `bb render-static` task can write the whole site to disk for CDN hosting if we ever change course. Same views, both modes.
 
 ### 5. Cache Like a Static Site (Spike-Proofing)
 
@@ -394,7 +414,7 @@ The design leaves room for future additions:
 
   ;; Web
   ring/ring-core {:mvn/version "1.12.1"}
-  ring/ring-jetty-adapter {:mvn/version "1.12.1"}
+  http-kit/http-kit {:mvn/version "2.8.0"}
   metosin/reitit {:mvn/version "0.7.2"}
 
   ;; HTML
@@ -414,7 +434,9 @@ The design leaves room for future additions:
   :run {:main-opts ["-m" "site.core"]}}}
 ```
 
-**Note**: EDN frontmatter parsing uses `clojure.edn/read-string` — no extra dependency needed.
+**Notes**:
+- EDN frontmatter parsing uses `clojure.edn/read-string` — no extra dependency needed
+- All workflows run through `bb.edn` tasks (see Design Decision 3); `bb dev`, `bb test`, `bb publish`, `bb new`
 
 ---
 
