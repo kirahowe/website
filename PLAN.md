@@ -14,13 +14,31 @@ A Clojure-based personal website inspired by [Simon Willison's blog](https://sim
 
 ### Entry Types
 
-Three content types, unified by shared metadata:
+Entry types are **open but configured**: `:type` is just a keyword in frontmatter, and the set of valid types is declared in project config — not hardcoded in the loader or a schema. Adding a type means adding a keyword to config and (optionally) a render method. Unknown types fail loudly at index time, so a typo like `:not` instead of `:note` can't silently coin a new type.
+
+```clojure
+;; config
+{:entry-types #{:post :note :link :quote}}
+```
+
+Launch set:
 
 | Type | Purpose | Typical Length |
 |------|---------|----------------|
 | **post** | Full articles, essays, tutorials | Long-form |
 | **note** | Quick thoughts, observations | Short, may lack title |
 | **link** | Bookmarks with commentary | Short + external URL |
+| **quote** | Quoted text with attribution | Short + source |
+
+Future candidates (add when needed): `:release` for project updates, `:til`, etc.
+
+Rendering is a multimethod dispatching on `:type`, with a sensible default — so a new type renders acceptably before it gets a custom look:
+
+```clojure
+(defmulti render-entry :type)
+(defmethod render-entry :default [entry] ...)
+(defmethod render-entry :quote [entry] ...)
+```
 
 ### Frontmatter Schema
 
@@ -32,9 +50,10 @@ All entries use **EDN frontmatter** (delimited by `;;;`) — no YAML. Clean, rea
  :title "My Post Title"
  :tags [:clojure :web :personal]
  :slug "custom-slug"              ; Optional, overrides filename
- :draft false                     ; Optional, default false
  :link-url "https://example.com"  ; Required for :link type
- :link-via "https://source.com"}  ; Optional, for links
+ :link-via "https://source.com"   ; Optional, for links
+ :source "Author Name"            ; For :quote type
+ :source-url "https://..."}       ; For :quote type
 ;;;
 
 Content body in markdown...
@@ -48,6 +67,8 @@ Content lives in a **separate repository**, structured to mirror URLs exactly:
 
 ```
 my-content/                       # Separate repo, opened in Obsidian
+├── drafts/                       # Flat folder — all writing starts here
+│   └── half-baked-idea.md
 ├── 2025/
 │   ├── 01/
 │   │   ├── 15/
@@ -69,6 +90,14 @@ my-content/                       # Separate repo, opened in Obsidian
 - The **date** comes from the directory path
 - The **slug** defaults to the filename (without `.md`), but can be overridden via `:slug` in frontmatter
 - Multiple entries on the same day are supported (multiple files in the same `DD/` folder)
+
+### Drafts Workflow
+
+Draft status is determined by **location, not a flag** — a file is a draft because it lives in `drafts/`, published because it lives in the date tree. No flag/location disagreement possible.
+
+1. **All writing starts in `drafts/`** — a flat folder, no date structure to create. This matters on mobile: authoring a draft is "new note in the drafts folder," nothing more. Publish dates are unknowable when writing begins anyway.
+2. **Publishing = moving the file** into `YYYY/MM/DD/` (today's date). A small `bin/publish` script can do the move + commit + push in one step.
+3. **Previewing drafts**: the server renders `drafts/` entries at `/drafts/<filename>` only when a secret preview token is supplied (`?preview=<token>`, token from an env var). Single-author site — no login system needed.
 
 ---
 
@@ -110,6 +139,7 @@ my-content/                       # Separate repo, opened in Obsidian
 | `/search` | Search page (query param: `?q=term`) |
 | `/feed.xml` | RSS/Atom feed |
 | `/about` | Static about page |
+| `/drafts/<name>?preview=<token>` | Draft preview (token-gated, never cached) |
 
 ---
 
@@ -124,6 +154,8 @@ my-content/                       # Separate repo, opened in Obsidian
 | **HTML** | [Hiccup](https://github.com/weavejester/hiccup) | Clojure data structures as HTML |
 | **Markdown** | [nextjournal/markdown](https://github.com/nextjournal/markdown) | Well-maintained, produces Hiccup-compatible AST |
 | **Frontmatter** | `clojure.edn/read-string` | Native EDN — no extra dependency |
+| **Storage/Index** | In-memory Clojure data (start) | Files are the source of truth; index is derived. [Datalevin](https://github.com/juji-io/datalevin) is the designated upgrade path — see Design Decisions |
+| **Caching** | CDN (e.g. Cloudflare) + cache headers | Survive traffic spikes without touching the JVM |
 | **Dev Server** | [ring-refresh](https://github.com/weavejester/ring-refresh) or similar | Auto-reload during development |
 
 ### Project Structure
@@ -162,6 +194,7 @@ website-v2/
 ```
 my-content/
 ├── .obsidian/                  # Obsidian config (gitignored or not)
+├── drafts/                     # All writing starts here
 ├── 2025/
 │   └── 01/
 │       └── 15/
@@ -171,6 +204,8 @@ my-content/
 ```
 
 The code repo references the content repo path via configuration (env var or config file).
+
+**Mobile authoring**: the content repo doubles as an iCloud-synced Obsidian vault. Phone workflow is: open Obsidian → new note in `drafts/` → write. The vault syncs to the laptop via iCloud, where publishing (move + commit + push) happens. Per-type Obsidian templates keep EDN frontmatter a fill-in-the-blanks exercise rather than phone-keyboard typing. Phone-only *publishing* is deliberately out of scope for launch (see Extension Points).
 
 ### Core Data Flow
 
@@ -212,8 +247,10 @@ The code repo references the content repo path via configuration (env var or con
 3. Create content loading functions
    - `load-entry` - single file → entry map (date from path, slug from filename or frontmatter)
    - `load-all-entries` - walk content directory → sorted entries
-4. Build entry index (in-memory, rebuilt on startup)
-5. Create single entry view
+4. Validate `:type` against configured `:entry-types` — fail loudly on unknown types
+5. Build entry index (in-memory, rebuilt on startup)
+6. Create single entry view (multimethod on `:type` with default)
+7. Draft support: load `drafts/` separately, token-gated preview route
 
 ### Phase 3: Archives & Navigation
 
@@ -237,27 +274,35 @@ The code repo references the content repo path via configuration (env var or con
 
 **Goal**: Full-text search
 
-1. Build simple in-memory search index
+1. Build simple in-memory search index (tokenized inverted index)
 2. Create search handler and view
 3. Highlight matches in results
+4. If/when this outgrows itself: swap the derived index to Datalevin (built-in full-text search + Datalog queries) — the files remain the source of truth
 
 ### Phase 6: Polish & Deploy
 
-**Goal**: Production-ready
+**Goal**: Production-ready, spike-proof
 
 1. Add RSS/Atom feed
-2. Implement caching headers
-3. Create 404 and error pages
-4. Add static page support (about, etc.)
-5. Set up deployment (Fly.io, Railway, or similar)
+2. Caching: `Cache-Control`/`ETag` headers on all public pages, CDN in front (e.g. Cloudflare). Everything except `/search` and draft previews is cacheable
+3. Push-to-publish: webhook (or poll) triggers `git pull` + reindex — publishing is just a git push, no redeploys
+4. Create 404 and error pages
+5. Add static page support (about, etc.)
+6. Set up deployment (Fly.io, Railway, or similar)
 
 ---
 
 ## Key Design Decisions
 
-### 1. In-Memory Content Index
+### 1. Files Are the Source of Truth; Everything Else Is Derived
 
-Content is loaded from the external content repo into memory at startup and optionally refreshed. For a personal blog with hundreds of entries, this is simple and fast. No database needed.
+There is no database *of record*. The markdown files are canonical, and every index — in-memory maps now, possibly Datalevin later — is a **disposable, derived artifact** rebuildable from the files at any time. This has cascading benefits: no migrations, no backup story, no drift between file and database, and the freedom to swap index technology without touching content.
+
+**Start**: plain in-memory Clojure data structures, loaded at startup and refreshed on publish. For a personal blog with hundreds of entries, `filter`/`group-by` over vectors is instant.
+
+**Upgrade path**: [Datalevin](https://github.com/juji-io/datalevin) — embedded (no server process), Datalog queries, and a built-in full-text search engine. It slots in as the derived index behind the same content-loading interface when search/filtering needs outgrow in-memory scans. Because it's rebuilt from files on startup, it stays as stateless as the in-memory version. (Postgres-style external databases are explicitly out: too much operational weight for a single-author site whose real data is a folder of text files.)
+
+This also resolves the static-vs-dynamic tension: the site is dynamic (so search and filtering can be genuinely flexible) but behaves like a static site for caching purposes, because content only changes on publish — see Decision 5.
 
 ```clojure
 ;; Content index structure (conceptual)
@@ -306,6 +351,21 @@ The architecture supports both:
 
 Same view functions work for both modes.
 
+### 5. Cache Like a Static Site (Spike-Proofing)
+
+Front-page-of-HN traffic must never reach the JVM in volume. Since content only changes on publish:
+
+- Every public page gets `Cache-Control` + `ETag` headers
+- A CDN (Cloudflare free tier) sits in front and absorbs read traffic
+- On publish (reindex), caches are invalidated — either by purge API call or short TTLs with stale-while-revalidate
+- Only `/search` and token-gated draft previews bypass the cache
+
+The result is static-site resilience with dynamic-site flexibility.
+
+### 6. Ingestion Writes Files — the Site Only Reads Them
+
+Future automated content sources (e.g. GitHub release notes flowing in as project updates) never get special code paths in the site. An ingestion script or GitHub Action fetches the external source and **writes ordinary markdown files** into the content repo (e.g. `:type :release`). The site's one invariant — "render the markdown files" — holds no matter how many sources feed it. Tone differences are handled by the type system: a `:release` entry can render compactly and be excluded from the main feed while remaining browsable and searchable.
+
 ---
 
 ## Extension Points
@@ -314,12 +374,14 @@ The design leaves room for future additions:
 
 | Feature | How to Add |
 |---------|------------|
-| **Comments** | Add Disqus/Utterances embed, or build own with SQLite |
+| **New entry types** | Add keyword to config + optional render method (e.g. `:release`, `:til`) |
+| **Automated ingestion** | GitHub Action fetches external source (release notes, etc.) and writes markdown files into the content repo |
+| **Phone-only publishing** | GitHub Action moves a file out of `drafts/` into the date tree on some trigger, deriving the date from the merge date |
+| **Comments** | Add Disqus/Utterances embed, or build own |
 | **Webmentions** | New handler + storage for incoming mentions |
 | **Series** | Add `series` to frontmatter, group in templates |
-| **Drafts Preview** | Query param `?preview=true` shows drafts |
 | **API** | JSON handlers alongside HTML handlers |
-| **Full-text DB** | Swap in SQLite FTS if in-memory search is too slow |
+| **Full-text DB** | Swap derived index to Datalevin (Datalog + built-in FTS) |
 | **Asset pipeline** | Add SCSS compilation, image optimization |
 
 ---
