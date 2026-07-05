@@ -14,9 +14,10 @@
     (reset! server nil)))
 
 (defn start!
-  "Options (merged over config.edn + env):
-    :reload? — rebuild the content index on every request (dev mode)
-    :block?  — park the calling thread (for `bb dev` / `bb run`)"
+  "Options (merged over config.edn + config.local.edn):
+    :dev?   — rebuild the content index on every request and serve
+              drafts at /drafts/<name>; this is what `bb dev` passes
+    :block? — park the calling thread (for `bb dev` / `bb run`)"
   ([] (start! {}))
   ([opts]
    (let [cfg (config/load-config (dissoc opts :block?))
@@ -27,9 +28,7 @@
      (reset! server (http/run-server handler {:port (:port cfg)}))
      (println (str "Serving content from " (:content-path cfg)
                    " at http://localhost:" (:port cfg)
-                   (when (:reload? cfg) " — dev mode, reindexing every request")))
-     (when-not (:admin-token cfg)
-       (println "Note: ADMIN_TOKEN not set — draft previews and /admin/reindex are disabled."))
+                   (when (:dev? cfg) " — dev mode: reindexing every request, drafts visible")))
      (when (:content-git-url cfg)
        (sync/start-sync-loop! cfg index-atom))
      (when (:block? opts)

@@ -26,7 +26,7 @@
 
 (defn draft-page [config entry]
   (layout/page config (str "Draft: " (or (:title entry) (:draft-name entry)))
-               [:div.draft-banner "Draft — not published. Don't share this URL."]
+               [:div.draft-banner "Draft — dev preview, not published."]
                [:article.entry-page.draft {:class (name (:type entry))}
                 [:div.entry-meta (c/type-badge entry) (c/tag-links entry)]
                 (c/entry-header entry)

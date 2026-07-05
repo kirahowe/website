@@ -100,11 +100,10 @@
       (html (v.search/search-page config q results) 200 no-store))
 
     :draft
-    (let [token (:admin-token config)
-          supplied (get (query-params req) "preview")
-          entry (get (:drafts index) (:name params))]
-      ;; 404 (not 403) on bad token — don't leak which drafts exist
-      (if (and token entry (= token supplied))
+    ;; Drafts are a dev-mode concern only — the production server never
+    ;; renders them.
+    (let [entry (get (:drafts index) (:name params))]
+      (if (and (:dev? config) entry)
         (html (v.entry/draft-page config entry) 200 no-store)
         (not-found config)))
 

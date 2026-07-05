@@ -20,6 +20,21 @@
   (println (apply str msg))
   (System/exit 1))
 
+(defn reindex
+  "bb reindex — parse and index every content file, failing loudly on any
+  problem. Run it to validate the whole tree locally; the server does
+  exactly this on boot and on every timed pull."
+  [& _]
+  (let [cfg (config/load-config)]
+    (try
+      (let [index (content/build-index cfg)]
+        (println (str "OK — " (count (:entries index)) " entries, "
+                      (count (:drafts index)) " drafts, "
+                      (count (:pages index)) " pages from "
+                      (:content-path cfg))))
+      (catch Exception e
+        (die "Content error: " (ex-message e))))))
+
 (defn new-draft
   "bb new <type> <title words...> — scaffolds drafts/<slug>.md in the
   content repo from a per-type frontmatter template."

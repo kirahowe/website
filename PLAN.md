@@ -97,7 +97,7 @@ Draft status is determined by **location, not a flag** — a file is a draft bec
 
 1. **All writing starts in `drafts/`** — a flat folder, no date structure to create. This matters on mobile: authoring a draft is "new note in the drafts folder," nothing more. Publish dates are unknowable when writing begins anyway.
 2. **Publishing = moving the file** into `YYYY/MM/DD/` (today's date). A small `bin/publish` script can do the move + commit + push in one step.
-3. **Previewing drafts**: the server renders `drafts/` entries at `/drafts/<filename>` only when a secret preview token is supplied (`?preview=<token>`, token from an env var). Single-author site — no login system needed.
+3. **Previewing drafts**: `bb dev` serves drafts at `/drafts/<filename>`; the production server never renders them at all. Single-author site — no tokens, no login system.
 
 ---
 
@@ -139,7 +139,7 @@ Draft status is determined by **location, not a flag** — a file is a draft bec
 | `/search` | Search page (query param: `?q=term`) |
 | `/feed.xml` | RSS/Atom feed |
 | `/about` | Static about page |
-| `/drafts/<name>?preview=<token>` | Draft preview (token-gated, never cached) |
+| `/drafts/<name>` | Draft preview (dev mode only — 404 in production) |
 
 ---
 
@@ -252,7 +252,7 @@ The code repo references the content repo path via configuration (env var or con
 4. Validate `:type` against configured `:entry-types` — fail loudly on unknown types
 5. Build entry index (in-memory, rebuilt on startup)
 6. Create single entry view (multimethod on `:type` with default)
-7. Draft support: load `drafts/` separately, token-gated preview route
+7. Draft support: load `drafts/` separately; preview route active in dev mode only
 
 ### Phase 3: Archives & Navigation
 
@@ -286,8 +286,8 @@ The code repo references the content repo path via configuration (env var or con
 **Goal**: Production-ready, spike-proof
 
 1. Add RSS/Atom feed
-2. Caching: `Cache-Control`/`ETag` headers on all public pages, CDN in front (e.g. Cloudflare). Everything except `/search` and draft previews is cacheable
-3. Push-to-publish: webhook (or poll) triggers `git pull` + reindex — publishing is just a git push, no redeploys
+2. Caching: `Cache-Control`/`ETag` headers on all public pages, CDN in front (e.g. Cloudflare). Everything except `/search` is cacheable
+3. Push-to-publish: the server pulls the content repo on a timer and reindexes when anything changed — publishing is just a git push, no redeploys, no admin endpoints
 4. Create 404 and error pages
 5. Add static page support (about, etc.)
 6. Set up deployment (Fly.io, Railway, or similar)
@@ -363,7 +363,7 @@ The stack makes this nearly free: http-kit, Hiccup, `clojure.edn`, `java.time`, 
 The content is entirely static files — so why not a static site generator? Because the features that matter here need a process at request time:
 
 - **Search** — genuinely dynamic; a pre-built client-side index (Lunr-style) degrades as content grows and caps filtering flexibility
-- **Draft previews** — token-gated rendering of unpublished content doesn't fit a public static build
+- **Draft previews in dev** — rendering unpublished content locally with the exact same code path as production
 - **Push-to-publish** — `git pull` + reindex in milliseconds, vs. a full rebuild + redeploy on every published note
 - **Future dynamic features** — webmentions, API endpoints, comments all want a server anyway
 
@@ -378,7 +378,7 @@ Front-page-of-HN traffic must never reach the server in volume. Since content on
 - Every public page gets `Cache-Control` + `ETag` headers
 - A CDN (Cloudflare free tier) sits in front and absorbs read traffic
 - On publish (reindex), caches are invalidated — either by purge API call or short TTLs with stale-while-revalidate
-- Only `/search` and token-gated draft previews bypass the cache
+- Only `/search` bypasses the cache (drafts don't exist in production)
 
 The result is static-site resilience with dynamic-site flexibility.
 

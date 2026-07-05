@@ -1,15 +1,11 @@
 (ns site.config
-  "Configuration is file-first: config.edn (committed) merged with
-  config.local.edn (gitignored — machine-local settings like your vault
-  path). The only environment variable is ADMIN_TOKEN, because it's the
-  only secret."
+  "Configuration is file-first and env-var-free: config.edn (committed)
+  merged with config.local.edn (gitignored — machine-local settings like
+  your vault path). Dev-only behavior is switched by which bb task you
+  run, not by configuration, so dev and prod can't drift apart."
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.string :as str]))
-
-(defn- env [k]
-  (let [v (System/getenv k)]
-    (when-not (or (nil? v) (= "" v)) v)))
 
 (defn- read-edn [path]
   (let [f (io/file path)]
@@ -24,21 +20,16 @@
     p))
 
 (defn resolve-config
-  "Pure merge: base ← local ← env ← overrides, then ~ expansion."
-  [base local env-map overrides]
-  (-> (merge base local env-map overrides)
+  "Pure merge: base ← local ← overrides, then ~ expansion."
+  [base local overrides]
+  (-> (merge base local overrides)
       (update :content-path expand-home)))
 
 (defn load-config
-  "config.edn ← config.local.edn ← ADMIN_TOKEN env var ← `overrides`.
-
-  ADMIN_TOKEN gates draft previews and /admin/reindex — the only secret,
-  so the only env var. (For local dev, :admin-token in config.local.edn
-  works too.)"
+  "config.edn ← config.local.edn ← `overrides` (e.g. {:dev? true} from
+  the `bb dev` task)."
   ([] (load-config {}))
   ([overrides]
-   (resolve-config
-    (read-edn "config.edn")
-    (read-edn "config.local.edn")
-    (if-let [token (env "ADMIN_TOKEN")] {:admin-token token} {})
-    overrides)))
+   (resolve-config (read-edn "config.edn")
+                   (read-edn "config.local.edn")
+                   overrides)))

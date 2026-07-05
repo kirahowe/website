@@ -5,13 +5,17 @@
  :paths ["src" "resources" "test"]
 
  :tasks
- {dev {:doc "Start the dev server (reindexes content on every request)"
+ {dev {:doc "Start the dev server (reindexes every request, drafts visible)"
        :requires ([site.core :as core])
-       :task (core/start! {:reload? true :block? true})}
+       :task (core/start! {:dev? true :block? true})}
 
   run {:doc "Start the production server"
        :requires ([site.core :as core])
        :task (core/start! {:block? true})}
+
+  reindex {:doc "Validate + index all content, failing loudly on broken files"
+           :requires ([site.author :as author])
+           :task (author/reindex)}
 
   test {:doc "Run the test suite"
         :requires ([clojure.test :as t]

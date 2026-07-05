@@ -5,8 +5,7 @@
             [clojure.string :as str]
             [site.content :as content]
             [site.handlers :as handlers]
-            [site.routes :as routes]
-            [site.sync :as sync]))
+            [site.routes :as routes]))
 
 (def ^:private content-types
   {"css" "text/css" "js" "text/javascript" "json" "application/json"
@@ -26,35 +25,15 @@
                    "Cache-Control" "public, max-age=86400"}
          :body (io/input-stream res)}))))
 
-(defn- reindex-response
-  "POST /admin/reindex?token=... — push-to-publish hook. Pulls the content
-  repo first when one is configured, then rebuilds unconditionally, so a
-  webhook firing right after `git push` publishes instantly."
-  [config index-atom req]
-  (let [token (:admin-token config)
-        supplied (get (handlers/query-params req) "token")]
-    (if (and token (= token supplied))
-      (let [_ (when (:content-git-url config) (sync/pull! config))
-            index (content/build-index config)]
-        (reset! index-atom index)
-        {:status 200
-         :headers {"Content-Type" "text/plain"}
-         :body (str "Reindexed: " (count (:entries index)) " entries, "
-                    (count (:drafts index)) " drafts, "
-                    (count (:pages index)) " pages\n")})
-      {:status 404 :headers {"Content-Type" "text/plain"} :body "not found\n"})))
-
 (defn make-app
-  "→ Ring handler. In :reload? mode (dev) the content index is rebuilt on
-  every request, so edits show up on refresh."
+  "→ Ring handler. In :dev? mode the content index is rebuilt on every
+  request (edits show up on refresh) and drafts are viewable."
   [config index-atom]
   (fn [req]
     (try
       (let [uri (:uri req)]
         (or (static-response uri)
-            (when (and (= "/admin/reindex" uri) (= :post (:request-method req)))
-              (reindex-response config index-atom req))
-            (let [index (if (:reload? config)
+            (let [index (if (:dev? config)
                           (content/build-index config)
                           @index-atom)
                   match (routes/match-route config (routes/path-segments uri))]

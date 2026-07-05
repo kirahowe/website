@@ -11,11 +11,14 @@
    :site-description "Testing"
    :base-url "https://example.com"
    :content-path "example-content"
-   :entry-types [:post :note :link :quote]
-   :admin-token "secret"})
+   :entry-types [:post :note :link :quote]})
 
 (def handler
   (app/make-app config (atom (content/build-index config))))
+
+(def dev-handler
+  (app/make-app (assoc config :dev? true)
+                (atom (content/build-index config))))
 
 (defn- GET
   ([uri] (GET uri nil))
@@ -102,11 +105,14 @@
     (is (= 404 (:status (GET "/nope"))))
     (is (= 404 (:status (GET "/2026/jul/4/nope"))))))
 
-(deftest drafts-are-gated
-  (testing "no token → 404, wrong token → 404, right token → 200 uncached"
+(deftest drafts-are-dev-only
+  (testing "production server: drafts don't exist"
     (is (= 404 (:status (GET "/drafts/an-idea-brewing"))))
-    (is (= 404 (:status (GET "/drafts/an-idea-brewing" "preview=wrong"))))
-    (let [{:keys [status body headers]} (GET "/drafts/an-idea-brewing" "preview=secret")]
+    (is (= 404 (:status (GET "/drafts/an-idea-brewing" "preview=anything")))))
+
+  (testing "dev mode: drafts render, uncached"
+    (let [{:keys [status body headers]}
+          (dev-handler {:request-method :get :uri "/drafts/an-idea-brewing"})]
       (is (= 200 status))
       (is (= "no-store" (get headers "Cache-Control")))
       (is (str/includes? body "Draft"))))
@@ -129,14 +135,6 @@
       (is (str/includes? body "Older"))
       (is (str/includes? body "\"/2026/jun\"")))))
 
-(deftest drafts-without-token-configured
-  (let [h (app/make-app (dissoc config :admin-token)
-                        (atom (content/build-index config)))]
-    (testing "no ADMIN_TOKEN configured → previews are off entirely"
-      (is (= 404 (:status (h {:request-method :get
-                              :uri "/drafts/an-idea-brewing"
-                              :query-string "preview="})))))))
-
 (deftest static-assets
   (let [{:keys [status headers]} (GET "/css/style.css")]
     (is (= 200 status))
@@ -144,11 +142,8 @@
   (testing "no path traversal"
     (is (not= 200 (:status (GET "/css/../../config.edn"))))))
 
-(deftest reindex-endpoint
-  (testing "requires POST and token"
-    (is (= 404 (:status (handler {:request-method :post :uri "/admin/reindex"}))))
-    (let [{:keys [status body]} (handler {:request-method :post
-                                          :uri "/admin/reindex"
-                                          :query-string "token=secret"})]
-      (is (= 200 status))
-      (is (str/includes? body "Reindexed: 6 entries")))))
+(deftest no-admin-http-surface
+  (testing "there is no reindex endpoint — the server has no admin routes"
+    (is (= 404 (:status (handler {:request-method :post
+                                  :uri "/admin/reindex"
+                                  :query-string "token=anything"}))))))

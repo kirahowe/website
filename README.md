@@ -38,7 +38,7 @@ of a git repo. One-time setup:
    (gitignored, merged over `config.edn` — no env vars needed):
    ```clojure
    {:content-path "~/Library/Mobile Documents/iCloud~md~obsidian/Documents/<VaultName>"
-    :admin-token "whatever-local-token"}   ; optional: enables draft previews in dev
+    :content-git-url nil}   ; the server pulls from git; your laptop reads the vault directly
    ```
    Then just `bb dev`.
 
@@ -57,13 +57,13 @@ Everything lives in **`config.edn`** (committed): site title, base URL,
 entry types, port, content path, content repo URL, sync interval, home
 feed size. **`config.local.edn`** (gitignored) merges over it for
 machine-local settings — your vault path, `:content-git-url nil` to turn
-off git syncing locally, a dev preview token.
+off git syncing locally.
 
-The **only environment variable** is `ADMIN_TOKEN`, because it's the only
-secret. It gates the two non-public things the server can do: render
-drafts (`/drafts/<name>?preview=<token>`) and accept
-`POST /admin/reindex?token=<token>`. Unset, those two features are simply
-off and everything else works — the timed git pull still publishes.
+There are **no environment variables and no secrets**. Dev-only behavior
+(draft previews at `/drafts/<name>`, per-request reindexing) is switched
+by which task you run — `bb dev` versus `bb run` — not by configuration,
+so dev and prod can't drift apart. The production server exposes no admin
+surface at all: it just pulls the content repo on a timer.
 
 ## Content layout
 
@@ -100,7 +100,8 @@ Body in markdown...
 
 ```sh
 bb new post My great idea      # scaffolds drafts/my-great-idea.md
-# ...write (drafts are previewable at /drafts/my-great-idea?preview=$ADMIN_TOKEN)
+# ...write — with `bb dev` running, preview at localhost:8080/drafts/my-great-idea
+bb reindex                     # optional: validate that everything parses
 bb publish my-great-idea       # moves it into today's date folder, commits, pushes
 ```
 
@@ -134,7 +135,6 @@ so publishing is just a git push; content changes never require a deploy.
 ```sh
 # once:
 fly launch --copy-config --no-deploy     # then edit `app` in fly.toml if taken
-fly secrets set ADMIN_TOKEN=$(openssl rand -hex 16)   # optional: previews + instant reindex
 
 # every code change:
 fly deploy
@@ -142,14 +142,8 @@ fly deploy
 
 - Every public page gets CDN-friendly cache headers; put Cloudflare (or any
   CDN) in front and traffic spikes never reach the server.
-- Want publishes live in seconds instead of minutes? Add a GitHub Action to
-  the content repo that runs
-  `curl -X POST "https://<your-app>.fly.dev/admin/reindex?token=$ADMIN_TOKEN"`
-  on push — the endpoint pulls before reindexing.
+- Publishes go live within `:content-sync-seconds` (default 5 minutes) of
+  the git push — no deploy, no webhook, no admin endpoint.
 
-Running anywhere else is the same idea without the Fly wrapper — the same
-`config.edn` plus, optionally, the one secret:
-
-```sh
-ADMIN_TOKEN=... bb run
-```
+Running anywhere else is the same idea without the Fly wrapper: the same
+`config.edn`, and just `bb run`.

@@ -1,9 +1,8 @@
-# Fly.io config. Everything non-secret lives in config.edn (including
-# :content-git-url — the content repo is public). Before first deploy:
+# Fly.io config. All app config lives in config.edn (including
+# :content-git-url — the content repo is public); there are no secrets
+# and no env vars. Before first deploy:
 #   1. change `app` to your (globally unique) app name
-#   2. optional but recommended: fly secrets set ADMIN_TOKEN=$(openssl rand -hex 16)
-#      (enables remote draft previews + the instant-reindex webhook)
-#   3. fly deploy
+#   2. fly deploy
 app = "kirahowe-www"
 primary_region = "yul"
 
