@@ -64,7 +64,7 @@
     :month
     (let [{:keys [year month]} params]
       (some-entries config (get (:by-month index) [year month])
-                    #(v.archive/month-page config year month %)))
+                    #(v.archive/month-page config index year month %)))
 
     :day
     (let [{:keys [year month day]} params]

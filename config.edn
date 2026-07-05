@@ -7,15 +7,20 @@
 
  ;; Where the content lives. Locally, point this at your vault in
  ;; config.local.edn (gitignored, merged over this file), e.g.
- ;;   {:content-path "~/Library/Mobile Documents/iCloud~md~obsidian/Documents/MyVault"}
+ ;;   {:content-path "~/Library/Mobile Documents/iCloud~md~obsidian/Documents/MyVault"
+ ;;    :content-git-url nil}
  :content-path "example-content"
 
- ;; Production: when :content-git-url is set the server clones that repo
- ;; into :content-path at boot and pulls on this interval, reindexing when
- ;; anything changed. If the URL must embed an access token (private repo),
- ;; use the CONTENT_GIT_URL env var instead of committing it here.
+ ;; When :content-git-url is set (it's a public repo — nothing secret),
+ ;; the server clones it into :content-path at boot and pulls on this
+ ;; interval, reindexing when anything changed. For the real site set
+ ;; e.g. :content-path "content" and:
  ;; :content-git-url "https://github.com/you/my-content.git"
  :content-sync-seconds 300
+
+ ;; The home feed shows at least this many recent items, rounded up to
+ ;; whole days, then links onward to the month archives.
+ :home-entries 10
 
  ;; Entry types that may appear in frontmatter, in nav order.
  ;; A typo'd type in a content file fails indexing loudly.

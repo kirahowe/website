@@ -116,6 +116,26 @@ h1, h2, h3 { line-height: 1.3; }
 
 /* Listings */
 .entry-list { display: flex; flex-direction: column; gap: 1.3rem; }
+
+/* Day-grouped feed (home, date archives) */
+.day-group { margin-bottom: 2.2rem; }
+.day-heading {
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 0 0 0.8rem;
+}
+.day-heading a { color: var(--muted); }
+.day-heading a:hover { color: var(--accent); }
+.day-group .entry-list { gap: 1rem; }
+
+/* "Older →" continuation into the month archives */
+.older {
+  margin-top: 2.5rem;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+}
 .entry-card {
   padding: 1rem 1.15rem;
   background: var(--card-bg);

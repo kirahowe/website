@@ -22,17 +22,20 @@
   ([uri query] (handler {:request-method :get :uri uri :query-string query})))
 
 (deftest pages-render
-  (testing "home is the full feed — every entry, every type, untruncated"
+  (testing "home is a day-grouped feed, untruncated bodies"
     (let [{:keys [status body headers]} (GET "/")]
       (is (= 200 status))
       (is (str/includes? (get headers "Cache-Control") "public"))
       (is (str/includes? body "Hello, world"))
       (is (str/includes? body "nextjournal/markdown"))
       (is (str/includes? body "Rich Hickey"))
-      ;; the oldest entry is present (nothing capped)...
+      ;; all 6 example entries fit within :home-entries, so the oldest shows
       (is (str/includes? body "Babashka"))
-      ;; ...and post bodies render in full, past the first paragraph
-      (is (str/includes? body "where code sleeps"))))
+      ;; post bodies render in full, past the first paragraph
+      (is (str/includes? body "where code sleeps"))
+      ;; day headings link to the day archives
+      (is (str/includes? body "July 4, 2026"))
+      (is (str/includes? body "\"/2026/jul/4\""))))
 
   (testing "single entry page renders markdown"
     (let [{:keys [status body]} (GET "/2026/jul/4/hello-world")]
@@ -52,6 +55,13 @@
     (is (= 200 (:status (GET "/2026/jul/4"))))
     (is (str/includes? (:body (GET "/2026/jul/4")) "Hello, world"))
     (is (= 404 (:status (GET "/2024")))))
+
+  (testing "month pages link to the neighboring months that have content"
+    (let [{:keys [body]} (GET "/2026/jun")]
+      (is (str/includes? body "\"/2026/jul\""))     ; newer neighbor
+      (is (str/includes? body "\"/2026/may\"")))    ; older neighbor
+    (let [{:keys [body]} (GET "/2026/may")]
+      (is (str/includes? body "\"/2025/nov\""))))   ; skips empty months, crosses years
 
   (testing "type and tag listings"
     (is (str/includes? (:body (GET "/posts")) "REPL-driven"))
@@ -105,6 +115,19 @@
     (is (not (str/includes? (:body (GET "/")) "isn't ready")))
     (is (not (str/includes? (:body (GET "/feed.xml")) "isn't ready")))
     (is (not (str/includes? (:body (GET "/search" "q=brewing")) "isn't ready")))))
+
+(deftest home-limits-to-whole-days
+  (let [h (app/make-app (assoc config :home-entries 2)
+                        (atom (content/build-index config)))
+        body (:body (h {:request-method :get :uri "/"}))]
+    (testing "both same-day entries show (days are never split)"
+      (is (str/includes? body "Hello, world"))
+      (is (str/includes? body "nextjournal/markdown")))
+    (testing "entries past the cut don't show"
+      (is (not (str/includes? body "Simplicity is a choice"))))
+    (testing "the feed continues into the month archive of the next entry"
+      (is (str/includes? body "Older"))
+      (is (str/includes? body "\"/2026/jun\"")))))
 
 (deftest drafts-without-token-configured
   (let [h (app/make-app (dissoc config :admin-token)

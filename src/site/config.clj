@@ -1,8 +1,8 @@
 (ns site.config
   "Configuration is file-first: config.edn (committed) merged with
   config.local.edn (gitignored — machine-local settings like your vault
-  path). Environment variables are reserved for actual secrets, plus
-  container-level overrides a platform like Fly injects."
+  path). The only environment variable is ADMIN_TOKEN, because it's the
+  only secret."
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.string :as str]))
@@ -30,24 +30,15 @@
       (update :content-path expand-home)))
 
 (defn load-config
-  "config.edn ← config.local.edn ← env ← `overrides`.
+  "config.edn ← config.local.edn ← ADMIN_TOKEN env var ← `overrides`.
 
-  Secrets (env-only, never commit these):
-    ADMIN_TOKEN      gates draft previews and /admin/reindex
-    CONTENT_GIT_URL  when it embeds a repo access token
-
-  Container-level (set by fly.toml, not by hand):
-    CONTENT_PATH, CONTENT_SYNC_SECONDS, PORT"
+  ADMIN_TOKEN gates draft previews and /admin/reindex — the only secret,
+  so the only env var. (For local dev, :admin-token in config.local.edn
+  works too.)"
   ([] (load-config {}))
   ([overrides]
    (resolve-config
     (read-edn "config.edn")
     (read-edn "config.local.edn")
-    (cond-> {}
-      (env "ADMIN_TOKEN") (assoc :admin-token (env "ADMIN_TOKEN"))
-      (env "CONTENT_GIT_URL") (assoc :content-git-url (env "CONTENT_GIT_URL"))
-      (env "CONTENT_PATH") (assoc :content-path (env "CONTENT_PATH"))
-      (env "CONTENT_SYNC_SECONDS") (assoc :content-sync-seconds
-                                          (parse-long (env "CONTENT_SYNC_SECONDS")))
-      (env "PORT") (assoc :port (parse-long (env "PORT"))))
+    (if-let [token (env "ADMIN_TOKEN")] {:admin-token token} {})
     overrides)))

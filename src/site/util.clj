@@ -44,6 +44,20 @@
   [{:keys [date slug]}]
   (str "/" (:year date) "/" (month-slug (:month date)) "/" (:day date) "/" slug))
 
+(defn day-key
+  "Grouping/sorting key for an entry's day: [2026 7 4]"
+  [{:keys [date]}]
+  [(:year date) (:month date) (:day date)])
+
+(defn day-url [{:keys [year month day]}]
+  (str "/" year "/" (month-slug month) "/" day))
+
+(defn month-url [[year month]]
+  (str "/" year "/" (month-slug month)))
+
+(defn month-label [[year month]]
+  (str (month-name month) " " year))
+
 (defn format-date
   "{:year 2026 :month 7 :day 4} → \"July 4, 2026\""
   [{:keys [year month day]}]

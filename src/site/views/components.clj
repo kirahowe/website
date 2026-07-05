@@ -28,13 +28,16 @@
    (name (:type entry))])
 
 (defn entry-meta
-  "The byline row: type badge, date, tags, permalink."
-  [entry]
-  [:div.entry-meta
-   (type-badge entry)
-   (when (:date entry) (date-link (:date entry)))
-   (tag-links entry)
-   [:a.permalink {:href (:path entry) :title "Permalink"} "#"]])
+  "The byline row: type badge, date, tags, permalink. Pass
+  {:show-date? false} inside day-grouped lists, where the heading
+  already carries the date."
+  ([entry] (entry-meta entry {}))
+  ([entry {:keys [show-date?] :or {show-date? true}}]
+   [:div.entry-meta
+    (type-badge entry)
+    (when (and show-date? (:date entry)) (date-link (:date entry)))
+    (tag-links entry)
+    [:a.permalink {:href (:path entry) :title "Permalink"} "#"]]))
 
 ;; --- type-specific rendering -------------------------------------------
 
@@ -72,11 +75,25 @@
 (defn entry-card
   "How an entry appears in the feed and listings: in full, never truncated.
   The title links to the entry's own page."
-  [entry]
-  [:article.entry-card {:class (name (:type entry))}
-   (entry-meta entry)
-   (entry-header entry)
-   (entry-body entry)])
+  ([entry] (entry-card entry {}))
+  ([entry opts]
+   [:article.entry-card {:class (name (:type entry))}
+    (entry-meta entry opts)
+    (entry-header entry)
+    (entry-body entry)]))
 
-(defn entry-list [entries]
-  [:div.entry-list (map entry-card entries)])
+(defn entry-list
+  ([entries] (entry-list entries {}))
+  ([entries opts]
+   [:div.entry-list (map #(entry-card % opts) entries)]))
+
+(defn day-grouped-list
+  "Entries (newest first) grouped under linked day headings, the way the
+  home page and date archives read."
+  [entries]
+  (for [group (partition-by util/day-key entries)]
+    (let [date (:date (first group))]
+      [:section.day-group
+       [:h2.day-heading
+        [:a {:href (util/day-url date)} (util/format-date date)]]
+       (entry-list group {:show-date? false})])))

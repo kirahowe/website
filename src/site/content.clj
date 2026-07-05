@@ -187,6 +187,10 @@
      :by-type (group-by :type entries)
      :by-year (group-by #(-> % :date :year) entries)
      :by-month (group-by (fn [e] [(-> e :date :year) (-> e :date :month)]) entries)
+     ;; months that have content, newest first — drives month-to-month nav
+     :months (vec (sort #(compare %2 %1)
+                        (distinct (map (fn [e] [(-> e :date :year) (-> e :date :month)])
+                                       entries))))
      :by-day (group-by (fn [e] [(-> e :date :year) (-> e :date :month) (-> e :date :day)]) entries)
      :by-tag (reduce (fn [acc e]
                        (reduce (fn [acc t] (update acc t (fnil conj []) e))

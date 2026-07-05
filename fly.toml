@@ -1,19 +1,13 @@
-# Fly.io config. Before first deploy:
+# Fly.io config. Everything non-secret lives in config.edn (including
+# :content-git-url — the content repo is public). Before first deploy:
 #   1. change `app` to your (globally unique) app name
-#   2. fly secrets set ADMIN_TOKEN=$(openssl rand -hex 16)
-#   3. fly secrets set CONTENT_GIT_URL=https://x-access-token:<PAT>@github.com/<you>/<content-repo>.git
-#      (plain https URL works for a public content repo)
-#   4. fly deploy
+#   2. optional but recommended: fly secrets set ADMIN_TOKEN=$(openssl rand -hex 16)
+#      (enables remote draft previews + the instant-reindex webhook)
+#   3. fly deploy
 app = "kirahowe-www"
 primary_region = "yul"
 
 [build]
-
-[env]
-  # Container-level overrides only — everything else lives in config.edn.
-  # /content is where the content repo gets cloned inside the machine
-  # (ephemeral is fine: re-cloned on boot, pulled every :content-sync-seconds).
-  CONTENT_PATH = "/content"
 
 [http_service]
   internal_port = 8080

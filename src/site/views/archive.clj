@@ -1,11 +1,15 @@
 (ns site.views.archive
-  "Archive listings: by date, by type, by tag — plus the tag index."
+  "Archive listings: by date, by type, by tag — plus the tag index.
+  Date archives group by day; month pages link to the neighboring
+  months that actually have content."
   (:require [clojure.string :as str]
             [site.util :as util]
             [site.views.components :as c]
             [site.views.layout :as layout]))
 
-(defn- listing [config title subnav entries]
+(defn- listing
+  "Flat cross-date listing (types, tags) — cards keep their dates."
+  [config title subnav entries]
   (layout/page config title
                [:h1 title]
                subnav
@@ -16,7 +20,7 @@
 (defn- months-subnav
   "For a year page: links to the months that actually have entries."
   [index year]
-  (let [months (->> (keys (:by-month index))
+  (let [months (->> (:months index)
                     (filter #(= year (first %)))
                     (map second)
                     sort)]
@@ -26,19 +30,34 @@
          [:a {:href (str "/" year "/" (util/month-slug m))} (util/month-name m)])])))
 
 (defn year-page [config index year entries]
-  (listing config (str year) (months-subnav index year) entries))
+  (layout/page config (str year)
+               [:h1 (str year)]
+               (months-subnav index year)
+               (c/day-grouped-list entries)))
 
-(defn month-page [config year month entries]
-  (listing config (str (util/month-name month) " " year)
-           [:nav.subnav [:a {:href (str "/" year)} (str "← " year)]]
-           entries))
+(defn month-page [config index year month entries]
+  (let [months (:months index)                       ; newest first
+        i (.indexOf months [year month])
+        newer (when (pos? i) (months (dec i)))
+        older (when (< (inc i) (count months)) (months (inc i)))]
+    (layout/page config (str (util/month-name month) " " year)
+                 [:h1 (str (util/month-name month) " " year)]
+                 [:nav.subnav
+                  (when newer
+                    [:a {:href (util/month-url newer)} (str "← " (util/month-label newer))])
+                  [:a {:href (str "/" year)} (str year)]
+                  (when older
+                    [:a {:href (util/month-url older)} (str (util/month-label older) " →")])]
+                 (c/day-grouped-list entries))))
 
 (defn day-page [config year month day entries]
-  (listing config (util/format-date {:year year :month month :day day})
-           [:nav.subnav
-            [:a {:href (str "/" year "/" (util/month-slug month))}
-             (str "← " (util/month-name month) " " year)]]
-           entries))
+  (let [date {:year year :month month :day day}]
+    (layout/page config (util/format-date date)
+                 [:h1 (util/format-date date)]
+                 [:nav.subnav
+                  [:a {:href (util/month-url [year month])}
+                   (str "← " (util/month-name month) " " year)]]
+                 (c/entry-list entries {:show-date? false}))))
 
 (defn type-page [config type year entries]
   (let [plural (str/capitalize (str (name type) "s"))]

@@ -26,12 +26,13 @@ of a git repo. One-time setup:
    iCloud so your phone sees it: Obsidian's iCloud vaults live at
    `~/Library/Mobile Documents/iCloud~md~obsidian/Documents/<VaultName>`
    on your Mac.
-2. Make it a repo and push it somewhere private:
+2. Make it a repo and push it (public — the server pulls it anonymously,
+   and everything in it is destined for the website anyway):
    ```sh
    cd ~/Library/Mobile\ Documents/iCloud~md~obsidian/Documents/<VaultName>
    printf '.obsidian/\n.DS_Store\n' > .gitignore
    git init && git add -A && git commit -m "content repo"
-   gh repo create my-content --private --source . --push
+   gh repo create my-content --public --source . --push
    ```
 3. Point the site at it with a `config.local.edn` in the project root
    (gitignored, merged over `config.edn` — no env vars needed):
@@ -53,12 +54,16 @@ gets committed.
 ## Configuration
 
 Everything lives in **`config.edn`** (committed): site title, base URL,
-entry types, port, content path, sync interval. **`config.local.edn`**
-(gitignored) merges over it for machine-local settings — your vault path,
-a dev preview token. Environment variables are reserved for actual
-secrets: `ADMIN_TOKEN` and `CONTENT_GIT_URL` when it embeds an access
-token. (`fly.toml` also injects `CONTENT_PATH=/content` at the container
-level — that's infra config, not something you manage by hand.)
+entry types, port, content path, content repo URL, sync interval, home
+feed size. **`config.local.edn`** (gitignored) merges over it for
+machine-local settings — your vault path, `:content-git-url nil` to turn
+off git syncing locally, a dev preview token.
+
+The **only environment variable** is `ADMIN_TOKEN`, because it's the only
+secret. It gates the two non-public things the server can do: render
+drafts (`/drafts/<name>?preview=<token>`) and accept
+`POST /admin/reindex?token=<token>`. Unset, those two features are simply
+off and everything else works — the timed git pull still publishes.
 
 ## Content layout
 
@@ -115,23 +120,25 @@ into the date tree. No flags to forget.
 
 ## Deploying to Fly.io
 
-`Dockerfile` and `fly.toml` are included. The machine clones the content
-repo at boot and pulls every `CONTENT_SYNC_SECONDS` (default 300),
-reindexing when anything changed — so publishing is just a git push.
+`Dockerfile` and `fly.toml` are included. Set in `config.edn`:
+
+```clojure
+{:content-path "content"                                    ; clone target
+ :content-git-url "https://github.com/<you>/<content-repo>.git"}
+```
+
+The machine clones the content repo at boot and pulls every
+`:content-sync-seconds` (default 300), reindexing when anything changed —
+so publishing is just a git push; content changes never require a deploy.
 
 ```sh
 # once:
 fly launch --copy-config --no-deploy     # then edit `app` in fly.toml if taken
-fly secrets set ADMIN_TOKEN=$(openssl rand -hex 16)
-fly secrets set CONTENT_GIT_URL="https://x-access-token:<PAT>@github.com/<you>/<content-repo>.git"
+fly secrets set ADMIN_TOKEN=$(openssl rand -hex 16)   # optional: previews + instant reindex
 
 # every code change:
 fly deploy
 ```
-
-For a private content repo, mint a fine-grained GitHub PAT with read-only
-Contents access to that one repo and embed it in `CONTENT_GIT_URL` as shown
-(a public repo needs no token). Content changes never require a deploy.
 
 - Every public page gets CDN-friendly cache headers; put Cloudflare (or any
   CDN) in front and traffic spikes never reach the server.
@@ -140,10 +147,9 @@ Contents access to that one repo and embed it in `CONTENT_GIT_URL` as shown
   `curl -X POST "https://<your-app>.fly.dev/admin/reindex?token=$ADMIN_TOKEN"`
   on push — the endpoint pulls before reindexing.
 
-Running anywhere else is the same idea without the Fly wrapper: put
-`:content-path` (and optionally `:content-git-url` for a public repo) in
-`config.edn`, supply the secrets, and `bb run`:
+Running anywhere else is the same idea without the Fly wrapper — the same
+`config.edn` plus, optionally, the one secret:
 
 ```sh
-ADMIN_TOKEN=... CONTENT_GIT_URL=... bb run
+ADMIN_TOKEN=... bb run
 ```
