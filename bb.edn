@@ -1,0 +1,32 @@
+{;; nextjournal/markdown is built into bb as of 1.12.196 — the site has
+ ;; zero external dependencies.
+ :min-bb-version "1.12.196"
+
+ :paths ["src" "resources" "test"]
+
+ :tasks
+ {dev {:doc "Start the dev server (reindexes content on every request)"
+       :requires ([site.core :as core])
+       :task (core/start! {:reload? true :block? true})}
+
+  run {:doc "Start the production server"
+       :requires ([site.core :as core])
+       :task (core/start! {:block? true})}
+
+  test {:doc "Run the test suite"
+        :requires ([clojure.test :as t]
+                   [site.content-test]
+                   [site.routes-test]
+                   [site.search-test]
+                   [site.views-test])
+        :task (let [{:keys [fail error]} (t/run-all-tests #"site\..*-test")]
+                (when (pos? (+ fail error))
+                  (System/exit 1)))}
+
+  new {:doc "Scaffold a new draft: bb new <type> <title words...>"
+       :requires ([site.author :as author])
+       :task (apply author/new-draft *command-line-args*)}
+
+  publish {:doc "Publish a draft: bb publish <name> [--no-git] — moves it into today's date folder, commits, pushes"
+           :requires ([site.author :as author])
+           :task (apply author/publish *command-line-args*)}}}

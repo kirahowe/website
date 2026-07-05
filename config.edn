@@ -1,0 +1,16 @@
+{;; Displayed in the site header and the feed
+ :site-title "Kira Howe"
+ :site-description "Notes, links, quotes, and longer-form writing"
+
+ ;; Absolute base URL, no trailing slash — used for the feed and canonical links
+ :base-url "https://kirahowe.com"
+
+ ;; Where the content repo is checked out (override with CONTENT_PATH)
+ :content-path "example-content"
+
+ ;; Entry types that may appear in frontmatter, in nav order.
+ ;; A typo'd type in a content file fails indexing loudly.
+ :entry-types [:post :note :link :quote]
+
+ ;; Override with PORT
+ :port 8080}

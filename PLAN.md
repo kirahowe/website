@@ -153,7 +153,7 @@ Draft status is determined by **location, not a flag** — a file is a draft bec
 | **HTTP server** | http-kit (built into bb) | Fast, tiny, Ring-style request/response handlers out of the box |
 | **Routing** | Hand-rolled (~50 lines) | Our URL space is small and perfectly regular — split path into segments, match on shape. Routes stay data, dispatch stays a pure function. (Reitit's Java trie router doesn't run under bb, and is overkill here anyway) |
 | **HTML** | Hiccup (built into bb) | Clojure data structures as HTML |
-| **Markdown** | [nextjournal/markdown](https://github.com/nextjournal/markdown) | Pure Clojure (0.6+), bb-compatible, produces Hiccup-compatible AST |
+| **Markdown** | [nextjournal/markdown](https://github.com/nextjournal/markdown) | Built into bb (≥ 1.12.196). Wraps commonmark-java; the AST converts straight to hiccup |
 | **Frontmatter** | `clojure.edn/read-string` | Native EDN — built in |
 | **Dates** | `java.time` interop (built into bb) | We only parse ints from paths and format month names — no date library needed |
 | **Storage/Index** | In-memory Clojure data (start) | Files are the source of truth; index is derived. [Datalevin](https://github.com/juji-io/datalevin) via its babashka pod is the designated upgrade path — see Design Decisions |
@@ -233,8 +233,8 @@ The code repo references the content repo path via configuration (env var or con
 
 **Goal**: Serve a single hardcoded entry
 
-1. **Smoke test bb compatibility** (five minutes, before anything else): nextjournal/markdown parses under bb; check whether `clojure.data.xml` (for RSS later) is bundled or needs to be a dep
-2. Set up `bb.edn` — deps (nextjournal/markdown) and tasks (dev/test)
+1. **Smoke test bb compatibility** (five minutes, before anything else): `bb --version` ≥ 1.12.196 and `(require 'nextjournal.markdown)` works — markdown is a bb built-in, not a dep. (RSS needs no XML library either; hiccup's `:mode :xml` renders the feed)
+2. Set up `bb.edn` — tasks only, zero deps
 3. Create minimal http-kit server in `core.clj`, started via `bb dev`
 4. Write the hand-rolled router (path segments → handler match)
 5. Create base HTML layout
@@ -341,7 +341,7 @@ Views are pure functions: `(data) → hiccup`. No side effects, easy to test.
 
 ### 3. Everything Runs Under Babashka — No JVM
 
-The entire site is bb-native: server, tasks, tests, tooling. One runtime, one `bb.edn` holding both deps and tasks. What this buys:
+The entire site is bb-native: server, tasks, tests, tooling. One runtime, one `bb.edn` — and zero dependencies to hold. What this buys:
 
 - **~10ms startup everywhere.** Dev "reload" is just restarting the process — no reload machinery, no stale state. A file watcher restarts the server on code changes; content changes only trigger a reindex.
 - **Tiny footprint.** Tens of MB instead of a JVM heap — runs comfortably on the smallest cloud instance.
@@ -349,7 +349,7 @@ The entire site is bb-native: server, tasks, tests, tooling. One runtime, one `b
 - **One-binary deploys.** The bb static binary plus the code; nothing else to install.
 - **REPL-driven development still works** — bb ships an nREPL server (`bb nrepl-server`).
 
-The stack makes this nearly free: http-kit, Hiccup, `clojure.edn`, and `java.time` are built into bb; nextjournal/markdown (0.6+) is pure Clojure; Datalevin ships a babashka pod — and its full-text search runs in native code, so the eventual search hotspot isn't interpreted.
+The stack makes this nearly free: http-kit, Hiccup, `clojure.edn`, `java.time`, *and* nextjournal/markdown (since bb 1.12.196) are all built into bb — the site has **zero external dependencies**. Datalevin ships a babashka pod — and its full-text search runs in native code, so the eventual search hotspot isn't interpreted.
 
 **The honest costs, and why they're acceptable:**
 
@@ -408,23 +408,18 @@ The design leaves room for future additions:
 
 ## Dependencies (bb.edn)
 
-There is no `deps.edn` — babashka is the only runtime, and `bb.edn` holds everything:
+There is no `deps.edn` — babashka is the only runtime — and there are **zero external dependencies**. Everything the site uses is built into bb (≥ 1.12.196):
 
-```clojure
-{:paths ["src" "resources"]
+| Need | Built-in |
+|------|----------|
+| HTTP server | http-kit (`org.httpkit.server`) |
+| HTML + RSS | Hiccup (`hiccup2.core`, `:mode :xml` for the feed) |
+| Markdown | nextjournal/markdown (bb bundles it, commonmark-java under the hood) |
+| Frontmatter | `clojure.edn` |
+| Dates | `java.time` interop |
+| File walking, git | `babashka.fs`, `babashka.process` |
 
- :deps
- {;; Markdown — pure Clojure, bb-compatible, hiccup-compatible AST
-  io.github.nextjournal/markdown {:mvn/version "0.6.157"}}
-
- :tasks
- {dev     {:doc "Start dev server with file watching"}
-  test    {:doc "Run the test suite"}
-  publish {:doc "Move a draft into the date tree, commit, push"}
-  new     {:doc "Scaffold a new draft from a type template"}}}
-```
-
-Everything else is built into bb: http-kit (server), Hiccup (HTML), `clojure.edn` (frontmatter), `java.time` (dates), `babashka.fs` (walking the content tree), `babashka.process`. The Phase 1 smoke test confirms nextjournal/markdown and checks whether `clojure.data.xml` (RSS feed) is bundled or needs adding to `:deps`. Datalevin arrives later as a pod, if/when search outgrows the in-memory index.
+`bb.edn` holds only `:paths`, `:min-bb-version`, and `:tasks`. Datalevin arrives later as a pod, if/when search outgrows the in-memory index.
 
 ---
 
