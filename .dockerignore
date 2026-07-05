@@ -1,0 +1,9 @@
+.git
+.gitignore
+.cpcache
+test
+PLAN.md
+README.md
+fly.toml
+Dockerfile
+.dockerignore

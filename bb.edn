@@ -18,6 +18,7 @@
                    [site.content-test]
                    [site.routes-test]
                    [site.search-test]
+                   [site.sync-test]
                    [site.views-test])
         :task (let [{:keys [fail error]} (t/run-all-tests #"site\..*-test")]
                 (when (pos? (+ fail error))

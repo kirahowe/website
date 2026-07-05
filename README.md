@@ -16,10 +16,40 @@ bb dev        # serve example-content at http://localhost:8080, reindexing every
 bb test       # run the test suite
 ```
 
-## How content works
+## Your real content: an Obsidian vault that is also a git repo
 
-Content lives in a **separate repo** (an Obsidian vault) configured via
-`:content-path` in `config.edn` or the `CONTENT_PATH` env var. Layout:
+The content is a **dedicated Obsidian vault** whose root is also the root
+of a git repo. One-time setup:
+
+1. In Obsidian, create a new vault (keep it separate from your personal
+   vault — everything committed here ends up on the server). Put it in
+   iCloud so your phone sees it: Obsidian's iCloud vaults live at
+   `~/Library/Mobile Documents/iCloud~md~obsidian/Documents/<VaultName>`
+   on your Mac.
+2. Make it a repo and push it somewhere private:
+   ```sh
+   cd ~/Library/Mobile\ Documents/iCloud~md~obsidian/Documents/<VaultName>
+   printf '.obsidian/\n.DS_Store\n' > .gitignore
+   git init && git add -A && git commit -m "content repo"
+   gh repo create my-content --private --source . --push
+   ```
+3. Point the site at it — either set `:content-path` in `config.edn` or:
+   ```sh
+   CONTENT_PATH="$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/<VaultName>" bb dev
+   ```
+
+Day to day: **phone** → open Obsidian, write in `drafts/` (iCloud syncs it).
+**Laptop** → `bb publish <name>` moves it into today's date folder, commits,
+and pushes; the server picks it up from git. Files outside `drafts/`,
+`pages/`, and the date tree are ignored by the site, and `.obsidian/` never
+gets committed.
+
+> iCloud tip: right-click the vault folder → "Keep Downloaded" so iCloud
+> can't evict the `.git` directory out from under you.
+
+## Content layout
+
+Configured via `:content-path` in `config.edn` or the `CONTENT_PATH` env var:
 
 ```
 my-content/
@@ -70,14 +100,35 @@ into the date tree. No flags to forget.
 | `/search?q=...` | full-text search |
 | `/feed.xml` | RSS |
 
-## Production
+## Deploying to Fly.io
+
+`Dockerfile` and `fly.toml` are included. The machine clones the content
+repo at boot and pulls every `CONTENT_SYNC_SECONDS` (default 300),
+reindexing when anything changed — so publishing is just a git push.
 
 ```sh
-CONTENT_PATH=/path/to/content ADMIN_TOKEN=... PORT=8080 bb run
+# once:
+fly launch --copy-config --no-deploy     # then edit `app` in fly.toml if taken
+fly secrets set ADMIN_TOKEN=$(openssl rand -hex 16)
+fly secrets set CONTENT_GIT_URL="https://x-access-token:<PAT>@github.com/<you>/<content-repo>.git"
+
+# every code change:
+fly deploy
 ```
+
+For a private content repo, mint a fine-grained GitHub PAT with read-only
+Contents access to that one repo and embed it in `CONTENT_GIT_URL` as shown
+(a public repo needs no token). Content changes never require a deploy.
 
 - Every public page gets CDN-friendly cache headers; put Cloudflare (or any
   CDN) in front and traffic spikes never reach the server.
-- Push-to-publish: after the content repo updates on the server
-  (webhook or cron `git pull`), `POST /admin/reindex?token=$ADMIN_TOKEN`
-  swaps in the new index.
+- Want publishes live in seconds instead of minutes? Add a GitHub Action to
+  the content repo that runs
+  `curl -X POST "https://<your-app>.fly.dev/admin/reindex?token=$ADMIN_TOKEN"`
+  on push — the endpoint pulls before reindexing.
+
+Running anywhere else is the same idea without the Fly wrapper:
+
+```sh
+CONTENT_PATH=/srv/content CONTENT_GIT_URL=... ADMIN_TOKEN=... PORT=8080 bb run
+```

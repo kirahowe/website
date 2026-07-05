@@ -3,7 +3,8 @@
   (:require [org.httpkit.server :as http]
             [site.app :as app]
             [site.config :as config]
-            [site.content :as content]))
+            [site.content :as content]
+            [site.sync :as sync]))
 
 (defonce server (atom nil))
 
@@ -19,6 +20,7 @@
   ([] (start! {}))
   ([opts]
    (let [cfg (config/load-config (dissoc opts :block?))
+         _ (sync/ensure-content! cfg)
          index-atom (atom (content/build-index cfg))
          handler (app/make-app cfg index-atom)]
      (stop!)
@@ -28,6 +30,8 @@
                    (when (:reload? cfg) " — dev mode, reindexing every request")))
      (when-not (:admin-token cfg)
        (println "Note: ADMIN_TOKEN not set — draft previews and /admin/reindex are disabled."))
+     (when (:content-git-url cfg)
+       (sync/start-sync-loop! cfg index-atom))
      (when (:block? opts)
        @(promise))
      @server)))

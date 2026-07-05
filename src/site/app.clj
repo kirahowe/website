@@ -5,7 +5,8 @@
             [clojure.string :as str]
             [site.content :as content]
             [site.handlers :as handlers]
-            [site.routes :as routes]))
+            [site.routes :as routes]
+            [site.sync :as sync]))
 
 (def ^:private content-types
   {"css" "text/css" "js" "text/javascript" "json" "application/json"
@@ -26,13 +27,15 @@
          :body (io/input-stream res)}))))
 
 (defn- reindex-response
-  "POST /admin/reindex?token=... — push-to-publish hook. A webhook (or a
-  cron `git pull`) hits this after the content repo updates."
+  "POST /admin/reindex?token=... — push-to-publish hook. Pulls the content
+  repo first when one is configured, then rebuilds unconditionally, so a
+  webhook firing right after `git push` publishes instantly."
   [config index-atom req]
   (let [token (:admin-token config)
         supplied (get (handlers/query-params req) "token")]
     (if (and token (= token supplied))
-      (let [index (content/build-index config)]
+      (let [_ (when (:content-git-url config) (sync/pull! config))
+            index (content/build-index config)]
         (reset! index-atom index)
         {:status 200
          :headers {"Content-Type" "text/plain"}
