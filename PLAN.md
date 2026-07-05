@@ -348,8 +348,7 @@ Views are pure functions: `(data) → hiccup`. No side effects, easy to test.
  {dev     {:doc "Start dev server with code reload + content watching"}
   test    {:doc "Run the test suite"}
   publish {:doc "Move a draft into the date tree, commit, push"}
-  new     {:doc "Scaffold a new draft from a type template"}
-  render-static {:doc "Render the whole site to disk (escape hatch)"}}}
+  new     {:doc "Scaffold a new draft from a type template"}}}
 ```
 
 Tasks use **bb-native libraries where possible** for instant startup: `babashka.fs` for file work, built-in http-kit/hiccup/edn for anything servery, `babashka.process` to launch the JVM only when actually needed (e.g. `bb dev` starting the site). Utility tasks like `publish` and `new` run entirely in bb — no JVM, no wait.
@@ -369,7 +368,7 @@ The content is entirely static files — so why not a static site generator? Bec
 
 The trade is nearly free because of Decision 5: every page except search is CDN-cached, so the site *behaves* like a static site under load while *being* dynamic where it counts.
 
-**Escape hatch**: views are pure functions, so a `bb render-static` task can write the whole site to disk for CDN hosting if we ever change course. Same views, both modes.
+Because views are pure functions of data, rendering the site to static files stays *possible* if we ever change course — but we deliberately don't build or maintain that path. An unused escape hatch is cruft; the architecture (pure views, files as source of truth) is the real insurance.
 
 ### 5. Cache Like a Static Site (Spike-Proofing)
 
