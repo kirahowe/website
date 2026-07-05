@@ -42,17 +42,42 @@
       (= before (head-rev content-path)) :unchanged
       :else :updated)))
 
+(defn build-indexed
+  "build-index, stamped (as metadata) with the git rev it was built from,
+  so the sync loop can tell whether the served index matches HEAD."
+  [config]
+  (let [index (content/build-index config)]
+    (with-meta index {:git-rev (head-rev (:content-path config))})))
+
 (defn sync-once!
-  "Pull, and rebuild the index only if the content actually changed."
+  "One sync tick: clone if the checkout is missing, otherwise pull; rebuild
+  whenever HEAD differs from the rev the served index was built from —
+  so a rebuild that failed (broken file pushed) is retried every tick
+  until the content is fixed. NEVER throws: any failure is logged and
+  the last good index keeps serving. → :updated | :unchanged | :error"
   [config index-atom]
-  (let [result (pull! config)]
-    (when (= :updated result)
-      (reset! index-atom (content/build-index config))
-      (println "content sync: new content, reindexed"))
-    result))
+  (try
+    (if-not (.exists (io/file (:content-path config)))
+      (do (ensure-content! config)
+          (reset! index-atom (build-indexed config))
+          (println "content sync: cloned and indexed")
+          :updated)
+      (if (= :error (pull! config))
+        :error
+        (let [rev (head-rev (:content-path config))]
+          (if (= rev (:git-rev (meta @index-atom)))
+            :unchanged
+            (do (reset! index-atom (build-indexed config))
+                (println (str "content sync: reindexed at " (subs rev 0 7)))
+                :updated)))))
+    (catch Exception e
+      (binding [*out* *err*]
+        (println "content sync failed — keeping previous content:" (ex-message e)))
+      :error)))
 
 (defn start-sync-loop!
-  "Background pull-and-reindex every :content-sync-seconds (default 300)."
+  "Background sync every :content-sync-seconds (default 300). sync-once!
+  can't throw, but belt-and-braces: nothing escapes this loop."
   [config index-atom]
   (let [seconds (or (:content-sync-seconds config) 300)]
     (future
@@ -60,8 +85,8 @@
         (Thread/sleep (* 1000 seconds))
         (try
           (sync-once! config index-atom)
-          (catch Exception e
+          (catch Throwable t
             (binding [*out* *err*]
-              (println "content sync error:" (ex-message e)))))
+              (println "content sync error:" (ex-message t)))))
         (recur)))
     (println (str "Content sync: pulling every " seconds "s"))))

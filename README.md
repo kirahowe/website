@@ -108,6 +108,11 @@ bb publish my-great-idea       # moves it into today's date folder, commits, pus
 A file is a draft because it lives in `drafts/`; publishing is moving it
 into the date tree. No flags to forget.
 
+`bb publish` **is** the manual publish. The live site picks the push up on
+its next timed pull (≤ `:content-sync-seconds`); to go live right now,
+`fly apps restart <app>` — the machine re-clones fresh content at boot
+(`bb publish` prints this command for you).
+
 ## URLs
 
 | URL | Shows |
@@ -143,7 +148,12 @@ fly deploy
 - Every public page gets CDN-friendly cache headers; put Cloudflare (or any
   CDN) in front and traffic spikes never reach the server.
 - Publishes go live within `:content-sync-seconds` (default 5 minutes) of
-  the git push — no deploy, no webhook, no admin endpoint.
+  the git push — no deploy, no webhook, no admin endpoint. Impatient?
+  `fly apps restart <app>` re-clones immediately.
+- A failed sync can never take the site down: bad network or a broken
+  content push is logged, the last good index keeps serving, and the
+  server retries every tick until the content is fixed. Even a broken
+  clone at boot serves an empty site rather than crash-looping.
 
 Running anywhere else is the same idea without the Fly wrapper: the same
 `config.edn`, and just `bb run`.

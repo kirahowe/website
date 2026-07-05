@@ -172,6 +172,12 @@
               (< i (dec (count entries))) (assoc :older (brief (entries (inc i))))))
           entries))))
 
+(def empty-index
+  "What the server serves when content is unavailable at boot — the sync
+  loop replaces it as soon as a pull succeeds."
+  {:entries [] :by-path {} :by-type {} :by-year {} :by-month {} :by-day {}
+   :by-tag {} :tag-counts [] :months [] :drafts {} :pages {}})
+
 (defn build-index
   "Content repo → the in-memory index every request reads from."
   [config]

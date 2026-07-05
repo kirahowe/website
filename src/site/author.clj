@@ -56,10 +56,15 @@
       (spit (str target) (frontmatter-template type title))
       (println "Draft created:" (str target)))))
 
+(defn- fly-app-name []
+  (when (fs/exists? "fly.toml")
+    (second (re-find #"(?m)^app\s*=\s*\"([^\"]+)\"" (slurp "fly.toml")))))
+
 (defn publish
-  "bb publish <name> [--no-git] — validates the draft, moves it into
-  today's YYYY/MM/DD/ folder, and (unless --no-git) commits and pushes
-  the content repo."
+  "bb publish <name> [--no-git] — the manual publish: validates the
+  draft, moves it into today's YYYY/MM/DD/ folder, and (unless --no-git)
+  commits and pushes the content repo. The live site picks it up on its
+  next timed pull, or immediately if you restart the machine."
   [& args]
   (let [no-git? (boolean (some #{"--no-git"} args))
         fname (first (remove #(str/starts-with? % "--") args))]
@@ -91,5 +96,9 @@
           (do (p/shell {:dir root} "git" "add" "-A")
               (p/shell {:dir root} "git" "commit" "-m" (str "Publish " base))
               (p/shell {:dir root} "git" "push")
-              (println "Committed and pushed."))
+              (println "Committed and pushed.")
+              (println (str "Live within ~" (or (:content-sync-seconds cfg) 300)
+                            "s on the next content sync."))
+              (when-let [app (fly-app-name)]
+                (println (str "To go live right now: fly apps restart " app))))
           (println "Skipped git (no repo or --no-git)."))))))

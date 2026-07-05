@@ -48,7 +48,7 @@
     (testing "ensure-content! is a no-op when already cloned"
       (sync/ensure-content! config))
 
-    (let [index-atom (atom (content/build-index config))]
+    (let [index-atom (atom (sync/build-indexed config))]
       (testing "nothing new → :unchanged, index untouched"
         (let [before @index-atom]
           (is (= :unchanged (sync/sync-once! config index-atom)))
@@ -61,3 +61,43 @@
         (is (= :updated (sync/sync-once! config index-atom)))
         (is (= 2 (count (:entries @index-atom))))
         (is (some? (get (:by-path @index-atom) "/2026/feb/10/second")))))))
+
+(deftest sync-failures-never-throw-and-self-heal
+  (let [origin (temp-dir)
+        checkout (str (temp-dir) "/content")
+        config (assoc config-base
+                      :content-path checkout
+                      :content-git-url origin)]
+    (sh! "git" "init" "-q" "-b" "main" origin)
+    (entry! origin "2026/01/05/first.md" ";;;\n{:type :note}\n;;;\nfirst")
+    (git! origin "add" "-A")
+    (git! origin "commit" "-q" "-m" "first")
+
+    (testing "a missing checkout self-heals by cloning"
+      (let [index-atom (atom content/empty-index)]
+        (is (= :updated (sync/sync-once! config index-atom)))
+        (is (= 1 (count (:entries @index-atom))))))
+
+    (let [index-atom (atom (sync/build-indexed config))]
+      (testing "a broken push returns :error and keeps the last good index"
+        (entry! origin "2026/01/06/bad.md" ";;;\n{:type :oops}\n;;;\nbroken")
+        (git! origin "add" "-A")
+        (git! origin "commit" "-q" "-m" "bad")
+        (is (= :error (sync/sync-once! config index-atom)))
+        (is (= 1 (count (:entries @index-atom)))))
+
+      (testing "still broken next tick: retried, still :error, still serving"
+        (is (= :error (sync/sync-once! config index-atom)))
+        (is (= 1 (count (:entries @index-atom)))))
+
+      (testing "a fix recovers on the next sync"
+        (entry! origin "2026/01/06/bad.md" ";;;\n{:type :note}\n;;;\nfixed")
+        (git! origin "add" "-A")
+        (git! origin "commit" "-q" "-m" "fix")
+        (is (= :updated (sync/sync-once! config index-atom)))
+        (is (= 2 (count (:entries @index-atom)))))
+
+      (testing "an unreachable origin logs :error without throwing"
+        (git! checkout "remote" "set-url" "origin" (str origin "-gone"))
+        (is (= :error (sync/sync-once! config index-atom)))
+        (is (= 2 (count (:entries @index-atom))))))))
