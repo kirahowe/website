@@ -21,7 +21,6 @@ COPY resources ./resources
 # in production CONTENT_PATH points at the cloned content repo instead.
 COPY example-content ./example-content
 
-ENV PORT=8080
 EXPOSE 8080
 
 ENTRYPOINT ["bb", "run"]

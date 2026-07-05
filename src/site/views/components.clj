@@ -70,17 +70,13 @@
 ;; --- listings ------------------------------------------------------------
 
 (defn entry-card
-  "How an entry appears in a list. Short types show in full; posts show
-  their first paragraph with a link to read on."
+  "How an entry appears in the feed and listings: in full, never truncated.
+  The title links to the entry's own page."
   [entry]
   [:article.entry-card {:class (name (:type entry))}
    (entry-meta entry)
    (entry-header entry)
-   (if (= :post (:type entry))
-     (list
-      [:div.entry-body.lede (markdown/render (markdown/lede (:body entry)))]
-      [:p.read-on [:a {:href (:path entry)} "Read on →"]])
-     (entry-body entry))])
+   (entry-body entry)])
 
 (defn entry-list [entries]
   [:div.entry-list (map entry-card entries)])

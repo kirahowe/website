@@ -10,11 +10,10 @@ primary_region = "yul"
 [build]
 
 [env]
-  PORT = "8080"
-  # Where the content repo gets cloned inside the machine (ephemeral is
-  # fine — it's re-cloned on boot and pulled every CONTENT_SYNC_SECONDS).
+  # Container-level overrides only — everything else lives in config.edn.
+  # /content is where the content repo gets cloned inside the machine
+  # (ephemeral is fine: re-cloned on boot, pulled every :content-sync-seconds).
   CONTENT_PATH = "/content"
-  CONTENT_SYNC_SECONDS = "300"
 
 [http_service]
   internal_port = 8080

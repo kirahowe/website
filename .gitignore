@@ -1,3 +1,4 @@
+config.local.edn
 .cpcache/
 .nrepl-port
 .clj-kondo/.cache/

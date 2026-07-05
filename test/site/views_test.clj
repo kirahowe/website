@@ -22,13 +22,17 @@
   ([uri query] (handler {:request-method :get :uri uri :query-string query})))
 
 (deftest pages-render
-  (testing "home shows recent entries of every type"
+  (testing "home is the full feed — every entry, every type, untruncated"
     (let [{:keys [status body headers]} (GET "/")]
       (is (= 200 status))
       (is (str/includes? (get headers "Cache-Control") "public"))
       (is (str/includes? body "Hello, world"))
       (is (str/includes? body "nextjournal/markdown"))
-      (is (str/includes? body "Rich Hickey"))))
+      (is (str/includes? body "Rich Hickey"))
+      ;; the oldest entry is present (nothing capped)...
+      (is (str/includes? body "Babashka"))
+      ;; ...and post bodies render in full, past the first paragraph
+      (is (str/includes? body "where code sleeps"))))
 
   (testing "single entry page renders markdown"
     (let [{:keys [status body]} (GET "/2026/jul/4/hello-world")]

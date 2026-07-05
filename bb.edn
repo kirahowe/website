@@ -15,6 +15,7 @@
 
   test {:doc "Run the test suite"
         :requires ([clojure.test :as t]
+                   [site.config-test]
                    [site.content-test]
                    [site.routes-test]
                    [site.search-test]

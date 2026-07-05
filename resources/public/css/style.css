@@ -132,7 +132,6 @@ h1, h2, h3 { line-height: 1.3; }
 .entry-title a { color: var(--fg); }
 .entry-title a:hover { color: var(--accent); text-decoration: none; }
 .entry-title .via { font-size: 0.8rem; font-weight: 400; color: var(--muted); }
-.read-on { margin: 0.25rem 0 0; font-size: 0.9rem; }
 
 /* Single entry page */
 .entry-page .entry-title { font-size: 1.5rem; margin: 0.75rem 0 0.5rem; }

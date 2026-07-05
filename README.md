@@ -33,10 +33,13 @@ of a git repo. One-time setup:
    git init && git add -A && git commit -m "content repo"
    gh repo create my-content --private --source . --push
    ```
-3. Point the site at it — either set `:content-path` in `config.edn` or:
-   ```sh
-   CONTENT_PATH="$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/<VaultName>" bb dev
+3. Point the site at it with a `config.local.edn` in the project root
+   (gitignored, merged over `config.edn` — no env vars needed):
+   ```clojure
+   {:content-path "~/Library/Mobile Documents/iCloud~md~obsidian/Documents/<VaultName>"
+    :admin-token "whatever-local-token"}   ; optional: enables draft previews in dev
    ```
+   Then just `bb dev`.
 
 Day to day: **phone** → open Obsidian, write in `drafts/` (iCloud syncs it).
 **Laptop** → `bb publish <name>` moves it into today's date folder, commits,
@@ -47,9 +50,19 @@ gets committed.
 > iCloud tip: right-click the vault folder → "Keep Downloaded" so iCloud
 > can't evict the `.git` directory out from under you.
 
+## Configuration
+
+Everything lives in **`config.edn`** (committed): site title, base URL,
+entry types, port, content path, sync interval. **`config.local.edn`**
+(gitignored) merges over it for machine-local settings — your vault path,
+a dev preview token. Environment variables are reserved for actual
+secrets: `ADMIN_TOKEN` and `CONTENT_GIT_URL` when it embeds an access
+token. (`fly.toml` also injects `CONTENT_PATH=/content` at the container
+level — that's infra config, not something you manage by hand.)
+
 ## Content layout
 
-Configured via `:content-path` in `config.edn` or the `CONTENT_PATH` env var:
+Whatever `:content-path` points at:
 
 ```
 my-content/
@@ -127,8 +140,10 @@ Contents access to that one repo and embed it in `CONTENT_GIT_URL` as shown
   `curl -X POST "https://<your-app>.fly.dev/admin/reindex?token=$ADMIN_TOKEN"`
   on push — the endpoint pulls before reindexing.
 
-Running anywhere else is the same idea without the Fly wrapper:
+Running anywhere else is the same idea without the Fly wrapper: put
+`:content-path` (and optionally `:content-git-url` for a public repo) in
+`config.edn`, supply the secrets, and `bb run`:
 
 ```sh
-CONTENT_PATH=/srv/content CONTENT_GIT_URL=... ADMIN_TOKEN=... PORT=8080 bb run
+ADMIN_TOKEN=... CONTENT_GIT_URL=... bb run
 ```
