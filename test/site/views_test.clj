@@ -11,7 +11,7 @@
    :site-description "Testing"
    :base-url "https://example.com"
    :content-path "example-content"
-   :entry-types [:post :note :link :quote]})
+   :entry-types [:post :note :link :quote :release :tool]})
 
 (def handler
   (app/make-app config (atom (content/build-index config))))
@@ -25,17 +25,19 @@
   ([uri query] (handler {:request-method :get :uri uri :query-string query})))
 
 (deftest pages-render
-  (testing "home is a day-grouped feed, untruncated bodies"
+  (testing "home is a day-grouped feed; posts preview, short types are full"
     (let [{:keys [status body headers]} (GET "/")]
       (is (= 200 status))
       (is (str/includes? (get headers "Cache-Control") "public"))
       (is (str/includes? body "Hello, world"))
       (is (str/includes? body "nextjournal/markdown"))
       (is (str/includes? body "Rich Hickey"))
-      ;; all 6 example entries fit within :home-entries, so the oldest shows
+      ;; all 8 example entries fit within :home-entries, so the oldest shows
       (is (str/includes? body "Babashka"))
-      ;; post bodies render in full, past the first paragraph
-      (is (str/includes? body "where code sleeps"))
+      ;; post previews stop after the first paragraph
+      (is (not (str/includes? body "where code sleeps")))
+      (is (str/includes? body "words]"))                       ; post preview link
+      (is (str/includes? body "Untitled notes are fine"))      ; notes stay full inline
       ;; day headings link to the day archives
       (is (str/includes? body "July 4, 2026"))
       (is (str/includes? body "\"/2026/jul/4\""))))
@@ -45,7 +47,10 @@
       (is (= 200 status))
       (is (str/includes? body "How it works</h2>"))  ; ## heading
       (is (str/includes? body "<code"))              ; inline code
-      (is (str/includes? body "entry-url"))))
+      (is (str/includes? body "entry-url")))
+    (let [{:keys [body]} (GET "/2025/nov/12/repl-driven")]
+      (is (str/includes? body "where code sleeps"))       ; full body lives on the entry page
+      (is (not (str/includes? body "words]")))))          ; no preview link there
 
   (testing "non-canonical entry URL redirects to canonical"
     (let [{:keys [status headers]} (GET "/2026/07/04/hello-world")]
@@ -64,6 +69,8 @@
       (is (str/includes? body "\"/2026/jul\""))     ; newer neighbor
       (is (str/includes? body "\"/2026/may\"")))    ; older neighbor
     (let [{:keys [body]} (GET "/2026/may")]
+      (is (str/includes? body "\"/2026/apr\"")))    ; older neighbor (new release entry)
+    (let [{:keys [body]} (GET "/2026/mar")]
       (is (str/includes? body "\"/2025/nov\""))))   ; skips empty months, crosses years
 
   (testing "type and tag listings"
@@ -71,7 +78,9 @@
     (is (str/includes? (:body (GET "/quotes")) "Simplicity"))
     (is (str/includes? (:body (GET "/tags/clojure")) "Babashka"))
     (is (= 200 (:status (GET "/2026/posts"))))
-    (is (= 404 (:status (GET "/2024/posts")))))
+    (is (= 404 (:status (GET "/2024/posts"))))
+    (is (str/includes? (:body (GET "/releases")) "website v1.0"))
+    (is (str/includes? (:body (GET "/tools")) "vault-publish")))
 
   (testing "quote renders with attribution"
     (let [{:keys [body]} (GET "/2026/jun/21/rich-hickey-on-simplicity")]
@@ -82,6 +91,10 @@
     (let [{:keys [body]} (GET "/2025/aug/30/babashka")]
       (is (str/includes? body "https://babashka.org"))
       (is (str/includes? body "via"))))
+
+  (testing "release and tool titles link out too"
+    (is (str/includes? (:body (GET "/2026/apr/18/website-v1")) "releases/tag/v1.0"))
+    (is (str/includes? (:body (GET "/2026/mar/7/vault-publish")) "github.com/kirahowe/vault-publish")))
 
   (testing "static page"
     (let [{:keys [status body]} (GET "/about")]

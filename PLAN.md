@@ -18,7 +18,7 @@ Entry types are **open but configured**: `:type` is just a keyword in frontmatte
 
 ```clojure
 ;; config
-{:entry-types #{:post :note :link :quote}}
+{:entry-types [:post :note :link :quote :release :tool]}
 ```
 
 Launch set:
@@ -29,8 +29,10 @@ Launch set:
 | **note** | Quick thoughts, observations | Short, may lack title |
 | **link** | Bookmarks with commentary | Short + external URL |
 | **quote** | Quoted text with attribution | Short + source |
+| **release** | Project release announcements | Short + link |
+| **tool** | Tools I've built or use | Short + link |
 
-Future candidates (add when needed): `:release` for project updates, `:til`, etc.
+Future candidates (add when needed): `:til`, etc.
 
 Rendering is a multimethod dispatching on `:type`, with a sensible default — so a new type renders acceptably before it gets a custom look:
 

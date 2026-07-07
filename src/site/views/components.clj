@@ -42,18 +42,20 @@
 ;; --- type-specific rendering -------------------------------------------
 
 (defmulti entry-header
-  "Heading for an entry; may be nil (untitled notes)."
+  "Heading for an entry; may be nil (untitled notes). Entries carrying
+  :link-url (links, releases, tools) link out instead of to their own page."
   :type)
 
 (defmethod entry-header :default [entry]
-  (when (:title entry)
-    [:h2.entry-title [:a {:href (:path entry)} (:title entry)]]))
+  (cond
+    (:link-url entry)
+    [:h2.entry-title
+     [:a.outbound {:href (:link-url entry)} (or (:title entry) (:link-url entry))]
+     (when-let [via (:link-via entry)]
+       [:span.via " (" [:a {:href via} "via"] ")"])]
 
-(defmethod entry-header :link [entry]
-  [:h2.entry-title
-   [:a.outbound {:href (:link-url entry)} (or (:title entry) (:link-url entry))]
-   (when-let [via (:link-via entry)]
-     [:span.via " (" [:a {:href via} "via"] ")"])])
+    (:title entry)
+    [:h2.entry-title [:a {:href (:path entry)} (:title entry)]]))
 
 (defmulti entry-body
   "Full rendered body for an entry."
@@ -70,17 +72,38 @@
                              [:a {:href url} source]
                              source)])])
 
+(defmulti card-body
+  "How an entry's body appears in a listing card. Posts are long-form
+  and get a preview (first paragraph + word-count link); every other
+  type shows in full."
+  :type)
+
+(defmethod card-body :default [entry]
+  (entry-body entry))
+
+(defmethod card-body :post [entry]
+  (let [body (:body entry)
+        lede (markdown/lede body)]
+    (if (= lede body)
+      (entry-body entry)
+      (list
+       [:div.entry-body.lede (markdown/render lede)]
+       [:p.more
+        [:a {:href (:path entry)}
+         (str "[… " (markdown/word-count body) " words]")]]))))
+
 ;; --- listings ------------------------------------------------------------
 
 (defn entry-card
-  "How an entry appears in the feed and listings: in full, never truncated.
-  The title links to the entry's own page."
+  "How an entry appears in the feed and listings. Posts preview with a
+  word-count link; everything else is full and untruncated. Titles link
+  to the entry's own page (or out, for :link-url types)."
   ([entry] (entry-card entry {}))
   ([entry opts]
    [:article.entry-card {:class (name (:type entry))}
     (entry-meta entry opts)
     (entry-header entry)
-    (entry-body entry)]))
+    (card-body entry)]))
 
 (defn entry-list
   ([entries] (entry-list entries {}))

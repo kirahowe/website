@@ -2,7 +2,7 @@
   (:require [clojure.test :refer [deftest is testing]]
             [site.routes :as routes]))
 
-(def config {:entry-types [:post :note :link :quote]})
+(def config {:entry-types [:post :note :link :quote :release :tool]})
 
 (defn- match [uri]
   (routes/match-route config (routes/path-segments uri)))
@@ -26,6 +26,8 @@
   (is (= {:handler :type-list :params {:type :post}} (match "/posts")))
   (is (= {:handler :type-list :params {:type :quote}} (match "/quotes")))
   (is (= {:handler :type-list :params {:type :note :year 2026}} (match "/2026/notes")))
+  (is (= {:handler :type-list :params {:type :release}} (match "/releases")))
+  (is (= {:handler :type-list :params {:type :tool}} (match "/tools")))
   (testing "unknown plural falls through to page lookup"
     (is (= {:handler :page :params {:slug "essays"}} (match "/essays")))))
 

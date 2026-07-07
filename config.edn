@@ -24,6 +24,6 @@
 
  ;; Entry types that may appear in frontmatter, in nav order.
  ;; A typo'd type in a content file fails indexing loudly.
- :entry-types [:post :note :link :quote]
+ :entry-types [:post :note :link :quote :release :tool]
 
  :port 8080}

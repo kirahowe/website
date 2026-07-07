@@ -13,6 +13,8 @@
   --badge-note: #16a34a;
   --badge-link: #d97706;
   --badge-quote: #9333ea;
+  --badge-release: #db2777;
+  --badge-tool: #0d9488;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -29,6 +31,8 @@
     --badge-note: #3fb950;
     --badge-link: #d29922;
     --badge-quote: #bc8cff;
+    --badge-release: #f472b6;
+    --badge-tool: #2dd4bf;
   }
 }
 
@@ -110,6 +114,8 @@ h1, h2, h3 { line-height: 1.3; }
 .type-badge.note { color: var(--badge-note) !important; }
 .type-badge.link { color: var(--badge-link) !important; }
 .type-badge.quote { color: var(--badge-quote) !important; }
+.type-badge.release { color: var(--badge-release) !important; }
+.type-badge.tool { color: var(--badge-tool) !important; }
 
 .tags .tag { margin-right: 0.45rem; color: var(--badge-note); }
 .permalink { margin-left: auto; }
@@ -147,11 +153,14 @@ h1, h2, h3 { line-height: 1.3; }
 .entry-card.note { border-left-color: var(--badge-note); }
 .entry-card.link { border-left-color: var(--badge-link); }
 .entry-card.quote { border-left-color: var(--badge-quote); }
+.entry-card.release { border-left-color: var(--badge-release); }
+.entry-card.tool { border-left-color: var(--badge-tool); }
 
 .entry-title { margin: 0.5rem 0 0.25rem; font-size: 1.15rem; }
 .entry-title a { color: var(--fg); }
 .entry-title a:hover { color: var(--accent); text-decoration: none; }
 .entry-title .via { font-size: 0.8rem; font-weight: 400; color: var(--muted); }
+.more { margin: 0.25rem 0 0; font-family: var(--mono); font-size: 0.85rem; }
 
 /* Single entry page */
 .entry-page .entry-title { font-size: 1.5rem; margin: 0.75rem 0 0.5rem; }

@@ -93,8 +93,8 @@ Body in markdown...
 
 - `:type` must be one of the types in `config.edn` — a typo fails indexing loudly
 - the slug is the filename unless `:slug` overrides it
-- link entries add `:link-url` (and optionally `:link-via`); quotes add
-  `:source` / `:source-url`
+- any entry with `:link-url` gets an outbound title (links, releases, tools);
+  `:link-via` adds attribution; quotes add `:source` / `:source-url`
 
 ## Authoring workflow
 
@@ -119,7 +119,7 @@ its next timed pull (≤ `:content-sync-seconds`); to go live right now,
 |-----|-------|
 | `/2026` · `/2026/jul` · `/2026/jul/4` | date archives |
 | `/2026/jul/4/hello-world` | single entry |
-| `/posts` · `/notes` · `/links` · `/quotes` | by type (`/2026/posts` filters by year) |
+| `/posts` · `/notes` · `/links` · `/quotes` · `/releases` · `/tools` | by type (`/2026/posts` filters by year) |
 | `/tags` · `/tags/clojure` · `/tags/clojure/2026` | by tag |
 | `/search?q=...` | full-text search |
 | `/feed.xml` | RSS |

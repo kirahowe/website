@@ -6,7 +6,7 @@
            [java.nio.file.attribute FileAttribute]))
 
 (def config
-  {:entry-types [:post :note :link :quote]
+  {:entry-types [:post :note :link :quote :release :tool]
    :content-path "example-content"})
 
 (deftest frontmatter-parsing
@@ -53,7 +53,7 @@
 (deftest index-building
   (let [index (content/build-index config)]
     (testing "all example entries load, newest first"
-      (is (= 6 (count (:entries index))))
+      (is (= 8 (count (:entries index))))
       (is (= "/2026/jul/4/nextjournal-markdown" (:path (first (:entries index)))))
       (is (apply >= (map #(-> % :date :year) (:entries index)))))
 
@@ -74,6 +74,8 @@
       (is (= 2 (count (get (:by-type index) :link))))
       (is (= 1 (count (get (:by-type index) :quote))))
       (is (= 1 (count (get (:by-type index) :note))))
+      (is (= 1 (count (get (:by-type index) :release))))
+      (is (= 1 (count (get (:by-type index) :tool))))
       (is (= 5 (count (get (:by-tag index) :clojure)))))
 
     (testing "tags are normalized to keywords"
