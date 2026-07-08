@@ -1,0 +1,24 @@
+name: Deploy
+
+# Deploys the site to Fly.io on every push to the default branch.
+# Only code changes need a deploy — content is a separate public repo the
+# running machine pulls on a timer, so writing/publishing never triggers CI.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:   # lets you deploy by hand from the Actions tab
+
+# Never let two deploys race; a newer push supersedes an in-flight one.
+concurrency:
+  group: deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
