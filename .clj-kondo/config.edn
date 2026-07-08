@@ -1,0 +1,10 @@
+;; clj-kondo config. The bb built-ins we lean on aren't on clj-kondo's
+;; classpath in CI, so silence "unresolved namespace" for them — their
+;; vars still resolve through the alias, so real errors are unaffected.
+{:linters
+ {:unresolved-namespace
+  {:exclude [babashka.fs
+             babashka.process
+             hiccup2.core
+             nextjournal.markdown
+             org.httpkit.server]}}}

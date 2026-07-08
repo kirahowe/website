@@ -1,0 +1,49 @@
+name: CI
+
+# Tests and linting run on every push to the default branch and every PR.
+# Deploy to Fly.io happens only after BOTH pass, and only on a push to main.
+# (Publishing a post never touches this — content is a separate public repo
+# the running machine pulls on a timer; only code changes deploy.)
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:   # deploy by hand from the Actions tab
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeLaGuardo/setup-clojure@13.4
+        with:
+          bb: 1.12.218              # match the Dockerfile's babashka
+          github-token: ${{ github.token }}
+      - run: bb test
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeLaGuardo/setup-clojure@13.4
+        with:
+          clj-kondo: latest
+          github-token: ${{ github.token }}
+      # Fail only on real errors (unresolved vars, syntax) — not style
+      # warnings. A lint nit shouldn't be able to block a deploy.
+      - run: clj-kondo --lint src test --fail-level error
+
+  deploy:
+    needs: [test, lint]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

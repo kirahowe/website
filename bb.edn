@@ -29,6 +29,12 @@
                 (when (pos? (+ fail error))
                   (System/exit 1)))}
 
+  lint {:doc "Lint src and test with clj-kondo (must be on PATH)"
+        :task (let [{:keys [exit]}
+                    (shell {:continue true}
+                           "clj-kondo --lint src test --fail-level error")]
+                (System/exit exit))}
+
   new {:doc "Scaffold a new draft: bb new <type> <title words...>"
        :requires ([site.author :as author])
        :task (apply author/new-draft *command-line-args*)}
