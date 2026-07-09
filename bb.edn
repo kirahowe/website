@@ -25,7 +25,7 @@
                    [site.search-test]
                    [site.sync-test]
                    [site.views-test])
-        :task (let [{:keys [fail error]} (t/run-all-tests #"site\..*-test")]
+        :task (let [{:keys [fail error]} (t/run-all-tests (re-pattern "site\\..*-test"))]
                 (when (pos? (+ fail error))
                   (System/exit 1)))}
 
