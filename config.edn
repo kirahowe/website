@@ -26,4 +26,4 @@
  ;; A typo'd type in a content file fails indexing loudly.
  :entry-types [:post :note :link :quote :release :tool]
 
- :port 8080}
+ :port 8100}
