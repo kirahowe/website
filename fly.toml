@@ -3,7 +3,7 @@
 # and no env vars. Before first deploy:
 #   1. change `app` to your (globally unique) app name
 #   2. fly deploy
-app = "kirahowe-www"
+app = "kirahowe-website"
 primary_region = "yul"
 
 [build]
