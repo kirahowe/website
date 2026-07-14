@@ -28,13 +28,15 @@
   didn't make the cut."
   [entry]
   (let [month-key [(-> entry :date :year) (-> entry :date :month)]]
-    [:nav.older
-     [:a {:href (util/month-url month-key)}
-      (str "Older → " (util/month-label month-key))]]))
+    [:a.feed-more {:href (util/month-url month-key)}
+     "Older → " (util/month-label month-key)]))
 
 (defn home [config index]
   (let [n (or (:home-entries config) default-home-entries)
         {:keys [shown next-entry]} (take-whole-days (:entries index) n)]
     (layout/page config nil
-                 (c/day-grouped-list shown)
-                 (when next-entry (older-link next-entry)))))
+                 (c/cols (list (c/feed shown)
+                               (when next-entry (older-link next-entry)))
+                         (c/sidebar
+                          (c/recent-links (:entries index) 5)
+                          (c/top-tags (:tag-counts index) 5))))))

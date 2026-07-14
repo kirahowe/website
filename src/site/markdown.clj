@@ -119,3 +119,40 @@
   "Rough word count of a markdown string (whitespace-separated tokens)."
   [s]
   (count (re-seq #"\S+" (str s))))
+
+(defn read-time
+  "Reading-time estimate in whole minutes (~200 wpm), at least 1."
+  [s]
+  (max 1 (Math/round (/ (word-count s) 200.0))))
+
+(defn excerpt
+  "The first paragraph as plain text — markdown syntax stripped — for the
+  one-line previews in feed rows and listings."
+  [s]
+  (-> (lede s)
+      (str/replace #"!\[\[[^\]]*\]\]" "")               ; ![[embeds]]
+      (str/replace #"!\[[^\]]*\]\([^)]*\)" "")           ; ![alt](img)
+      (str/replace #"\[\[[^\]|]+\|([^\]]+)\]\]" "$1")    ; [[t|label]] → label
+      (str/replace #"\[\[([^\]]+)\]\]" "$1")             ; [[t]] → t
+      (str/replace #"\[([^\]]+)\]\([^)]*\)" "$1")        ; [text](url) → text
+      (str/replace #"[*_`>#]" "")                         ; emphasis / code / heading marks
+      (str/replace #"\s+" " ")
+      str/trim))
+
+(defn- add-class [[tag & more] cls]
+  (let [[attrs children] (if (map? (first more))
+                           [(first more) (rest more)]
+                           [{} more])]
+    (into [tag (update attrs :class #(if % (str % " " cls) cls))] children)))
+
+(defn render-article
+  "Like `render`, but returns the body's block children as a sequence with
+  the first paragraph tagged `.lead` — the opening-paragraph emphasis on
+  post and page bodies."
+  [s wikilinks]
+  (let [[_div & children] (render s wikilinks)
+        [before [lead & after]] (split-with #(not (and (vector? %) (= :p (first %))))
+                                            children)]
+    (concat before
+            (when lead [(add-class lead "lead")])
+            after)))

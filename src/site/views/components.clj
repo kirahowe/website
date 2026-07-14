@@ -1,122 +1,169 @@
 (ns site.views.components
-  "Reusable pieces. Entry rendering dispatches on :type via multimethods
-  with a :default, so a new type renders acceptably before it gets a
-  custom look."
-  (:require [site.markdown :as markdown]
+  "Reusable feed and sidebar pieces. Entries are modelled as
+  {:type :title :path :date :tags :body :link-url :source :source-url}; the
+  five page types compose from the functions here (entry-row, feed, sidebar
+  sections, page-header, type-summary)."
+  (:require [clojure.set :as set]
+            [site.markdown :as markdown]
             [site.util :as util]))
 
-(defn date-link
-  "2026/jul/4 as three archive links."
-  [{:keys [year month day]}]
-  (let [ms (util/month-slug month)]
-    [:time.entry-date {:datetime (format "%04d-%02d-%02d" year month day)}
-     [:a {:href (str "/" year)} year]
-     "/"
-     [:a {:href (str "/" year "/" ms)} ms]
-     "/"
-     [:a {:href (str "/" year "/" ms "/" day)} day]]))
+(def type-order [:post :note :link :quote :release :tool])
 
-(defn tag-links [entry]
-  (when (seq (:tags entry))
-    [:span.tags
-     (for [t (sort-by name (:tags entry))]
-       [:a.tag {:href (str "/tags/" (name t))} (str "#" (name t))])]))
+;; --- small atoms ---------------------------------------------------------
 
-(defn type-badge [entry]
-  [:a.type-badge {:class (name (:type entry))
-                  :href (str "/" (name (:type entry)) "s")}
-   (name (:type entry))])
+(defn dot
+  "The type colour dot: a decorative marker reading its colour from the
+  entry type."
+  [type]
+  [:span.dot {:class (name type)}])
 
-(defn entry-meta
-  "The byline row: type badge, date, tags, permalink. Pass
-  {:show-date? false} inside day-grouped lists, where the heading
-  already carries the date."
-  ([entry] (entry-meta entry {}))
-  ([entry {:keys [show-date?] :or {show-date? true}}]
-   [:div.entry-meta
-    (type-badge entry)
-    (when (and show-date? (:date entry)) (date-link (:date entry)))
-    (tag-links entry)
-    [:a.permalink {:href (:path entry) :title "Permalink"} "#"]]))
+(defn- outbound
+  "Links, releases and tools point at their source; everything else at its
+  own page."
+  [entry]
+  (or (:link-url entry) (:path entry)))
 
-;; --- type-specific rendering -------------------------------------------
+(defn entry-label
+  "A one-line label for an entry in a dense list: its title, a short quote
+  excerpt, or — for untitled notes — the date."
+  [entry]
+  (or (:title entry)
+      (when (= :quote (:type entry))
+        (let [ex (markdown/excerpt (:body entry))]
+          (str "“" (subs ex 0 (min 60 (count ex))) "”")))
+      (util/format-date (:date entry))))
 
-(defmulti entry-header
-  "Heading for an entry; may be nil (untitled notes). Entries carrying
-  :link-url (links, releases, tools) link out instead of to their own page."
-  :type)
+(defn tag-links [tags]
+  [:span.entry-tags
+   (for [t (sort-by name tags)]
+     [:a {:href (str "/tags/" (name t))} (str "#" (name t))])])
 
-(defmethod entry-header :default [entry]
+;; --- feed row ------------------------------------------------------------
+
+(defn- entry-hint
+  "The right-hand hint in a feed row: a reading time for text entries, the
+  source host for outbound ones, nothing for quotes."
+  [entry]
   (cond
-    (:link-url entry)
-    [:h2.entry-title
-     [:a.outbound {:href (:link-url entry)} (or (:title entry) (:link-url entry))]
-     (when-let [via (:link-via entry)]
-       [:span.via " (" [:a {:href via} "via"] ")"])]
+    (:link-url entry) (util/host (:link-url entry))
+    (#{:post :note} (:type entry)) [:a {:href (:path entry)}
+                                    (str (markdown/read-time (:body entry)) " min read")]))
 
-    (:title entry)
-    [:h2.entry-title [:a {:href (:path entry)} (:title entry)]]))
+(defn- entry-foot [entry]
+  [:div.entry-foot
+   [:span.entry-kind {:class (name (:type entry))}
+    (dot (:type entry))
+    (name (:type entry))
+    (when (seq (:tags entry))
+      (list [:span.sep "·"] (tag-links (:tags entry))))]
+   (when-let [h (entry-hint entry)]
+     [:span.entry-hint h])])
 
-(defmulti entry-body
-  "Full rendered body for an entry."
-  :type)
+(defn- entry-title [entry]
+  (when (:title entry)
+    [:h3.entry-title [:a {:href (outbound entry)} (:title entry)]]))
 
-(defmethod entry-body :default [entry]
-  [:div.entry-body (markdown/render (:body entry) (:wikilinks entry))])
+(defn entry-row
+  "One entry in the feed: a quote renders as a blockquote with a linked
+  source; every other type renders as title + excerpt. Both close with the
+  type/tags/hint foot."
+  [entry]
+  [:article.entry
+   (if (= :quote (:type entry))
+     (list
+      [:blockquote (markdown/excerpt (:body entry)) [:span.quote-close "”"]]
+      (when-let [src (:source entry)]
+        [:p.quote-cite "— " (if-let [url (:source-url entry)]
+                              [:a {:href url} src]
+                              src)]))
+     (list
+      (entry-title entry)
+      [:p.entry-excerpt (markdown/excerpt (:body entry))]))
+   (entry-foot entry)])
 
-(defmethod entry-body :quote [entry]
-  [:div.entry-body
-   [:blockquote (markdown/render (:body entry) (:wikilinks entry))]
-   (when-let [source (:source entry)]
-     [:p.quote-source "— " (if-let [url (:source-url entry)]
-                             [:a {:href url} source]
-                             source)])])
+(defn day-group [entries]
+  (let [date (:date (first entries))]
+    [:section.day-group
+     [:h2.day-heading [:a {:href (util/day-url date)} (util/format-date date)]]
+     (map entry-row entries)]))
 
-(defmulti card-body
-  "How an entry's body appears in a listing card. Posts are long-form
-  and get a preview (first paragraph + word-count link); every other
-  type shows in full."
-  :type)
-
-(defmethod card-body :default [entry]
-  (entry-body entry))
-
-(defmethod card-body :post [entry]
-  (let [body (:body entry)
-        lede (markdown/lede body)]
-    (if (= lede body)
-      (entry-body entry)
-      (list
-       [:div.entry-body.lede (markdown/render lede (:wikilinks entry))]
-       [:p.more
-        [:a {:href (:path entry)}
-         (str "[… " (markdown/word-count body) " words]")]]))))
-
-;; --- listings ------------------------------------------------------------
-
-(defn entry-card
-  "How an entry appears in the feed and listings. Posts preview with a
-  word-count link; everything else is full and untruncated. Titles link
-  to the entry's own page (or out, for :link-url types)."
-  ([entry] (entry-card entry {}))
-  ([entry opts]
-   [:article.entry-card {:class (name (:type entry))}
-    (entry-meta entry opts)
-    (entry-header entry)
-    (card-body entry)]))
-
-(defn entry-list
-  ([entries] (entry-list entries {}))
-  ([entries opts]
-   [:div.entry-list (map #(entry-card % opts) entries)]))
-
-(defn day-grouped-list
-  "Entries (newest first) grouped under linked day headings, the way the
-  home page and date archives read."
+(defn feed
+  "Entries (newest first) grouped under linked day headings — the shape the
+  home page, tag pages and month pages all share."
   [entries]
   (for [group (partition-by util/day-key entries)]
-    (let [date (:date (first group))]
-      [:section.day-group
-       [:h2.day-heading
-        [:a {:href (util/day-url date)} (util/format-date date)]]
-       (entry-list group {:show-date? false})])))
+    (day-group group)))
+
+;; --- page header + counts ------------------------------------------------
+
+(defn page-header
+  "Slim banner atop tag / year / month pages: a title (hiccup) and a plain
+  entry count."
+  [title count]
+  [:header.page-header
+   [:h1 title (when count [:span.count count])]])
+
+(defn count-label [n]
+  (str n " " (if (= 1 n) "entry" "entries")))
+
+(defn type-summary
+  "A per-type breakdown line — \"4 posts · 9 links · 2 quotes\" — in nav
+  order. When `link?`, each type word links to its listing."
+  [entries link?]
+  (let [counts (frequencies (map :type entries))]
+    (interpose [:span.sep "·"]
+               (for [t type-order :when (counts t)
+                     :let [plural (str (name t) "s")]]
+                 [:span (counts t) " "
+                  (if link? [:a {:href (str "/" plural)} plural] plural)]))))
+
+;; --- sidebar -------------------------------------------------------------
+
+(defn sidebar [& sections]
+  (into [:aside.sidebar] (remove nil? sections)))
+
+(defn side-section [title & body]
+  (into [:section.side [:h2 title]] body))
+
+(defn cols
+  "The two-column shell: main feed on the left, sidebar on the right, with a
+  vertical hairline divider carried by .main."
+  [main aside]
+  [:div.cols [:div.main main] aside])
+
+(defn side-link [{:keys [path title type]}]
+  [:a.side-link {:href path} (when type (dot type)) title])
+
+(defn recent-links
+  "The N most recent titled entries, each with its type dot."
+  [entries n]
+  (side-section "Recent"
+                (for [e (take n (filter :title entries))]
+                  (side-link {:path (:path e) :title (entry-label e) :type (:type e)}))))
+
+(defn tag-cloud [tag-counts]
+  [:div.tag-cloud
+   (for [[t n] tag-counts]
+     [:a {:href (str "/tags/" (name t))} (str "#" (name t)) " " [:b n]])])
+
+(defn top-tags [tag-counts n]
+  (when (seq tag-counts)
+    (side-section "Top tags" (tag-cloud (take n tag-counts)))))
+
+;; --- related grid (post/entry footer) ------------------------------------
+
+(defn related
+  "Up to n other entries, most-shared-tags first (recency breaks ties)."
+  [entries entry n]
+  (let [tags (set (:tags entry))]
+    (->> entries
+         (remove #(= (:path %) (:path entry)))
+         (sort-by #(- (count (set/intersection tags (set (:tags %))))))
+         (take n))))
+
+(defn related-item [e]
+  [:a.related-item {:href (:path e)}
+   (dot (:type e))
+   [:span.kind (name (:type e))]
+   [:span.title (entry-label e)]
+   [:span.when (util/short-date (:date e))]])

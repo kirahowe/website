@@ -17,6 +17,12 @@
  ;; A typo'd type in a content file fails indexing loudly.
  :entry-types [:post :note :link :quote :release :tool]
 
+ ;; Short bio shown in the footer of every entry page.
+ :bio "Kira Howe is a software engineer writing about Clojure, data, and the craft of building small, durable software."
+
+ ;; Footer social links, [label url]. RSS is always included first.
+ :social [["GitHub" "https://github.com/kirahowe"]]
+
  ;; Command used by `bb suggest-tags` (invoked via your login shell, so
  ;; shell aliases/functions work). dev.edn can override it.
  :llm-command "claude"

@@ -45,6 +45,7 @@
       1 (cond
           (= a "feed.xml") {:handler :feed}
           (= a "search") {:handler :search}
+          (= a "archive") {:handler :archive}
           (= a "tags") {:handler :tags}
           (plural->type a) {:handler :type-list :params {:type (plural->type a)}}
           (util/parse-year a) {:handler :year :params {:year (util/parse-year a)}}

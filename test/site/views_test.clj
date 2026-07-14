@@ -34,10 +34,10 @@
       (is (str/includes? body "Rich Hickey"))
       ;; all 8 example entries fit within :home-entries, so the oldest shows
       (is (str/includes? body "Babashka"))
-      ;; post previews stop after the first paragraph
+      ;; feed previews are the first paragraph only, as plain-text excerpts
       (is (not (str/includes? body "where code sleeps")))
-      (is (str/includes? body "words]"))                       ; post preview link
-      (is (str/includes? body "Untitled notes are fine"))      ; notes stay full inline
+      (is (str/includes? body "min read"))                     ; reading-time hint
+      (is (str/includes? body "Untitled notes are fine"))      ; note excerpt shows
       ;; day headings link to the day archives
       (is (str/includes? body "July 4, 2026"))
       (is (str/includes? body "\"/2026/jul/4\""))))
@@ -142,8 +142,8 @@
     (testing "both same-day entries show (days are never split)"
       (is (str/includes? body "Hello, world"))
       (is (str/includes? body "nextjournal/markdown")))
-    (testing "entries past the cut don't show"
-      (is (not (str/includes? body "Simplicity is a choice"))))
+    (testing "the feed stops at the whole-day cut (later days aren't in the feed)"
+      (is (not (str/includes? body "June 21, 2026"))))
     (testing "the feed continues into the month archive of the next entry"
       (is (str/includes? body "Older"))
       (is (str/includes? body "\"/2026/jun\"")))))

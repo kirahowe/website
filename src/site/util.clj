@@ -63,6 +63,31 @@
   [{:keys [year month day]}]
   (str (month-name month) " " day ", " year))
 
+(defn short-date
+  "{:year 2026 :month 7 :day 4} → \"Jul 4\" — the compact form used in
+  related-entry rows."
+  [{:keys [month day]}]
+  (str (str/capitalize (month-slug month)) " " day))
+
+(defn ordinal
+  "1 → \"1st\", 2 → \"2nd\", 11 → \"11th\", 23 → \"23rd\"."
+  [n]
+  (let [suffix (if (<= 11 (mod n 100) 13)
+                 "th"
+                 (case (mod n 10) 1 "st" 2 "nd" 3 "rd" "th"))]
+    (str n suffix)))
+
+(defn host
+  "\"https://youtu.be/xyz\" → \"youtu.be\" — the source hint shown on
+  outbound entries (links, releases, tools)."
+  [url]
+  (some-> url
+          (str/replace #"^\w+://" "")
+          (str/replace #"^www\." "")
+          (str/split #"/")
+          first
+          not-empty))
+
 (defn slugify
   "\"My Post Title!\" → \"my-post-title\""
   [s]

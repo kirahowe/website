@@ -76,9 +76,15 @@
       (if-let [entry (get (:by-path index) canonical)]
         ;; Serve one canonical URL; /2026/07/04/x redirects to /2026/jul/4/x
         (if (= (:uri req) canonical)
-          (html (v.entry/entry-page config entry))
+          (html (v.entry/entry-page config index entry))
           {:status 301 :headers {"Location" canonical}})
         (not-found config)))
+
+    :archive
+    ;; "Archive" in the nav lands on the most recent year that has content.
+    (if-let [year (first (sort > (keys (:by-year index))))]
+      {:status 302 :headers {"Location" (str "/" year)}}
+      (html (v.home/home config index)))
 
     :type-list
     (let [{:keys [type year]} params]
