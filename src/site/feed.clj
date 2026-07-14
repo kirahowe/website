@@ -24,7 +24,7 @@
      [:guid url]
      [:pubDate (rfc-1123 (:date entry))]
      ;; Escaped HTML content — hiccup escapes the rendered string for us.
-     [:description (str (h/html (markdown/render (:body entry))))]]))
+     [:description (str (h/html (markdown/render (:body entry) (:wikilinks entry))))]]))
 
 (defn rss
   "The 20 most recent entries as an RSS 2.0 XML string."

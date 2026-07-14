@@ -32,13 +32,13 @@
     (content/build-index cfg)))
 
 (defn start!
-  "Options (merged over config.edn + config.local.edn):
-    :dev?   — rebuild the content index on every request and serve
-              drafts at /drafts/<name>; this is what `bb dev` passes
+  "Options:
+    :env    — :dev (config.edn + dev.edn; reindex every request, drafts
+              visible) or :prod (config.edn + prod.edn). Defaults to :prod.
     :block? — park the calling thread (for `bb dev` / `bb run`)"
   ([] (start! {}))
   ([opts]
-   (let [cfg (config/load-config (dissoc opts :block?))
+   (let [cfg (config/load-config (or (:env opts) :prod))
          index-atom (atom (initial-index cfg))
          handler (app/make-app cfg index-atom)]
      (stop!)

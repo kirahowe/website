@@ -1,55 +1,111 @@
 (ns site.content
-  "Loads the content repo (a folder of markdown files with EDN frontmatter)
-  into an in-memory index.
+  "Loads the content repo (a folder of markdown files) into an in-memory
+  index.
 
   Files are the source of truth; everything built here is derived and
   rebuildable at any time.
 
   Layout of the content repo:
-    drafts/<name>.md          — unpublished; served only via token-gated preview
+    drafts/<name>.md          — unpublished; served only via dev preview
     pages/<slug>.md           — static pages (about, ...)
-    YYYY/MM/DD/<name>.md      — published entries; date comes from the path,
-                                slug from the filename unless :slug overrides it"
-  (:require [clojure.edn :as edn]
+    attachments/              — images pasted in Obsidian, served at /attachments/
+    YYYY/MM/DD/<name>.md      — published entries; date comes from the path
+
+  Frontmatter dialects, detected by the first line:
+    ---   YAML — what Obsidian writes (the Properties panel). Natural
+          property names map onto the entry model: link → :link-url,
+          via → :link-via, author → :source, source → :source-url.
+    ;;;   EDN — the original format, still accepted.
+    none  a bare note publishes as a :post.
+
+  The filename is the human title (quotes stay untitled unless a title
+  property says otherwise); the slug is slugified from it unless a slug
+  property pins something else (e.g. to preserve an old URL)."
+  (:require [clj-yaml.core :as yaml]
+            [clojure.edn :as edn]
             [clojure.java.io :as io]
+            [clojure.set :as set]
             [clojure.string :as str]
             [site.util :as util]))
 
-(def frontmatter-delimiter ";;;")
+(def edn-delimiter ";;;")
+(def yaml-delimiter "---")
+
+(defn- split-frontmatter
+  "raw → [meta-str body] when raw starts with the delimiter line, else nil.
+  Throws on an opening delimiter that never closes."
+  [raw delimiter file]
+  (let [lines (str/split-lines raw)]
+    (when (= delimiter (str/trim (or (first lines) "")))
+      (let [end (->> (map-indexed vector (rest lines))
+                     (filter #(= delimiter (str/trim (second %))))
+                     ffirst)]
+        (when-not end
+          (throw (ex-info (str "Unterminated frontmatter (no closing " delimiter "): " file)
+                          {:file file})))
+        [(str/join "\n" (take end (rest lines)))
+         (str/trim (str/join "\n" (drop (+ end 2) lines)))]))))
+
+(defn- read-edn-meta [s file]
+  (let [meta (try (edn/read-string s)
+                  (catch Exception e
+                    (throw (ex-info (str "Invalid EDN frontmatter in " file ": " (ex-message e))
+                                    {:file file} e))))]
+    (when-not (map? meta)
+      (throw (ex-info (str "Frontmatter must be an EDN map: " file)
+                      {:file file :meta meta})))
+    meta))
+
+(defn- normalize-yaml-meta
+  "Obsidian properties → entry keys. Blank/empty properties are treated
+  as absent; date and publish are workflow properties, not entry data
+  (the path is the date)."
+  [meta file]
+  (when-not (map? meta)
+    (throw (ex-info (str "Frontmatter must be a YAML map: " file)
+                    {:file file :meta meta})))
+  (let [present (into {}
+                      (remove (fn [[_ v]]
+                                (or (nil? v) (and (string? v) (str/blank? v)))))
+                      meta)]
+    (-> present
+        (set/rename-keys {:link :link-url
+                          :via :link-via
+                          :author :source
+                          :source :source-url})
+        (dissoc :date :publish)
+        (cond->
+         (:type present) (update :type keyword)
+         (:tags present) (update :tags #(if (coll? %) % [%]))))))
+
+(defn- read-yaml-meta [s file]
+  (normalize-yaml-meta
+   (try (yaml/parse-string s)
+        (catch Exception e
+          (throw (ex-info (str "Invalid YAML frontmatter in " file ": " (ex-message e))
+                          {:file file} e))))
+   file))
 
 (defn parse-frontmatter
-  "Splits raw file content into {:meta <edn map> :body <markdown string>}.
-  Frontmatter is an EDN map between two `;;;` lines at the top of the file."
+  "Splits raw file content into {:meta <map> :body <markdown string>}.
+  Detects the frontmatter dialect by the first line; a file with no
+  frontmatter at all is an entry with empty metadata."
   [raw file]
-  (let [lines (str/split-lines raw)]
-    (when-not (= frontmatter-delimiter (str/trim (or (first lines) "")))
-      (throw (ex-info (str "Missing EDN frontmatter (file must start with ;;;): " file)
-                      {:file file})))
-    (let [end (->> (map-indexed vector (rest lines))
-                   (filter #(= frontmatter-delimiter (str/trim (second %))))
-                   ffirst)]
-      (when-not end
-        (throw (ex-info (str "Unterminated frontmatter (no closing ;;;): " file)
-                        {:file file})))
-      (let [meta-str (str/join "\n" (take end (rest lines)))
-            body (str/join "\n" (drop (+ end 2) lines))
-            meta (try (edn/read-string meta-str)
-                      (catch Exception e
-                        (throw (ex-info (str "Invalid EDN frontmatter in " file ": " (ex-message e))
-                                        {:file file} e))))]
-        (when-not (map? meta)
-          (throw (ex-info (str "Frontmatter must be an EDN map: " file)
-                          {:file file :meta meta})))
-        {:meta meta :body (str/trim body)}))))
+  (if-let [[meta-str body] (split-frontmatter raw edn-delimiter file)]
+    {:meta (read-edn-meta meta-str file) :body body}
+    (if-let [[meta-str body] (split-frontmatter raw yaml-delimiter file)]
+      {:meta (read-yaml-meta meta-str file) :body body}
+      {:meta {} :body (str/trim raw)})))
 
 (defn check-type!
-  "Validates :type against the configured :entry-types. Fails loudly so a
+  "Resolves :type, defaulting to :post (a bare note is a post), and
+  validates it against the configured :entry-types. Fails loudly so a
   typo can't silently coin a new type."
   [config meta file]
   (let [allowed (set (:entry-types config))
-        t (:type meta)]
+        t (or (:type meta) :post)]
     (when-not (keyword? t)
-      (throw (ex-info (str "Missing or non-keyword :type in " file)
+      (throw (ex-info (str "Non-keyword :type in " file)
                       {:file file :type t})))
     (when-not (allowed t)
       (throw (ex-info (str "Unknown entry type " t " in " file
@@ -73,9 +129,17 @@
 (defn- normalize-tags [tags]
   (into #{} (map keyword) tags))
 
+(defn- title-for
+  "The filename is the title, except for quotes, which stay untitled
+  unless a title property is set explicitly."
+  [meta type fname]
+  (or (:title meta)
+      (when-not (= type :quote) fname)))
+
 (defn load-entry
-  "file → entry map. The date comes from the file's path; the slug from the
-  filename unless overridden by :slug in frontmatter."
+  "file → entry map. The date comes from the file's path; the title from
+  the filename; the slug is slugified from the filename unless :slug
+  overrides it."
   [config root file]
   (let [rp (rel-path root file)
         [_ y m d fname] (re-matches entry-path-re rp)]
@@ -88,7 +152,9 @@
         (throw (ex-info (str "Invalid date in path: " rp) {:file rp :date date})))
       (let [entry (merge (dissoc meta :slug)
                          {:type type
-                          :slug (or (:slug meta) fname)
+                          :title (title-for meta type fname)
+                          :slug (or (:slug meta) (util/slugify fname))
+                          :file-title fname
                           :date date
                           :tags (normalize-tags (:tags meta))
                           :body body
@@ -97,7 +163,7 @@
 
 (defn load-draft
   "Drafts have no date (that's decided at publish time); they are addressed
-  by filename and only served through the token-gated preview route."
+  by filename and only served through the dev preview route."
   [config root file]
   (let [rp (rel-path root file)
         name (base-name file)
@@ -105,7 +171,9 @@
         type (check-type! config meta rp)]
     (merge (dissoc meta :slug)
            {:type type
-            :slug (or (:slug meta) name)
+            :title (title-for meta type name)
+            :slug (or (:slug meta) (util/slugify name))
+            :file-title name
             :draft-name name
             :draft? true
             :tags (normalize-tags (:tags meta))
@@ -118,13 +186,10 @@
   [root file]
   (let [rp (rel-path root file)
         slug (base-name file)
-        raw (slurp (io/file (str file)))
-        {:keys [meta body]} (if (str/starts-with? (str/triml raw) frontmatter-delimiter)
-                              (parse-frontmatter raw rp)
-                              {:meta {} :body raw})]
+        {:keys [meta body]} (parse-frontmatter (slurp (io/file (str file))) rp)]
     {:slug slug
      :title (or (:title meta) (str/capitalize slug))
-     :body (str/trim body)
+     :body body
      :path (str "/" slug)}))
 
 (defn- md-files [dir]
@@ -172,6 +237,13 @@
               (< i (dec (count entries))) (assoc :older (brief (entries (inc i))))))
           entries))))
 
+(defn wikilink-targets
+  "{lowercased filename → entry path} for every published entry — what
+  [[wikilinks]] resolve against. Attached to each entry so rendering can
+  resolve links wherever the entry travels."
+  [entries]
+  (into {} (map (fn [e] [(str/lower-case (:file-title e)) (:path e)])) entries))
+
 (def empty-index
   "What the server serves when content is unavailable at boot — the sync
   loop replaces it as soon as a pull succeeds."
@@ -187,7 +259,9 @@
         _ (when (seq dupes)
             (throw (ex-info (str "Duplicate entry paths: " (str/join ", " dupes))
                             {:paths (vec dupes)})))
-        entries (link-neighbors entries)]
+        wikilinks (wikilink-targets entries)
+        entries (mapv #(assoc % :wikilinks wikilinks) (link-neighbors entries))
+        drafts (update-vals drafts #(assoc % :wikilinks wikilinks))]
     {:entries entries
      :by-path (into {} (map (juxt :path identity)) entries)
      :by-type (group-by :type entries)

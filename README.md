@@ -1,29 +1,35 @@
 # website-v2
 
-A personal weblog — posts, notes, links, and quotes — rendered from a folder
-of markdown files by a small Clojure program running entirely under
-[babashka](https://babashka.org). No JVM, no database, no build step, and
-zero external dependencies (everything used, including nextjournal/markdown,
-is built into bb ≥ 1.12.196).
+A personal weblog — posts, notes, links, and quotes — rendered straight
+from an **Obsidian vault** by a small Clojure program running entirely
+under [babashka](https://babashka.org). No JVM, no database, no build
+step, and zero external dependencies (everything used, including
+nextjournal/markdown and clj-yaml, is built into bb ≥ 1.12.196).
 
-See [PLAN.md](PLAN.md) for the full architecture and its rationale.
+The guiding rule: **you write in Obsidian's native dialect; the machine
+adapts.** YAML properties, `[[wikilinks]]`, pasted images — the site's
+indexer and renderer translate all of it at read time. Nothing in the
+vault exists for the machine's benefit.
+
+See [PLAN.md](PLAN.md) for the original architecture and its rationale.
 
 ## Quick start
 
 ```sh
 # install babashka ≥ 1.12.196 (https://github.com/babashka/babashka#installation), then:
-bb dev        # serve example-content at http://localhost:8080, reindexing every request
+bb dev        # serve the vault configured in dev.edn at http://localhost:8100
 bb test       # run the test suite
 ```
 
-## Your real content: an Obsidian vault that is also a git repo
+(No vault yet? Point `:content-path` in `dev.edn` at `example-content`.)
 
-The content is a **dedicated Obsidian vault** whose root is also the root
-of a git repo. One-time setup:
+## The content is an Obsidian vault that is also a git repo
 
-1. In Obsidian, create a new vault (keep it separate from your personal
-   vault — everything committed here ends up on the server). Put it in
-   iCloud so your phone sees it: Obsidian's iCloud vaults live at
+One-time setup:
+
+1. In Obsidian, create a dedicated vault (everything committed here ends
+   up on the server). Put it in iCloud so your phone sees it: Obsidian's
+   iCloud vaults live at
    `~/Library/Mobile Documents/iCloud~md~obsidian/Documents/<VaultName>`
    on your Mac.
 2. Make it a repo and push it (public — the server pulls it anonymously,
@@ -34,84 +40,100 @@ of a git repo. One-time setup:
    git init && git add -A && git commit -m "content repo"
    gh repo create my-content --public --source . --push
    ```
-3. Point the site at it with a `config.local.edn` in the project root
-   (gitignored, merged over `config.edn` — no env vars needed):
-   ```clojure
-   {:content-path "~/Library/Mobile Documents/iCloud~md~obsidian/Documents/<VaultName>"
-    :content-git-url nil}   ; the server pulls from git; your laptop reads the vault directly
-   ```
-   Then just `bb dev`.
-
-Day to day: **phone** → open Obsidian, write in `drafts/` (iCloud syncs it).
-**Laptop** → `bb publish <name>` moves it into today's date folder, commits,
-and pushes; the server picks it up from git. Files outside `drafts/`,
-`pages/`, and the date tree are ignored by the site, and `.obsidian/` never
-gets committed.
+3. Point `:content-path` in `dev.edn` at the vault, and
+   `:content-git-url` in `prod.edn` at the repo. Then just `bb dev`.
 
 > iCloud tip: right-click the vault folder → "Keep Downloaded" so iCloud
 > can't evict the `.git` directory out from under you.
 
-## Configuration
+## Writing
 
-Everything lives in **`config.edn`** (committed): site title, base URL,
-entry types, port, content path, content repo URL, sync interval, home
-feed size. **`config.local.edn`** (gitignored) merges over it for
-machine-local settings — your vault path, `:content-git-url nil` to turn
-off git syncing locally.
+- **New note in `drafts/`.** The filename is the title. A bare note with
+  no frontmatter publishes as a post — frontmatter is entirely optional.
+- **Properties, not metadata.** Frontmatter is YAML — Obsidian's
+  Properties panel. `tags` autocomplete against the vault; other entry
+  types set `type: link` / `type: quote` plus their natural fields
+  (`link`, `via`, `author`, `source`).
+- **Link with `[[wikilinks]]`.** They resolve by filename to the entry's
+  URL at render time. An unresolved link (e.g. to a still-unpublished
+  draft) degrades to plain text — never a dead link — and `bb publish`
+  warns about it.
+- **Paste images.** Obsidian files them under `attachments/` (the vault
+  is preconfigured); the server serves them at `/attachments/...`. An
+  image never requires a site deploy.
+- **Slugs are automatic**: `slugify(filename)`. A `slug:` property exists
+  only to pin a URL (e.g. one inherited from an old blog).
 
-There are **no environment variables and no secrets**. Dev-only behavior
-(draft previews at `/drafts/<name>`, per-request reindexing) is switched
-by which task you run — `bb dev` versus `bb run` — not by configuration,
-so dev and prod can't drift apart. The production server exposes no admin
-surface at all: it just pulls the content repo on a timer.
+```sh
+bb new post My great idea      # scaffolds drafts/My great idea.md
+# ...write — with `bb dev` running, preview at localhost:8100/drafts/My great idea
+bb suggest-tags my-great-idea  # LLM-suggested tags, printed ready to paste
+bb reindex                     # optional: validate that everything parses
+bb publish my-great-idea       # lints, moves into today's date folder, commits, pushes
+```
+
+A file is a draft because it lives in `drafts/`; publishing is moving it
+into the date tree. No flags to forget. `bb publish` warns about
+unresolved wikilinks, missing attachments, missing or never-seen tags,
+and a link entry without a URL — but a warning never blocks a publish.
+
+`bb publish` **is** the manual publish. The live site picks the push up
+on its next timed pull (≤ `:content-sync-seconds`); to go live right
+now, `fly apps restart <app>` — `bb publish` prints this command for you.
 
 ## Content layout
 
 Whatever `:content-path` points at:
 
 ```
-my-content/
-├── drafts/                 # all writing starts here (flat — phone-friendly)
-│   └── an-idea.md
-├── pages/                  # static pages → /about, etc.
+my-vault/
+├── drafts/                      # all writing starts here (flat — phone-friendly)
+│   └── An idea brewing.md
+├── pages/                       # static pages → /about, etc.
 │   └── about.md
-└── 2026/07/04/             # published entries; the path IS the date
-    └── hello-world.md      # → /2026/jul/4/hello-world
+├── attachments/                 # pasted images → served at /attachments/...
+│   └── screenshot.png
+└── 2026/07/04/                  # published entries; the path IS the date
+    └── Hello world.md           # → /2026/jul/4/hello-world
 ```
 
-Every entry is markdown with EDN frontmatter:
+Frontmatter, when an entry needs any (a plain post doesn't):
 
 ```markdown
-;;;
-{:type :post
- :title "Hello, world"
- :tags [:clojure :meta]}
-;;;
+---
+type: link
+link: https://example.com/article
+via: https://news.ycombinator.com/item?id=1
+tags:
+  - clojure
+slug: custom-slug
+---
 
-Body in markdown...
+Body in markdown, with [[Hello world|wikilinks]] and ![[screenshot.png]].
 ```
 
-- `:type` must be one of the types in `config.edn` — a typo fails indexing loudly
-- the slug is the filename unless `:slug` overrides it
-- any entry with `:link-url` gets an outbound title (links, releases, tools);
-  `:link-via` adds attribution; quotes add `:source` / `:source-url`
+- `type` defaults to `post`; a typo'd type fails indexing loudly
+- quotes use `author:` and `source:` (the URL), and stay untitled unless
+  a `title:` property says otherwise
+- the original EDN frontmatter (`;;;`-delimited) is still accepted
 
-## Authoring workflow
+## Configuration
 
-```sh
-bb new post My great idea      # scaffolds drafts/my-great-idea.md
-# ...write — with `bb dev` running, preview at localhost:8080/drafts/my-great-idea
-bb reindex                     # optional: validate that everything parses
-bb publish my-great-idea       # moves it into today's date folder, commits, pushes
-```
+Three committed files, no environment variables, no secrets:
 
-A file is a draft because it lives in `drafts/`; publishing is moving it
-into the date tree. No flags to forget.
+- **`config.edn`** — the base that always applies: site title, base URL,
+  entry types, `:llm-command` (what `bb suggest-tags` shells out to),
+  port.
+- **`dev.edn`** — merged in by `bb dev` and the authoring tasks: your
+  vault path, `:content-git-url nil` (no git syncing locally), personal
+  `:llm-command` override.
+- **`prod.edn`** — merged in by `bb run`: the clone target, the content
+  repo URL, the sync interval.
 
-`bb publish` **is** the manual publish. The live site picks the push up on
-its next timed pull (≤ `:content-sync-seconds`); to go live right now,
-`fly apps restart <app>` — the machine re-clones fresh content at boot
-(`bb publish` prints this command for you).
+Dev-only behavior (draft previews at `/drafts/<name>`, per-request
+reindexing) follows the environment, so dev and prod can't drift apart.
+The production server exposes no admin surface at all: it just pulls the
+content repo on a timer.
 
 ## URLs
 
@@ -123,14 +145,16 @@ its next timed pull (≤ `:content-sync-seconds`); to go live right now,
 | `/tags` · `/tags/clojure` · `/tags/clojure/2026` | by tag |
 | `/search?q=...` | full-text search |
 | `/feed.xml` | RSS |
+| `/attachments/...` | images from the vault |
 
 ## Deploying to Fly.io
 
-`Dockerfile` and `fly.toml` are included. Set in `config.edn`:
+`Dockerfile` and `fly.toml` are included. `prod.edn` holds the content
+repo settings:
 
 ```clojure
 {:content-path "content"                                    ; clone target
- :content-git-url "https://github.com/<you>/<content-repo>.git"}
+ :content-git-url "https://github.com/<you>/<content-repo>"}
 ```
 
 The machine clones the content repo at boot and pulls every
@@ -148,12 +172,11 @@ fly deploy
 - Every public page gets CDN-friendly cache headers; put Cloudflare (or any
   CDN) in front and traffic spikes never reach the server.
 - Publishes go live within `:content-sync-seconds` (default 5 minutes) of
-  the git push — no deploy, no webhook, no admin endpoint. Impatient?
-  `fly apps restart <app>` re-clones immediately.
+  the git push — no deploy, no webhook, no admin endpoint.
 - A failed sync can never take the site down: bad network or a broken
   content push is logged, the last good index keeps serving, and the
   server retries every tick until the content is fixed. Even a broken
   clone at boot serves an empty site rather than crash-looping.
 
 Running anywhere else is the same idea without the Fly wrapper: the same
-`config.edn`, and just `bb run`.
+config files, and just `bb run`.

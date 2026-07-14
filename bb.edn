@@ -5,13 +5,13 @@
  :paths ["src" "resources" "test"]
 
  :tasks
- {dev {:doc "Start the dev server (reindexes every request, drafts visible)"
+ {dev {:doc "Start the dev server (config.edn + dev.edn; reindexes every request, drafts visible)"
        :requires ([site.core :as core])
-       :task (core/start! {:dev? true :block? true})}
+       :task (core/start! {:env :dev :block? true})}
 
-  run {:doc "Start the production server"
+  run {:doc "Start the production server (config.edn + prod.edn)"
        :requires ([site.core :as core])
-       :task (core/start! {:block? true})}
+       :task (core/start! {:env :prod :block? true})}
 
   reindex {:doc "Validate + index all content, failing loudly on broken files"
            :requires ([site.author :as author])
@@ -39,6 +39,10 @@
        :requires ([site.author :as author])
        :task (apply author/new-draft *command-line-args*)}
 
-  publish {:doc "Publish a draft: bb publish <name> [--no-git] — moves it into today's date folder, commits, pushes"
+  publish {:doc "Publish a draft: bb publish <name> [--no-git] — lints it, moves it into today's date folder, commits, pushes"
            :requires ([site.author :as author])
-           :task (apply author/publish *command-line-args*)}}}
+           :task (apply author/publish *command-line-args*)}
+
+  suggest-tags {:doc "Suggest tags for a draft with the configured LLM: bb suggest-tags <name>"
+                :requires ([site.author :as author])
+                :task (apply author/suggest-tags *command-line-args*)}}}

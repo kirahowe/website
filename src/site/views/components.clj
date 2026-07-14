@@ -62,11 +62,11 @@
   :type)
 
 (defmethod entry-body :default [entry]
-  [:div.entry-body (markdown/render (:body entry))])
+  [:div.entry-body (markdown/render (:body entry) (:wikilinks entry))])
 
 (defmethod entry-body :quote [entry]
   [:div.entry-body
-   [:blockquote (markdown/render (:body entry))]
+   [:blockquote (markdown/render (:body entry) (:wikilinks entry))]
    (when-let [source (:source entry)]
      [:p.quote-source "— " (if-let [url (:source-url entry)]
                              [:a {:href url} source]
@@ -87,7 +87,7 @@
     (if (= lede body)
       (entry-body entry)
       (list
-       [:div.entry-body.lede (markdown/render lede)]
+       [:div.entry-body.lede (markdown/render lede (:wikilinks entry))]
        [:p.more
         [:a {:href (:path entry)}
          (str "[… " (markdown/word-count body) " words]")]]))))

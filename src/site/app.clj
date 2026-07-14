@@ -5,7 +5,8 @@
             [clojure.string :as str]
             [site.content :as content]
             [site.handlers :as handlers]
-            [site.routes :as routes]))
+            [site.routes :as routes])
+  (:import [java.net URLDecoder]))
 
 (def ^:private content-types
   {"css" "text/css" "js" "text/javascript" "json" "application/json"
@@ -25,6 +26,23 @@
                    "Cache-Control" "public, max-age=86400"}
          :body (io/input-stream res)}))))
 
+(defn- attachment-response
+  "Serves images pasted into the vault: /attachments/<file> comes from
+  the content repo's attachments/ folder, so an image never needs a
+  site deploy."
+  [config uri]
+  (when (str/starts-with? uri "/attachments/")
+    (let [name (URLDecoder/decode (subs uri (count "/attachments/")) "UTF-8")
+          ext (str/lower-case (peek (str/split name #"\.")))
+          f (io/file (:content-path config) "attachments" name)]
+      (when (and (not (str/includes? name ".."))
+                 (content-types ext)
+                 (.isFile f))
+        {:status 200
+         :headers {"Content-Type" (content-types ext)
+                   "Cache-Control" "public, max-age=86400"}
+         :body (io/input-stream f)}))))
+
 (defn make-app
   "→ Ring handler. In :dev? mode the content index is rebuilt on every
   request (edits show up on refresh) and drafts are viewable."
@@ -33,6 +51,7 @@
     (try
       (let [uri (:uri req)]
         (or (static-response uri)
+            (attachment-response config uri)
             (let [index (if (:dev? config)
                           (content/build-index config)
                           @index-atom)

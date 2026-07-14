@@ -1,0 +1,5 @@
+{;; Production: clone the public content repo at boot, pull on a timer,
+ ;; reindex when anything changed.
+ :content-path "content"
+ :content-git-url "https://github.com/kirahowe/kirahowe-content"
+ :content-sync-seconds 300}

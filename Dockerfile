@@ -14,11 +14,11 @@ RUN curl -sLO https://raw.githubusercontent.com/babashka/babashka/master/install
  && bb --version
 
 WORKDIR /app
-COPY bb.edn config.edn ./
+COPY bb.edn config.edn prod.edn ./
 COPY src ./src
 COPY resources ./resources
-# Fallback content so the image runs even without CONTENT_GIT_URL;
-# in production CONTENT_PATH points at the cloned content repo instead.
+# Fallback content so the image can boot even if the content clone fails;
+# prod.edn points :content-path at the cloned content repo.
 COPY example-content ./example-content
 
 EXPOSE 8080

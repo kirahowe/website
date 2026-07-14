@@ -24,9 +24,10 @@
                           "test.md")]
       (is (= "before\n;;;\nafter" body))))
 
-  (testing "missing frontmatter fails loudly"
-    (is (thrown-with-msg? Exception #"Missing EDN frontmatter"
-                          (content/parse-frontmatter "just text" "test.md"))))
+  (testing "no frontmatter at all is a bare note: empty meta, body intact"
+    (let [{:keys [meta body]} (content/parse-frontmatter "just text" "test.md")]
+      (is (= {} meta))
+      (is (= "just text" body))))
 
   (testing "unterminated frontmatter fails loudly"
     (is (thrown-with-msg? Exception #"Unterminated"
@@ -40,13 +41,50 @@
     (is (thrown-with-msg? Exception #"must be an EDN map"
                           (content/parse-frontmatter ";;;\n:just-a-keyword\n;;;\nbody" "test.md")))))
 
+(deftest yaml-frontmatter
+  (testing "Obsidian property names map onto the entry model"
+    (let [{:keys [meta body]} (content/parse-frontmatter
+                               (str "---\n"
+                                    "type: link\n"
+                                    "link: https://example.com\n"
+                                    "via: https://news.example.com\n"
+                                    "tags:\n  - clojure\n  - web\n"
+                                    "date: 2025-01-09\n"
+                                    "---\n\nBody here\n")
+                               "test.md")]
+      (is (= :link (:type meta)))
+      (is (= "https://example.com" (:link-url meta)))
+      (is (= "https://news.example.com" (:link-via meta)))
+      (is (= ["clojure" "web"] (vec (:tags meta))))
+      (is (nil? (:date meta)) "the path is the date; a date property is workflow noise")
+      (is (= "Body here" body))))
+
+  (testing "quotes: author → :source, source → :source-url"
+    (let [{:keys [meta]} (content/parse-frontmatter
+                          "---\ntype: quote\nauthor: Ada Lovelace\nsource: https://example.com/notes\n---\nQ"
+                          "test.md")]
+      (is (= "Ada Lovelace" (:source meta)))
+      (is (= "https://example.com/notes" (:source-url meta)))))
+
+  (testing "blank properties are treated as absent"
+    (let [{:keys [meta]} (content/parse-frontmatter
+                          "---\ntype: link\nlink: https://example.com\nvia: \ntags:\n---\nB"
+                          "test.md")]
+      (is (nil? (:link-via meta)))
+      (is (nil? (:tags meta)))))
+
+  (testing "a single-string tag still becomes a collection"
+    (let [{:keys [meta]} (content/parse-frontmatter
+                          "---\ntags: solo\n---\nB"
+                          "test.md")]
+      (is (= ["solo"] (vec (:tags meta)))))))
+
 (deftest type-validation
   (testing "typo'd type cannot silently coin a new type"
     (is (thrown-with-msg? Exception #"Unknown entry type"
                           (content/check-type! config {:type :postt} "x.md"))))
-  (testing "missing type fails"
-    (is (thrown-with-msg? Exception #"Missing or non-keyword"
-                          (content/check-type! config {} "x.md"))))
+  (testing "missing type defaults to :post — a bare note is a post"
+    (is (= :post (content/check-type! config {} "x.md"))))
   (testing "valid type passes"
     (is (= :quote (content/check-type! config {:type :quote} "x.md")))))
 
@@ -96,6 +134,25 @@
 
     (testing "pages load"
       (is (= "About" (:title (get (:pages index) "about")))))))
+
+(deftest obsidian-native-entries
+  (let [dir (str (Files/createTempDirectory "content-test" (into-array FileAttribute [])))
+        day (io/file dir "2026" "07" "10")]
+    (.mkdirs day)
+    (spit (io/file day "My Great Idea.md") "---\ntags:\n  - clojure\n---\nSee [[Everything fails]] for more.")
+    (spit (io/file day "Everything fails.md") "---\ntype: quote\nauthor: W. Vogels\n---\nEverything fails, all the time.")
+    (let [index (content/build-index (assoc config :content-path dir))
+          post (get (:by-path index) "/2026/jul/10/my-great-idea")
+          quote (get (:by-path index) "/2026/jul/10/everything-fails")]
+      (testing "filename is the title; slug is slugified from it"
+        (is (= "My Great Idea" (:title post)))
+        (is (= :post (:type post)) "no type property means post"))
+      (testing "quotes stay untitled unless a title property is set"
+        (is (nil? (:title quote)))
+        (is (= "W. Vogels" (:source quote))))
+      (testing "entries carry the wikilink target map"
+        (is (= "/2026/jul/10/everything-fails"
+               (get (:wikilinks post) "everything fails")))))))
 
 (deftest broken-content
   (let [dir (str (Files/createTempDirectory "content-test" (into-array FileAttribute [])))]

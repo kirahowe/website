@@ -1,0 +1,6 @@
+{;; Development: serve the Obsidian vault directly, no git syncing.
+ :content-path "~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Blog"
+ :content-git-url nil
+
+ ;; `claude` wrapped with this machine's personal config dir
+ :llm-command "clk"}

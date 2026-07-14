@@ -1,8 +1,10 @@
 (ns site.config
-  "Configuration is file-first and env-var-free: config.edn (committed)
-  merged with config.local.edn (gitignored — machine-local settings like
-  your vault path). Dev-only behavior is switched by which bb task you
-  run, not by configuration, so dev and prod can't drift apart."
+  "Configuration is file-first and env-var-free. config.edn is the base
+  that always applies (site identity, entry types, port). On top of it,
+  exactly one environment file is merged: dev.edn (`bb dev` — your vault,
+  no git syncing) or prod.edn (`bb run` — the cloned content repo).
+  Dev-only behavior follows the environment, so dev and prod can't drift
+  apart on a forgotten flag."
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.string :as str]))
@@ -20,16 +22,17 @@
     p))
 
 (defn resolve-config
-  "Pure merge: base ← local ← overrides, then ~ expansion."
-  [base local overrides]
-  (-> (merge base local overrides)
+  "Pure merge: base ← env file, stamped with :env (and :dev?, which the
+  server keys request-time behavior on), then ~ expansion."
+  [base env-config env]
+  (-> (merge base env-config)
+      (assoc :env env :dev? (= env :dev))
       (update :content-path expand-home)))
 
 (defn load-config
-  "config.edn ← config.local.edn ← `overrides` (e.g. {:dev? true} from
-  the `bb dev` task)."
-  ([] (load-config {}))
-  ([overrides]
-   (resolve-config (read-edn "config.edn")
-                   (read-edn "config.local.edn")
-                   overrides)))
+  "config.edn ← <env>.edn, where env is :dev or :prod. Authoring tasks
+  (`bb new`, `bb publish`, ...) run with :dev — they operate on the vault."
+  [env]
+  (resolve-config (read-edn "config.edn")
+                  (read-edn (str (name env) ".edn"))
+                  env))

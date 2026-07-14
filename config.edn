@@ -1,22 +1,13 @@
-{;; Displayed in the site header and the feed
+{;; Base configuration — applies in every environment. Environment
+ ;; specifics (where the content lives, git syncing) are in dev.edn and
+ ;; prod.edn; `bb dev` and `bb run` pick the right one.
+
+ ;; Displayed in the site header and the feed
  :site-title "Kira Howe"
- :site-description "Notes, links, quotes, and longer-form writing"
+ :site-description "My personal space on the internet"
 
  ;; Absolute base URL, no trailing slash — used for the feed and canonical links
  :base-url "https://kirahowe.com"
-
- ;; Where the content lives. Locally, point this at your vault in
- ;; config.local.edn (gitignored, merged over this file), e.g.
- ;;   {:content-path "~/Library/Mobile Documents/iCloud~md~obsidian/Documents/MyVault"
- ;;    :content-git-url nil}
- :content-path "example-content"
-
- ;; When :content-git-url is set (it's a public repo — nothing secret),
- ;; the server clones it into :content-path at boot and pulls on this
- ;; interval, reindexing when anything changed. For the real site set
- ;; e.g. :content-path "content" and:
- ;; :content-git-url "https://github.com/you/my-content.git"
- :content-sync-seconds 300
 
  ;; The home feed shows at least this many recent items, rounded up to
  ;; whole days, then links onward to the month archives.
@@ -25,5 +16,9 @@
  ;; Entry types that may appear in frontmatter, in nav order.
  ;; A typo'd type in a content file fails indexing loudly.
  :entry-types [:post :note :link :quote :release :tool]
+
+ ;; Command used by `bb suggest-tags` (invoked via your login shell, so
+ ;; shell aliases/functions work). dev.edn can override it.
+ :llm-command "claude"
 
  :port 8100}
