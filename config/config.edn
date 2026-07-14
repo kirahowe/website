@@ -21,4 +21,7 @@
  ;; shell aliases/functions work). dev.edn can override it.
  :llm-command "claude"
 
- :port 8100}
+ ;; NOTE: :port is environment-specific and lives in the env files —
+ ;; dev.edn (8100) and prod.edn (8080, what Fly's Dockerfile expects) —
+ ;; so the two environments can't collide on a port by accident.
+ }

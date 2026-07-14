@@ -153,7 +153,7 @@
     (is (= 200 status))
     (is (= "text/css" (get headers "Content-Type"))))
   (testing "no path traversal"
-    (is (not= 200 (:status (GET "/css/../../config.edn"))))))
+    (is (not= 200 (:status (GET "/css/../../config/config.edn"))))))
 
 (deftest no-admin-http-surface
   (testing "there is no reindex endpoint — the server has no admin routes"

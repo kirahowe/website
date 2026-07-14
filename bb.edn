@@ -5,11 +5,11 @@
  :paths ["src" "resources" "test"]
 
  :tasks
- {dev {:doc "Start the dev server (config.edn + dev.edn; reindexes every request, drafts visible)"
+ {dev {:doc "Start the dev server (config/config.edn + config/dev.edn; reindexes every request, drafts visible)"
        :requires ([site.core :as core])
        :task (core/start! {:env :dev :block? true})}
 
-  run {:doc "Start the production server (config.edn + prod.edn)"
+  run {:doc "Start the production server (config/config.edn + config/prod.edn)"
        :requires ([site.core :as core])
        :task (core/start! {:env :prod :block? true})}
 

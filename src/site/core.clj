@@ -33,8 +33,9 @@
 
 (defn start!
   "Options:
-    :env    — :dev (config.edn + dev.edn; reindex every request, drafts
-              visible) or :prod (config.edn + prod.edn). Defaults to :prod.
+    :env    — :dev (config/config.edn + config/dev.edn; reindex every
+              request, drafts visible) or :prod (config/config.edn +
+              config/prod.edn). Defaults to :prod.
     :block? — park the calling thread (for `bb dev` / `bb run`)"
   ([] (start! {}))
   ([opts]

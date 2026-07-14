@@ -167,11 +167,11 @@
   [cfg]
   (let [repo (some-> (:publish-repo cfg) fs/expand-home)]
     (when-not repo
-      (die "No :publish-repo set in dev.edn — the git checkout (outside "
+      (die "No :publish-repo set in config/dev.edn — the git checkout (outside "
            "iCloud) the vault mirrors into. See the README."))
     (when-not (fs/exists? (fs/path repo ".git"))
       (die "Not a git repo: " repo "\nClone your content repo there, or "
-           "`git init` it, then set :publish-repo in dev.edn."))
+           "`git init` it, then set :publish-repo in config/dev.edn."))
     (str repo)))
 
 (defn- mirror-and-push! [cfg message]

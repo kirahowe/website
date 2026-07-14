@@ -14,7 +14,8 @@ RUN curl -sLO https://raw.githubusercontent.com/babashka/babashka/master/install
  && bb --version
 
 WORKDIR /app
-COPY bb.edn config.edn prod.edn ./
+COPY bb.edn ./
+COPY config ./config
 COPY src ./src
 COPY resources ./resources
 # Fallback content so the image can boot even if the content clone fails;

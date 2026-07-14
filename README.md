@@ -17,11 +17,11 @@ See [PLAN.md](PLAN.md) for the original architecture and its rationale.
 
 ```sh
 # install babashka ≥ 1.12.196 (https://github.com/babashka/babashka#installation), then:
-bb dev        # serve the vault configured in dev.edn at http://localhost:8100
+bb dev        # serve the vault configured in config/dev.edn at http://localhost:8100
 bb test       # run the test suite
 ```
 
-(No vault yet? Point `:content-path` in `dev.edn` at `example-content`.)
+(No vault yet? Point `:content-path` in `config/dev.edn` at `example-content`.)
 
 ## How content reaches the site: iCloud vault + a separate git repo
 
@@ -66,8 +66,8 @@ One-time setup:
    printf '.DS_Store\n' > .gitignore && git add -A && git commit -m "init"
    gh repo create kirahowe-content --public --source . --push
    ```
-3. In `dev.edn`, point `:content-path` at the vault and `:publish-repo` at
-   that checkout. In `prod.edn`, point `:content-git-url` at the repo.
+3. In `config/dev.edn`, point `:content-path` at the vault and `:publish-repo` at
+   that checkout. In `config/prod.edn`, point `:content-git-url` at the repo.
    Then `bb dev`, and `bb publish` / `bb sync` to push content live.
 
 > iCloud tip: right-click the vault folder → "Keep Downloaded" so iCloud
@@ -151,16 +151,18 @@ Body in markdown, with [[Hello world|wikilinks]] and ![[screenshot.png]].
 
 ## Configuration
 
-Three committed files, no environment variables, no secrets:
+Three committed files under `config/`, no environment variables, no secrets:
 
-- **`config.edn`** — the base that always applies: site title, base URL,
-  entry types, `:llm-command` (what `bb suggest-tags` shells out to),
-  port.
-- **`dev.edn`** — merged in by `bb dev` and the authoring tasks: your
-  vault path, `:content-git-url nil` (no git syncing locally), personal
-  `:llm-command` override.
-- **`prod.edn`** — merged in by `bb run`: the clone target, the content
-  repo URL, the sync interval.
+- **`config/config.edn`** — the base that always applies: site title,
+  base URL, entry types, `:llm-command` (what `bb suggest-tags` shells
+  out to).
+- **`config/dev.edn`** — merged in by `bb dev` and the authoring tasks:
+  your vault path, `:content-git-url nil` (no git syncing locally),
+  personal `:llm-command` override, `:port 8100`.
+- **`config/prod.edn`** — merged in by `bb run`: the clone target, the
+  content repo URL, the sync interval, `:port 8080` (what Fly routes to).
+
+The port is environment-specific, so dev and prod never collide on one.
 
 Dev-only behavior (draft previews at `/drafts/<name>`, per-request
 reindexing) follows the environment, so dev and prod can't drift apart.

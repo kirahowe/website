@@ -2,4 +2,8 @@
  ;; reindex when anything changed.
  :content-path "content"
  :content-git-url "https://github.com/kirahowe/kirahowe-content"
- :content-sync-seconds 300}
+ :content-sync-seconds 300
+
+ ;; Fly routes to internal_port 8080 (fly.toml) and the Dockerfile
+ ;; EXPOSEs 8080 — the server must listen there.
+ :port 8080}

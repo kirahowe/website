@@ -8,4 +8,7 @@
  :publish-repo "~/code/projects/kirahowe-content"
 
  ;; `claude` wrapped with this machine's personal config dir
- :llm-command "clk"}
+ :llm-command "clk"
+
+ ;; Dev runs on its own port so it never fights the prod port (8080).
+ :port 8100}
