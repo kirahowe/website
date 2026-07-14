@@ -23,28 +23,55 @@ bb test       # run the test suite
 
 (No vault yet? Point `:content-path` in `dev.edn` at `example-content`.)
 
-## The content is an Obsidian vault that is also a git repo
+## How content reaches the site: iCloud vault + a separate git repo
+
+Two directories, and **git never lives inside iCloud** — that's what keeps
+iCloud from corrupting it:
+
+```
+iCloud vault (source of truth)         Publish repo (transport, disposable)
+~/…/Obsidian/Documents/Blog/           ~/code/projects/kirahowe-content/
+├── drafts/       ← you write here      ├── .git/     ← OUTSIDE iCloud
+├── 2026/07/…     ← published           ├── 2026/07/…
+├── attachments/  ← pasted images       ├── attachments/
+├── pages/                              └── pages/
+├── templates/, dev.md  (never published)
+└── .obsidian/          (never published)
+        │                                      │
+        │  iCloud ⇄ phone                      │  git push ⇄ GitHub ⇄ server
+        └──────────► bb publish / bb sync ─────┘
+```
+
+- The **vault** is a plain Obsidian vault in iCloud (so your phone sees
+  it). It contains no `.git` — nothing git-related ever syncs to your
+  phone or gets mangled by iCloud.
+- The **publish repo** is a normal git checkout *outside* iCloud. It's a
+  mirror of the vault's publishable content and is disposable: if it ever
+  wedges, delete it and re-clone. `bb publish` / `bb sync` mirror the
+  vault into it and push; the server pulls from GitHub as usual.
+- Your Mac is the only bridge between the two sync systems, and only when
+  you run `bb publish` / `bb sync`.
 
 One-time setup:
 
-1. In Obsidian, create a dedicated vault (everything committed here ends
-   up on the server). Put it in iCloud so your phone sees it: Obsidian's
-   iCloud vaults live at
-   `~/Library/Mobile Documents/iCloud~md~obsidian/Documents/<VaultName>`
-   on your Mac.
-2. Make it a repo and push it (public — the server pulls it anonymously,
-   and everything in it is destined for the website anyway):
+1. In Obsidian, create a dedicated vault in iCloud (everything that gets
+   published ends up on the server). Its `.obsidian/` and top-level
+   `dev.md`/`templates/` stay private — only the date tree, `pages/`, and
+   `attachments/` are mirrored out.
+2. Make a git checkout **outside** iCloud and push it once (public — the
+   server pulls it anonymously):
    ```sh
-   cd ~/Library/Mobile\ Documents/iCloud~md~obsidian/Documents/<VaultName>
-   printf '.obsidian/\n.DS_Store\n' > .gitignore
-   git init && git add -A && git commit -m "content repo"
-   gh repo create my-content --public --source . --push
+   mkdir -p ~/code/projects/kirahowe-content && cd $_
+   git init -b main
+   printf '.DS_Store\n' > .gitignore && git add -A && git commit -m "init"
+   gh repo create kirahowe-content --public --source . --push
    ```
-3. Point `:content-path` in `dev.edn` at the vault, and
-   `:content-git-url` in `prod.edn` at the repo. Then just `bb dev`.
+3. In `dev.edn`, point `:content-path` at the vault and `:publish-repo` at
+   that checkout. In `prod.edn`, point `:content-git-url` at the repo.
+   Then `bb dev`, and `bb publish` / `bb sync` to push content live.
 
 > iCloud tip: right-click the vault folder → "Keep Downloaded" so iCloud
-> can't evict the `.git` directory out from under you.
+> keeps a real local copy instead of evicting files to placeholders.
 
 ## Writing
 
@@ -69,13 +96,18 @@ bb new post My great idea      # scaffolds drafts/My great idea.md
 # ...write — with `bb dev` running, preview at localhost:8100/drafts/My great idea
 bb suggest-tags my-great-idea  # LLM-suggested tags, printed ready to paste
 bb reindex                     # optional: validate that everything parses
-bb publish my-great-idea       # lints, moves into today's date folder, commits, pushes
+bb publish my-great-idea       # lints, moves into today's date folder, mirrors + pushes
 ```
 
 A file is a draft because it lives in `drafts/`; publishing is moving it
 into the date tree. No flags to forget. `bb publish` warns about
 unresolved wikilinks, missing attachments, missing or never-seen tags,
 and a link entry without a URL — but a warning never blocks a publish.
+
+**Editing or deleting something already published?** Change it in Obsidian,
+then `bb sync` — it re-mirrors the vault into the publish repo and pushes,
+deletions included. `bb publish` does this automatically for the draft it
+publishes; `bb sync` is for everything else.
 
 `bb publish` **is** the manual publish. The live site picks the push up
 on its next timed pull (≤ `:content-sync-seconds`); to go live right

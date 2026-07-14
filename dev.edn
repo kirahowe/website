@@ -2,5 +2,10 @@
  :content-path "~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Blog"
  :content-git-url nil
 
+ ;; The git checkout — OUTSIDE iCloud — that `bb publish` / `bb sync`
+ ;; mirror the vault's publishable content into and push. Keeping git out
+ ;; of the iCloud vault is what stops iCloud from corrupting it.
+ :publish-repo "~/code/projects/kirahowe-content"
+
  ;; `claude` wrapped with this machine's personal config dir
  :llm-command "clk"}

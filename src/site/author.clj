@@ -108,12 +108,83 @@
   (when (fs/exists? "fly.toml")
     (second (re-find #"(?m)^app\s*=\s*\"([^\"]+)\"" (slurp "fly.toml")))))
 
+;; --- vault → publish repo mirror -----------------------------------------
+;;
+;; The vault (iCloud) is the source of truth. Git never lives inside it —
+;; instead a separate checkout outside iCloud (:publish-repo) is the
+;; transport the server pulls from. Publishing/syncing mirrors the vault's
+;; publishable content into that repo and pushes. The two sync systems
+;; (iCloud, git) never share a file.
+
+(def ^:private mirrored-dirs
+  "Top-level vault folders that cross into the public repo. drafts/,
+  templates/, dev.md and .obsidian/ are deliberately absent — they stay
+  private to the vault."
+  #{"pages" "attachments"})
+
+(defn- mirrored?
+  "A top-level vault entry that gets published: a YYYY date folder, or one
+  of the always-published folders."
+  [f]
+  (and (fs/directory? f)
+       (let [n (fs/file-name f)]
+         (or (re-matches #"\d{4}" n) (mirrored-dirs n)))))
+
+(defn- mirror!
+  "Replace the publish repo's mirrored content with the vault's, so that
+  deletions in the vault propagate too. Leaves the repo's own files
+  (.git, README, .gitignore) untouched."
+  [vault repo]
+  (doseq [f (filter mirrored? (fs/list-dir repo))]
+    (fs/delete-tree f))
+  (doseq [f (filter mirrored? (fs/list-dir vault))]
+    (fs/copy-tree f (fs/path repo (fs/file-name f)))))
+
+(defn- git-push!
+  "Stage everything in the repo, commit, and push. No-op (with a note) when
+  the mirror already matches. A push that fails on a fresh repo (no remote
+  yet) is reported with the one-liner to create it, not treated as fatal."
+  [cfg repo message]
+  (if (str/blank? (:out (p/sh {:dir (str repo)} "git" "status" "--porcelain")))
+    (println "Nothing to sync — the repo already matches the vault.")
+    (do
+      (p/shell {:dir (str repo)} "git" "add" "-A")
+      (p/shell {:dir (str repo)} "git" "commit" "-m" message)
+      (let [{:keys [exit err]} (p/sh {:dir (str repo)} "git" "push")]
+        (if (zero? exit)
+          (do (println "Committed and pushed.")
+              (println (str "Live within ~" (or (:content-sync-seconds cfg) 300)
+                            "s on the next content sync."))
+              (when-let [app (fly-app-name)]
+                (println (str "To go live right now: fly apps restart " app))))
+          (do (println "Committed locally, but the push failed:" (str/trim (str err)))
+              (println (str "First publish? Create the remote from " repo ":\n"
+                            "  gh repo create <content-repo> --public --source . --push"))))))))
+
+(defn- publish-repo-path
+  "The git checkout the vault mirrors into. Fails loudly if unset or not a
+  git repo — publishing without it configured is a setup mistake."
+  [cfg]
+  (let [repo (some-> (:publish-repo cfg) fs/expand-home)]
+    (when-not repo
+      (die "No :publish-repo set in dev.edn — the git checkout (outside "
+           "iCloud) the vault mirrors into. See the README."))
+    (when-not (fs/exists? (fs/path repo ".git"))
+      (die "Not a git repo: " repo "\nClone your content repo there, or "
+           "`git init` it, then set :publish-repo in dev.edn."))
+    (str repo)))
+
+(defn- mirror-and-push! [cfg message]
+  (let [repo (publish-repo-path cfg)]
+    (mirror! (:content-path cfg) repo)
+    (git-push! cfg repo message)))
+
 (defn publish
   "bb publish <name words...> [--no-git] — the manual publish: validates
-  the draft, lints it, moves it into today's YYYY/MM/DD/ folder, and
-  (unless --no-git) commits and pushes the content repo. The live site
-  picks it up on its next timed pull, or immediately if you restart the
-  machine."
+  the draft, lints it, moves it into today's YYYY/MM/DD/ folder in the
+  vault, then (unless --no-git) mirrors the vault into the publish repo
+  and pushes. The live site picks it up on its next timed pull, or
+  immediately if you restart the machine."
   [& args]
   (let [no-git? (boolean (some #{"--no-git"} args))
         fname (str/join " " (remove #(str/starts-with? % "--") args))]
@@ -149,16 +220,21 @@
           (fs/move src target)
           (println "Published:" (str target))
           (println "URL path:  " (str "/" y "/" (util/month-slug m) "/" d "/" slug))
-          (if (and (not no-git?) (fs/exists? (fs/path root ".git")))
-            (do (p/shell {:dir root} "git" "add" "-A")
-                (p/shell {:dir root} "git" "commit" "-m" (str "Publish " base))
-                (p/shell {:dir root} "git" "push")
-                (println "Committed and pushed.")
-                (println (str "Live within ~" (or (:content-sync-seconds cfg) 300)
-                              "s on the next content sync."))
-                (when-let [app (fly-app-name)]
-                  (println (str "To go live right now: fly apps restart " app))))
-            (println "Skipped git (no repo or --no-git).")))))))
+          (if no-git?
+            (println "Skipped git (--no-git). Run `bb sync` when you're ready to push.")
+            (mirror-and-push! cfg (str "Publish " base))))))))
+
+(defn sync-content
+  "bb sync — mirror the vault's publishable content into the publish repo
+  and push, without publishing a new draft. Use after editing or deleting
+  an already-published entry in Obsidian: deletions propagate too."
+  [& _]
+  (let [cfg (config/load-config :dev)]
+    ;; Validate the whole tree first — never push a broken index.
+    (try (content/build-index cfg)
+         (catch Exception e
+           (die "Content error, not syncing: " (ex-message e))))
+    (mirror-and-push! cfg "Sync content")))
 
 (defn- ask-llm
   "Runs the configured :llm-command through an interactive shell so

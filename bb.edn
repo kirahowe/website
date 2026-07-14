@@ -45,4 +45,8 @@
 
   suggest-tags {:doc "Suggest tags for a draft with the configured LLM: bb suggest-tags <name>"
                 :requires ([site.author :as author])
-                :task (apply author/suggest-tags *command-line-args*)}}}
+                :task (apply author/suggest-tags *command-line-args*)}
+
+  sync {:doc "Mirror the vault's published content into the publish repo and push (bb sync)"
+        :requires ([site.author :as author])
+        :task (apply author/sync-content *command-line-args*)}}}
