@@ -4,6 +4,7 @@
             [site.app :as app]
             [site.config :as config]
             [site.content :as content]
+            [site.livereload :as livereload]
             [site.sync :as sync]))
 
 (defonce server (atom nil))
@@ -41,7 +42,12 @@
   ([opts]
    (let [cfg (config/load-config (or (:env opts) :prod))
          index-atom (atom (initial-index cfg))
-         handler (app/make-app cfg index-atom)]
+         ;; In dev, resolve make-app per request (through its var) so edits to
+         ;; the request pipeline itself take effect after a hot reload; prod
+         ;; builds the handler once.
+         handler (if (:dev? cfg)
+                   (livereload/wrap (fn [req] ((app/make-app cfg index-atom) req)))
+                   (app/make-app cfg index-atom))]
      (stop!)
      (reset! server (http/run-server handler {:port (:port cfg)}))
      (println (str "Serving content from " (:content-path cfg)
@@ -49,6 +55,8 @@
                    (when (:dev? cfg) " — dev mode: reindexing every request, drafts visible")))
      (when (:content-git-url cfg)
        (sync/start-sync-loop! cfg index-atom))
+     (when (:dev? cfg)
+       (livereload/start-watcher! cfg))
      (when (:block? opts)
        @(promise))
      @server)))

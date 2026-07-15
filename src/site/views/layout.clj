@@ -16,6 +16,17 @@
 (def ^:private wordmark
   (delay (slurp (io/resource "public/images/wordmark.svg"))))
 
+;; Injected only under `bb dev`: opens an SSE stream to site.livereload and
+;; refreshes the page when a watched file changes. Reconnecting after the
+;; server itself restarts also reloads, so code edits (which need a `bb dev`
+;; restart) still land in the browser without a manual refresh.
+(def ^:private livereload-script
+  (str "(function(){var opened=false;"
+       "var es=new EventSource('/__livereload');"
+       "es.addEventListener('reload',function(){location.reload()});"
+       "es.addEventListener('open',function(){if(opened)location.reload();opened=true});"
+       "})();"))
+
 (defn- header [config home?]
   [:header.site-header
    [:a {:class (if home? "brand" "brand brand-sm") :href "/"} (h/raw @wordmark)]
@@ -78,7 +89,8 @@
               [:body
                (header config (nil? title))
                [:main content]
-               (footer config)]]))))
+               (footer config)
+               (when (:dev? config) [:script (h/raw livereload-script)])]]))))
 
 (defn static-page [config {:keys [title body]}]
   (page config title
