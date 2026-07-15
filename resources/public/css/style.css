@@ -111,6 +111,7 @@ body {
 }
 
 a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 2px; }
 
 ::selection { background: var(--accent); color: var(--on-accent); }
 
@@ -156,7 +157,6 @@ a { color: var(--accent); text-decoration: none; }
   letter-spacing: .01em;
 }
 .site-nav a { color: var(--accent); }
-.site-nav a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .site-nav .type { color: var(--type-color); }
 
 .nav-sep {
@@ -233,7 +233,6 @@ a { color: var(--accent); text-decoration: none; }
   color: var(--muted);
 }
 .type-summary a { color: var(--accent); }
-.type-summary a:hover { text-decoration: underline; text-underline-offset: 2px; }
 .type-summary .sep { margin: 0 var(--sp1); opacity: .45; }
 
 /* --------------------------------------------------------------------------
@@ -272,12 +271,10 @@ a { color: var(--accent); text-decoration: none; }
   letter-spacing: -.005em;
 }
 .entry-title a { color: var(--accent); }
-.entry-title a:hover { text-decoration: underline; text-underline-offset: 2px; }
 
 /* Simon-style "(via)" credit after an outbound entry's title */
 .via { font-weight: 400; color: var(--muted); }
 .via a { color: var(--accent); }
-.via a:hover { text-decoration: underline; text-underline-offset: 2px; }
 .entry-title .via { font-size: .75em; }
 .article h1 .via { font-size: .5em; letter-spacing: 0; }
 
@@ -342,7 +339,6 @@ a { color: var(--accent); text-decoration: none; }
   color: var(--muted);
 }
 .quote-cite a { color: var(--accent); }
-.quote-cite a:hover { text-decoration: underline; text-underline-offset: 2px; }
 
 /* --------------------------------------------------------------------------
    Article — single post, static pages. Full reading measure, no sidebar.
@@ -391,15 +387,6 @@ a { color: var(--accent); text-decoration: none; }
 .article li { margin-bottom: var(--sp2); }
 .article li::marker { color: var(--muted); }
 
-/* Body links — accent with a faint underline that solidifies on hover */
-.article p a,
-.article li a {
-  color: var(--accent);
-  border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
-}
-.article p a:hover,
-.article li a:hover { border-bottom-color: var(--accent); }
-
 .article code {
   padding: 2px 6px;
   border-radius: 5px;
@@ -436,7 +423,6 @@ a { color: var(--accent); text-decoration: none; }
   font: 500 var(--fs-sm) var(--mono);
   color: var(--accent);
 }
-.feed-more:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 /* --------------------------------------------------------------------------
    Post footer — tag chips, related grid, bio
@@ -490,7 +476,8 @@ a { color: var(--accent); text-decoration: none; }
   text-overflow: ellipsis;
   color: var(--head);
 }
-.related-item:hover .title { color: var(--accent); }
+.related-item:hover { text-decoration: none; }
+.related-item:hover .title { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 .related-item .when {
   flex: none;
   font: 400 var(--fs-sm) var(--mono);
@@ -503,9 +490,7 @@ a { color: var(--accent); text-decoration: none; }
   display: inline-block;
   margin-top: var(--sp3);
   color: var(--accent);
-  border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
 }
-.bio .more:hover { border-bottom-color: var(--accent); }
 
 /* --------------------------------------------------------------------------
    Year archive — month index with per-type counts
@@ -529,7 +514,6 @@ a { color: var(--accent); text-decoration: none; }
   letter-spacing: -.01em;
   color: var(--accent);
 }
-.month-name:hover { text-decoration: underline; text-underline-offset: 3px; }
 .month-count { font: 400 var(--fs-sm) var(--mono); color: var(--muted); }
 .month-count .sep { margin: 0 2px; opacity: .45; }
 
@@ -543,6 +527,7 @@ a { color: var(--accent); text-decoration: none; }
 .day-row .day { font: 400 var(--fs-sm) var(--mono); text-align: right; color: var(--muted); }
 .day-row .dot { align-self: center; }
 .day-row .title { font: 400 var(--fs) var(--sans); line-height: var(--lh-tight); color: var(--accent); }
+.day-row:hover { text-decoration: none; }
 .day-row:hover .title { text-decoration: underline; text-underline-offset: 2px; }
 
 /* --------------------------------------------------------------------------
@@ -556,7 +541,6 @@ a { color: var(--accent); text-decoration: none; }
 
 .year-nav { display: flex; flex-wrap: wrap; gap: var(--sp2) var(--sp3); font: 400 var(--fs-sm) var(--mono); }
 .year-nav a { color: var(--accent); }
-.year-nav a:hover { text-decoration: underline; text-underline-offset: 2px; }
 .year-nav .current { font-weight: 600; color: var(--head); }
 
 .calendar-head { display: flex; align-items: baseline; gap: var(--sp2); font: 400 var(--fs-sm) var(--mono); color: var(--muted); }
@@ -571,7 +555,6 @@ a { color: var(--accent); text-decoration: none; }
 .calendar td { padding: 2px 0; text-align: center; color: var(--muted); opacity: .4; }
 .calendar td.on { opacity: 1; }
 .calendar td.on a { font-weight: 600; color: var(--accent); }
-.calendar td.on a:hover { text-decoration: underline; }
 
 /* --------------------------------------------------------------------------
    Tags index, search
@@ -645,7 +628,6 @@ a { color: var(--accent); text-decoration: none; }
 }
 .site-footer .social { display: flex; flex-wrap: wrap; gap: var(--sp1) var(--sp4); }
 .site-footer a { color: var(--accent); }
-.site-footer a:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 /* --------------------------------------------------------------------------
    Narrow screens — collapse to a single column
