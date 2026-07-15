@@ -79,8 +79,8 @@
       (entry-title entry)
       [:p.entry-excerpt (markdown/excerpt (:body entry))
        (when (#{:post :note} (:type entry))
-         [:a.excerpt-more {:href (:path entry)}
-          (str " … " (markdown/read-time (:body entry)) " min read")])]))
+         (list " " [:a.excerpt-more {:href (:path entry)}
+                    (str "[…" (markdown/read-time (:body entry)) " min read]")]))]))
    (entry-foot entry)])
 
 (defn day-group [entries]

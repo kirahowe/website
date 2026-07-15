@@ -288,7 +288,7 @@ a { color: var(--accent); text-decoration: none; }
   color: var(--fg);
   opacity: .82;
 }
-.excerpt-more { color: var(--muted); white-space: nowrap; }
+.excerpt-more { font-family: var(--mono); font-size: .85em; color: var(--muted); white-space: nowrap; }
 .excerpt-more:hover { color: var(--accent); }
 
 .entry-foot {
