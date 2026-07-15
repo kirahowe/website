@@ -33,10 +33,11 @@
           (str "“" (subs ex 0 (min 60 (count ex))) "”")))
       (util/format-date (:date entry))))
 
-(defn tag-links [tags]
-  [:span.entry-tags
-   (for [t (sort-by name tags)]
-     [:a {:href (str "/tags/" (name t))} (str "#" (name t))])])
+(defn tag-links
+  "An entry's #tag links, sorted by name — flowed inline into the feed foot."
+  [tags]
+  (for [t (sort-by name tags)]
+    [:a.entry-tag {:href (str "/tags/" (name t))} (str "#" (name t))]))
 
 (defn via-link
   "The “(via)” credit link shown after an outbound entry's title when the
@@ -47,25 +48,14 @@
 
 ;; --- feed row ------------------------------------------------------------
 
-(defn- entry-hint
-  "The right-hand hint in a feed row: a reading time for text entries, the
-  source host for outbound ones, nothing for quotes."
+(defn- entry-foot
+  "The dense foot under a feed row: the type (with its colour dot) and the
+  entry's tags flowing together on a single wrapping line."
   [entry]
-  (cond
-    (:link-url entry) (util/host (:link-url entry))
-    (#{:post :note} (:type entry)) [:a {:href (:path entry)}
-                                    (str (markdown/read-time (:body entry)) " min read")]))
-
-(defn- entry-foot [entry]
-  (let [hint (entry-hint entry)]
-    [:div.entry-foot
-     [:div.entry-line
-      [:span.entry-kind {:class (name (:type entry))}
-       (dot (:type entry))
-       (name (:type entry))]
-      (when hint [:span.entry-hint hint])]
-     (when (seq (:tags entry))
-       (tag-links (:tags entry)))]))
+  [:div.entry-foot {:class (name (:type entry))}
+   [:span.entry-kind (dot (:type entry)) (name (:type entry))]
+   (when (seq (:tags entry))
+     (cons [:span.sep "·"] (tag-links (:tags entry))))])
 
 (defn- entry-title [entry]
   (when (:title entry)
@@ -73,8 +63,9 @@
 
 (defn entry-row
   "One entry in the feed: a quote renders as a blockquote with a linked
-  source; every other type renders as title + excerpt. Both close with the
-  type/tags/hint foot."
+  source; every other type renders as title + excerpt — with a reading-time
+  link tacked onto the end of a post/note excerpt. Both close with the
+  type/tags foot."
   [entry]
   [:article.entry
    (if (= :quote (:type entry))
@@ -86,7 +77,10 @@
                               src)]))
      (list
       (entry-title entry)
-      [:p.entry-excerpt (markdown/excerpt (:body entry))]))
+      [:p.entry-excerpt (markdown/excerpt (:body entry))
+       (when (#{:post :note} (:type entry))
+         [:a.excerpt-more {:href (:path entry)}
+          (str " … " (markdown/read-time (:body entry)) " min read")])]))
    (entry-foot entry)])
 
 (defn day-group [entries]

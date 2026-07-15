@@ -278,35 +278,26 @@ a { color: var(--accent); text-decoration: none; }
   color: var(--fg);
   opacity: .82;
 }
+.excerpt-more { color: var(--muted); white-space: nowrap; }
+.excerpt-more:hover { color: var(--accent); }
 
 .entry-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp1) var(--sp3);
   margin-top: var(--sp3);
   font: 400 var(--fs-sm) var(--mono);
   color: var(--muted);
 }
-.entry-line {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: var(--sp4);
-}
 .entry-kind {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: var(--sp2);
-  min-width: 0;
 }
-.entry-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px var(--sp3);
-  margin-top: var(--sp2);
-}
-.entry-tags a { color: var(--muted); }
-.entry-tags a:hover { color: var(--fg); }
-.entry-hint { flex: none; white-space: nowrap; }
-.entry-hint a { color: var(--muted); }
-.entry-hint a:hover { color: var(--accent); }
+.entry-foot .sep { opacity: .45; }
+.entry-tag { color: var(--muted); }
+.entry-tag:hover { color: var(--fg); }
 
 /* Quote entries — hanging Caveat marks in the quote colour, linked source */
 .entry blockquote,
