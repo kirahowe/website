@@ -114,15 +114,18 @@
   (str n " " (if (= 1 n) "entry" "entries")))
 
 (defn type-summary
-  "A per-type breakdown line — \"4 posts · 9 links · 2 quotes\" — in nav
-  order. When `link?`, each type word links to its listing."
+  "A per-type breakdown line — \"4 posts · 1 quote · 9 links\" — in nav
+  order; the word singularizes on a count of one. When `link?`, each type
+  word links to its listing (whose URL stays plural)."
   [entries link?]
   (let [counts (frequencies (map :type entries))]
     (interpose [:span.sep "·"]
                (for [t type-order :when (counts t)
-                     :let [plural (str (name t) "s")]]
-                 [:span (counts t) " "
-                  (if link? [:a {:href (str "/" plural)} plural] plural)]))))
+                     :let [n (counts t)
+                           slug (str (name t) "s")
+                           word (str (name t) (when (> n 1) "s"))]]
+                 [:span n " "
+                  (if link? [:a {:href (str "/" slug)} word] word)]))))
 
 ;; --- sidebar -------------------------------------------------------------
 

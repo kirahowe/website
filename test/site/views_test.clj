@@ -82,6 +82,13 @@
     (is (str/includes? (:body (GET "/releases")) "website v1.0"))
     (is (str/includes? (:body (GET "/tools")) "vault-publish")))
 
+  (testing "the per-type count summary singularizes a lone entry"
+    ;; June has exactly one entry (a quote), so the month summary must
+    ;; read "1 quote", not "1 quotes".
+    (let [{:keys [body]} (GET "/2026/jun")]
+      (is (str/includes? body ">quote</a>"))
+      (is (not (str/includes? body ">quotes</a>")))))
+
   (testing "quote renders with attribution"
     (let [{:keys [body]} (GET "/2026/jun/21/rich-hickey-on-simplicity")]
       (is (str/includes? body "<blockquote>"))
