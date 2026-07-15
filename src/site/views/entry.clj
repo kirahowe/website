@@ -20,14 +20,13 @@
    (when-let [title (:title entry)]
      [:h1 (if (:link-url entry)
             [:a {:href (:link-url entry)} title]
-            title)])
+            title)
+      (c/via-link entry)])
    [:div.article-meta
     (util/format-date (:date entry))
     (cond
       (:link-url entry)
-      (list [:span.sep "·"] (util/host (:link-url entry))
-            (when-let [via (:link-via entry)]
-              (list [:span.sep "·"] "via " [:a {:href via} (util/host via)])))
+      (list [:span.sep "·"] (util/host (:link-url entry)))
       (#{:post :note} (:type entry))
       (list [:span.sep "·"] (str (markdown/read-time (:body entry)) " min read")))]))
 

@@ -256,6 +256,13 @@ a { color: var(--accent); text-decoration: none; }
 .entry-title a { color: var(--accent); }
 .entry-title a:hover { text-decoration: underline; text-underline-offset: 2px; }
 
+/* Simon-style "(via)" credit after an outbound entry's title */
+.via { font-weight: 400; color: var(--muted); }
+.via a { color: var(--accent); }
+.via a:hover { text-decoration: underline; text-underline-offset: 2px; }
+.entry-title .via { font-size: .75em; }
+.article h1 .via { font-size: .5em; letter-spacing: 0; }
+
 .entry-excerpt {
   margin: 0;
   font: 400 13px/1.55 var(--sans);

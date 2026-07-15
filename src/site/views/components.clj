@@ -38,6 +38,13 @@
    (for [t (sort-by name tags)]
      [:a {:href (str "/tags/" (name t))} (str "#" (name t))])])
 
+(defn via-link
+  "The “(via)” credit link shown after an outbound entry's title when the
+  entry records where it was found."
+  [entry]
+  (when-let [via (:link-via entry)]
+    [:span.via " (" [:a {:href via} "via"] ")"]))
+
 ;; --- feed row ------------------------------------------------------------
 
 (defn- entry-hint
@@ -61,7 +68,7 @@
 
 (defn- entry-title [entry]
   (when (:title entry)
-    [:h3.entry-title [:a {:href (outbound entry)} (:title entry)]]))
+    [:h3.entry-title [:a {:href (outbound entry)} (:title entry)] (via-link entry)]))
 
 (defn entry-row
   "One entry in the feed: a quote renders as a blockquote with a linked
