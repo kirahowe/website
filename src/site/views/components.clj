@@ -55,7 +55,7 @@
   [:div.entry-foot {:class (name (:type entry))}
    [:span.entry-kind (dot (:type entry)) (name (:type entry))]
    (when (seq (:tags entry))
-     (cons [:span.sep "·"] (tag-links (:tags entry))))])
+     (cons [:span.sep "/"] (tag-links (:tags entry))))])
 
 (defn- entry-title [entry]
   (when (:title entry)
@@ -109,12 +109,12 @@
   (str n " " (if (= 1 n) "entry" "entries")))
 
 (defn type-summary
-  "A per-type breakdown line — \"4 posts · 1 quote · 9 links\" — in nav
+  "A per-type breakdown line — \"4 posts / 1 quote / 9 links\" — in nav
   order; the word singularizes on a count of one. When `link?`, each type
   word links to its listing (whose URL stays plural)."
   [entries link?]
   (let [counts (frequencies (map :type entries))]
-    (interpose [:span.sep "·"]
+    (interpose [:span.sep "/"]
                (for [t type-order :when (counts t)
                      :let [n (counts t)
                            slug (str (name t) "s")

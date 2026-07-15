@@ -105,7 +105,7 @@
 
 (defn type-page [config type year entries]
   (let [plural (str/capitalize (str (name type) "s"))
-        title (if year (str plural " · " year) plural)]
+        title (if year (str plural " / " year) plural)]
     (layout/page config title
                  (c/page-header title (c/count-label (count entries)))
                  (c/feed entries))))
@@ -122,7 +122,7 @@
                   (c/side-link {:path "/tags" :title "All tags"})))
 
 (defn tag-page [config tag year entries]
-  (let [title (str "#" (name tag) (when year (str " · " year)))]
+  (let [title (str "#" (name tag) (when year (str " / " year)))]
     (layout/page config title
                  (c/page-header (list [:span.hash "#"] (name tag))
                                 (c/count-label (count entries)))

@@ -26,9 +26,9 @@
     (util/format-date (:date entry))
     (cond
       (:link-url entry)
-      (list [:span.sep "·"] (util/host (:link-url entry)))
+      (list [:span.sep "/"] (util/host (:link-url entry)))
       (#{:post :note} (:type entry))
-      (list [:span.sep "·"] (str (markdown/read-time (:body entry)) " min read")))]))
+      (list [:span.sep "/"] (str (markdown/read-time (:body entry)) " min read")))]))
 
 (defn- quote-blockquote
   "The quote body as a blockquote, with the closing Caveat mark tucked onto

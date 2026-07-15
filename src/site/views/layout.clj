@@ -43,7 +43,7 @@
 (defn- footer [config]
   (let [year (.getYear (java.time.LocalDate/now))]
     [:footer.site-footer
-     [:span "© " year " " (:site-title config) " · built with Clojure + hiccup"]
+     [:span "© " year " " (:site-title config) " / built with Clojure + hiccup"]
      [:span.social
       [:a {:href "/feed.xml"} "RSS"]
       (for [[label url] (:social config)]
