@@ -456,8 +456,8 @@ a { color: var(--accent); text-decoration: none; }
 .tag-chips a { color: var(--muted); }
 .tag-chips a:hover { color: var(--accent); }
 
-/* Dense two-column related grid */
-.related { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--sp5); }
+/* Dense single-column related list */
+.related { display: grid; grid-template-columns: 1fr; }
 .related-item {
   display: flex;
   align-items: baseline;
@@ -647,7 +647,6 @@ a { color: var(--accent); text-decoration: none; }
   .cols { grid-template-columns: 1fr; }
   .main { border-right: 0; }
   .sidebar { border-top: 1px solid var(--hair); }
-  .related { grid-template-columns: 1fr; }
   .article, .page-header, .post-footer .section,
   .month-index, .tag-list, .search-form, .search-count,
   .type-summary, .empty, .draft-banner { padding-left: var(--sp5); padding-right: var(--sp5); }
