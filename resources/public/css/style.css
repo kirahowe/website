@@ -280,26 +280,27 @@ a { color: var(--accent); text-decoration: none; }
 }
 
 .entry-foot {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: var(--sp4);
   margin-top: var(--sp3);
   font: 400 var(--fs-sm) var(--mono);
   color: var(--muted);
 }
+.entry-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--sp4);
+}
 .entry-kind {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: var(--sp2);
   min-width: 0;
 }
-.entry-kind .sep { opacity: .45; }
 .entry-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 2px var(--sp3);
+  margin-top: var(--sp2);
 }
 .entry-tags a { color: var(--muted); }
 .entry-tags a:hover { color: var(--fg); }

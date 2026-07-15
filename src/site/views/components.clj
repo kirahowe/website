@@ -57,14 +57,15 @@
                                     (str (markdown/read-time (:body entry)) " min read")]))
 
 (defn- entry-foot [entry]
-  [:div.entry-foot
-   [:span.entry-kind {:class (name (:type entry))}
-    (dot (:type entry))
-    (name (:type entry))
-    (when (seq (:tags entry))
-      (list [:span.sep "·"] (tag-links (:tags entry))))]
-   (when-let [h (entry-hint entry)]
-     [:span.entry-hint h])])
+  (let [hint (entry-hint entry)]
+    [:div.entry-foot
+     [:div.entry-line
+      [:span.entry-kind {:class (name (:type entry))}
+       (dot (:type entry))
+       (name (:type entry))]
+      (when hint [:span.entry-hint hint])]
+     (when (seq (:tags entry))
+       (tag-links (:tags entry)))]))
 
 (defn- entry-title [entry]
   (when (:title entry)
