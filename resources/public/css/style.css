@@ -581,20 +581,23 @@ a { color: var(--accent); text-decoration: none; }
   padding: var(--sp2) var(--sp3);
   font: 400 14px var(--mono);
   color: var(--fg);
-  background: var(--panel);
+  background: transparent;
   border: 1px solid var(--hair2);
   border-radius: 7px;
 }
-.search-form input:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+.search-form input::placeholder { color: var(--muted); }
+.search-form input:focus { outline: none; border-color: var(--accent); }
 .search-form button {
   padding: var(--sp2) var(--sp4);
   font: 500 13px var(--mono);
-  color: var(--on-accent);
-  background: var(--accent);
-  border: 0;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--accent);
   border-radius: 7px;
   cursor: pointer;
+  transition: background .12s ease, color .12s ease;
 }
+.search-form button:hover { background: var(--accent); color: var(--on-accent); }
 .search-count { padding: var(--sp5) var(--sp6) 0; font: 400 12px var(--mono); color: var(--muted); }
 
 .empty { padding: var(--sp5) var(--sp6); color: var(--muted); }
