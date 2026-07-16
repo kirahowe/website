@@ -7,7 +7,7 @@
             [site.markdown :as markdown]
             [site.util :as util]))
 
-(def type-order [:post :note :link :quote :release :tool])
+(def type-order [:post :link :quote :release :tool])
 
 ;; --- small atoms ---------------------------------------------------------
 
@@ -25,7 +25,7 @@
 
 (defn entry-label
   "A one-line label for an entry in a dense list: its title, a short quote
-  excerpt, or — for untitled notes — the date."
+  excerpt, or — for untitled entries — the date."
   [entry]
   (or (:title entry)
       (when (= :quote (:type entry))
@@ -74,7 +74,7 @@
 (defn entry-row
   "One entry in the feed: a quote renders as a blockquote with a linked
   source; every other type renders as title + excerpt — with a reading-time
-  link tacked onto the end of a post/note excerpt. Both close with the
+  link tacked onto the end of a post excerpt. Both close with the
   type/tags foot."
   [entry]
   [:article.entry
@@ -85,7 +85,7 @@
      (list
       (entry-title entry)
       [:p.entry-excerpt (markdown/excerpt (:body entry))
-       (when (#{:post :note} (:type entry))
+       (when (= :post (:type entry))
          (list " " [:a.excerpt-more {:href (:path entry)}
                     (str "[…" (markdown/read-time (:body entry)) " min read]")]))]))
    (entry-foot entry)])

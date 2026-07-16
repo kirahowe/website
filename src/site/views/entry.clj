@@ -27,7 +27,7 @@
     (cond
       (:link-url entry)
       (list [:span.sep "/"] (util/host (:link-url entry)))
-      (#{:post :note} (:type entry))
+      (= :post (:type entry))
       (list [:span.sep "/"] (str (markdown/read-time (:body entry)) " min read")))]))
 
 (defn- quote-blockquote

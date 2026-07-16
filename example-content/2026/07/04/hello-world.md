@@ -17,5 +17,5 @@ published at `/2026/jul/4/hello-world`.
   (str "/" (:year date) "/" (month-slug (:month date)) "/" (:day date) "/" slug))
 ```
 
-Posts, notes, links, and quotes all flow through the same pipeline, and the
+Posts, links, and quotes all flow through the same pipeline, and the
 whole thing rebuilds from the files at any time.

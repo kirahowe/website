@@ -7,7 +7,7 @@
   /2026/jul                month archive (numeric months accepted too)
   /2026/jul/4              day archive
   /2026/jul/4/my-post      single entry
-  /posts /notes /links ... type listings (derived from config :entry-types)
+  /posts /links ... type listings (derived from config :entry-types)
   /2026/posts              type listing filtered by year
   /tags                    tag index
   /tags/clojure            entries tagged clojure
@@ -30,7 +30,7 @@
        (mapv decode)))
 
 (defn type-plurals
-  "{\"posts\" :post, \"notes\" :note, ...} from config."
+  "{\"posts\" :post, \"links\" :link, ...} from config."
   [config]
   (into {} (map (fn [t] [(str (name t) "s") t])) (:entry-types config)))
 

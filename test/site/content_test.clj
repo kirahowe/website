@@ -6,32 +6,32 @@
            [java.nio.file.attribute FileAttribute]))
 
 (def config
-  {:entry-types [:post :note :link :quote :release :tool]
+  {:entry-types [:post :link :quote :release :tool]
    :content-path "example-content"})
 
 (deftest frontmatter-parsing
   (testing "valid frontmatter"
     (let [{:keys [meta body]} (content/parse-frontmatter
-                               ";;;\n{:type :note\n :tags [:a]}\n;;;\n\nHello *world*\n"
+                               ";;;\n{:type :link\n :tags [:a]}\n;;;\n\nHello *world*\n"
                                "test.md")]
-      (is (= :note (:type meta)))
+      (is (= :link (:type meta)))
       (is (= [:a] (:tags meta)))
       (is (= "Hello *world*" body))))
 
   (testing "body may contain the delimiter"
     (let [{:keys [body]} (content/parse-frontmatter
-                          ";;;\n{:type :note}\n;;;\nbefore\n;;;\nafter"
+                          ";;;\n{:type :link}\n;;;\nbefore\n;;;\nafter"
                           "test.md")]
       (is (= "before\n;;;\nafter" body))))
 
-  (testing "no frontmatter at all is a bare note: empty meta, body intact"
+  (testing "no frontmatter at all is a bare entry: empty meta, body intact"
     (let [{:keys [meta body]} (content/parse-frontmatter "just text" "test.md")]
       (is (= {} meta))
       (is (= "just text" body))))
 
   (testing "unterminated frontmatter fails loudly"
     (is (thrown-with-msg? Exception #"Unterminated"
-                          (content/parse-frontmatter ";;;\n{:type :note}\nno end" "test.md"))))
+                          (content/parse-frontmatter ";;;\n{:type :link}\nno end" "test.md"))))
 
   (testing "invalid EDN fails loudly"
     (is (thrown-with-msg? Exception #"Invalid EDN"
@@ -83,7 +83,7 @@
   (testing "typo'd type cannot silently coin a new type"
     (is (thrown-with-msg? Exception #"Unknown entry type"
                           (content/check-type! config {:type :postt} "x.md"))))
-  (testing "missing type defaults to :post — a bare note is a post"
+  (testing "missing type defaults to :post — a bare entry is a post"
     (is (= :post (content/check-type! config {} "x.md"))))
   (testing "valid type passes"
     (is (= :quote (content/check-type! config {:type :quote} "x.md")))))
@@ -108,10 +108,9 @@
       (is (= 2 (count (get (:by-day index) [2026 7 4])))))
 
     (testing "type and tag groupings"
-      (is (= 2 (count (get (:by-type index) :post))))
+      (is (= 3 (count (get (:by-type index) :post))))
       (is (= 2 (count (get (:by-type index) :link))))
       (is (= 1 (count (get (:by-type index) :quote))))
-      (is (= 1 (count (get (:by-type index) :note))))
       (is (= 1 (count (get (:by-type index) :release))))
       (is (= 1 (count (get (:by-type index) :tool))))
       (is (= 5 (count (get (:by-tag index) :clojure)))))

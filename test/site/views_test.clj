@@ -11,7 +11,7 @@
    :site-description "Testing"
    :base-url "https://example.com"
    :content-path "example-content"
-   :entry-types [:post :note :link :quote :release :tool]})
+   :entry-types [:post :link :quote :release :tool]})
 
 (def handler
   (app/make-app config (atom (content/build-index config))))
@@ -37,7 +37,7 @@
       ;; feed previews are the first paragraph only, as plain-text excerpts
       (is (not (str/includes? body "where code sleeps")))
       (is (str/includes? body "min read"))                     ; reading-time hint
-      (is (str/includes? body "Untitled notes are fine"))      ; note excerpt shows
+      (is (str/includes? body "Untitled entries are fine"))    ; untitled post excerpt shows
       ;; day headings link to the day archives
       (is (str/includes? body "July 4, 2026"))
       (is (str/includes? body "\"/2026/jul/4\""))))

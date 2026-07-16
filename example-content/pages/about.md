@@ -2,7 +2,7 @@
 {:title "About"}
 ;;;
 
-This is a personal weblog: posts, notes, links, and quotes, organized by
+This is a personal weblog: posts, links, and quotes, organized by
 date and tag.
 
 It's built with [Clojure](https://clojure.org) running under

@@ -8,7 +8,7 @@
   (:import [java.nio.file Files]
            [java.nio.file.attribute FileAttribute]))
 
-(def config-base {:entry-types [:post :note :link :quote]})
+(def config-base {:entry-types [:post :link :quote]})
 
 (defn- sh! [& args]
   (let [{:keys [exit err] :as res} (apply sh/sh args)]
@@ -37,7 +37,7 @@
                       :content-git-url origin)]
     ;; a content repo with one entry
     (sh! "git" "init" "-q" "-b" "main" origin)
-    (entry! origin "2026/01/05/first.md" ";;;\n{:type :note}\n;;;\nfirst entry")
+    (entry! origin "2026/01/05/first.md" ";;;\n{:type :post}\n;;;\nfirst entry")
     (git! origin "add" "-A")
     (git! origin "commit" "-q" "-m" "first")
 
@@ -69,7 +69,7 @@
                       :content-path checkout
                       :content-git-url origin)]
     (sh! "git" "init" "-q" "-b" "main" origin)
-    (entry! origin "2026/01/05/first.md" ";;;\n{:type :note}\n;;;\nfirst")
+    (entry! origin "2026/01/05/first.md" ";;;\n{:type :post}\n;;;\nfirst")
     (git! origin "add" "-A")
     (git! origin "commit" "-q" "-m" "first")
 
@@ -91,7 +91,7 @@
         (is (= 1 (count (:entries @index-atom)))))
 
       (testing "a fix recovers on the next sync"
-        (entry! origin "2026/01/06/bad.md" ";;;\n{:type :note}\n;;;\nfixed")
+        (entry! origin "2026/01/06/bad.md" ";;;\n{:type :post}\n;;;\nfixed")
         (git! origin "add" "-A")
         (git! origin "commit" "-q" "-m" "fix")
         (is (= :updated (sync/sync-once! config index-atom)))

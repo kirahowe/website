@@ -251,7 +251,7 @@
 (defn suggest-tags
   "bb suggest-tags <draft name> — has the configured LLM read the draft
   and propose tags, printed as a YAML block ready to paste into the
-  note's properties."
+  draft's properties."
   [& args]
   (let [fname (str/join " " args)]
     (when (str/blank? fname)

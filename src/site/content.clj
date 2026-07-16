@@ -16,7 +16,7 @@
           property names map onto the entry model: link → :link-url,
           via → :link-via, author → :source, source → :source-url.
     ;;;   EDN — the original format, still accepted.
-    none  a bare note publishes as a :post.
+    none  a bare entry publishes as a :post.
 
   The filename is the human title (quotes stay untitled unless a title
   property says otherwise); the slug is slugified from it unless a slug
@@ -98,7 +98,7 @@
       {:meta {} :body (str/trim raw)})))
 
 (defn check-type!
-  "Resolves :type, defaulting to :post (a bare note is a post), and
+  "Resolves :type, defaulting to :post (a bare entry is a post), and
   validates it against the configured :entry-types. Fails loudly so a
   typo can't silently coin a new type."
   [config meta file]

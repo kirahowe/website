@@ -15,7 +15,7 @@
 
  ;; Entry types that may appear in frontmatter, in nav order.
  ;; A typo'd type in a content file fails indexing loudly.
- :entry-types [:post :note :link :quote :release :tool]
+ :entry-types [:post :link :quote :release :tool]
 
  ;; Short bio shown in the footer of every entry page.
  :bio "Kira Howe is a software engineer writing about Clojure, data, and the craft of building small, durable software."
