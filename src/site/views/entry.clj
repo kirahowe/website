@@ -43,10 +43,7 @@
   (if (= :quote (:type entry))
     (list
      (quote-blockquote entry)
-     (when-let [src (:source entry)]
-       [:p.quote-cite "— " (if-let [url (:source-url entry)]
-                             [:a {:href url} src]
-                             src)]))
+     (c/quote-source entry))
     (markdown/render-article (:body entry) (:wikilinks entry))))
 
 (defn- post-footer [config index entry]
@@ -54,9 +51,7 @@
     [:div.post-footer
      (when (seq (:tags entry))
        [:section.section
-        [:div.tag-chips
-         (for [t (sort-by name (:tags entry))]
-           [:a {:href (str "/tags/" (name t))} (str "#" (name t))])]])
+        [:div.tag-chips (c/tag-links (:tags entry))]])
      (when (seq rel)
        [:section.section
         [:h2 "Related"]
@@ -78,7 +73,5 @@
                [:article.article
                 (when (:title entry) [:h1 (:title entry)])
                 (when (seq (:tags entry))
-                  [:div.tag-chips
-                   (for [t (sort-by name (:tags entry))]
-                     [:a {:href (str "/tags/" (name t))} (str "#" (name t))])])
+                  [:div.tag-chips (c/tag-links (:tags entry))])
                 (article-body entry)]))

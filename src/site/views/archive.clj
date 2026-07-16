@@ -22,10 +22,10 @@
        [:a.month-name {:href (str "/" year "/" slug)} (util/month-name month)]
        [:span.month-count (c/type-summary entries false)]]
       (for [e entries]
-        [:a.day-row {:href (:path e)}
-         [:span.day (util/ordinal (-> e :date :day))]
-         (c/dot (:type e))
-         [:span.title (c/entry-label e)]])])])
+        (c/index-row {:href (:path e)
+                      :date (util/ordinal (-> e :date :day))
+                      :type (:type e)
+                      :title (c/entry-label e)}))])])
 
 (defn- year-nav [index current]
   (c/side-section "Jump to year"
@@ -135,7 +135,5 @@
     (layout/page config "Tags"
                  (c/page-header "Tags" (str (count tags) " tags"))
                  (if (seq tags)
-                   [:div.tag-list
-                    (for [[t n] tags]
-                      [:a {:href (str "/tags/" (name t))} (str "#" (name t)) " " [:b n]])]
+                   [:div.tag-index (c/tag-cloud tags)]
                    [:p.empty "No tags yet."]))))

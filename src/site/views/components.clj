@@ -12,10 +12,10 @@
 ;; --- small atoms ---------------------------------------------------------
 
 (defn dot
-  "The type colour dot: a decorative marker reading its colour from the
-  entry type."
+  "The type colour dot: a marker reading its colour from the entry type.
+  Carries the type name as a tooltip for rows where it's the only type cue."
   [type]
-  [:span.dot {:class (name type)}])
+  [:span.dot {:class (name type) :title (name type)}])
 
 (defn- outbound
   "Links, releases and tools point at their source; everything else at its
@@ -34,10 +34,20 @@
       (util/format-date (:date entry))))
 
 (defn tag-links
-  "An entry's #tag links, sorted by name — flowed inline into the feed foot."
+  "An entry's #tag links, sorted by name — the one tag atom, used by the
+  feed foot, the post footer, and draft pages."
   [tags]
   (for [t (sort-by name tags)]
-    [:a.entry-tag {:href (str "/tags/" (name t))} (str "#" (name t))]))
+    [:a.tag {:href (str "/tags/" (name t))} (str "#" (name t))]))
+
+(defn quote-source
+  "The \"— source\" line under a quote, linked when a URL is known. Shared
+  by the feed row and the entry page."
+  [{:keys [source source-url]}]
+  (when source
+    [:p.quote-cite "— " (if source-url
+                          [:a {:href source-url} source]
+                          source)]))
 
 (defn via-link
   "The “(via)” credit link shown after an outbound entry's title when the
@@ -71,10 +81,7 @@
    (if (= :quote (:type entry))
      (list
       [:blockquote (markdown/excerpt (:body entry)) [:span.quote-close "”"]]
-      (when-let [src (:source entry)]
-        [:p.quote-cite "— " (if-let [url (:source-url entry)]
-                              [:a {:href url} src]
-                              src)]))
+      (quote-source entry))
      (list
       (entry-title entry)
       [:p.entry-excerpt (markdown/excerpt (:body entry))
@@ -137,7 +144,7 @@
   [:div.cols [:div.main main] aside])
 
 (defn side-link [{:keys [path title type]}]
-  [:a.side-link {:href path} (when type (dot type)) title])
+  [:a.side-link {:href path} (when type (dot type)) [:span.title title]])
 
 (defn recent-links
   "The N most recent titled entries, each with its type dot."
@@ -146,16 +153,28 @@
                 (for [e (take n (filter :title entries))]
                   (side-link {:path (:path e) :title (entry-label e) :type (:type e)}))))
 
-(defn tag-cloud [tag-counts]
+(defn tag-cloud
+  "Tag links with counts — the sidebar widget and the tags index share it."
+  [tag-counts]
   [:div.tag-cloud
    (for [[t n] tag-counts]
-     [:a {:href (str "/tags/" (name t))} (str "#" (name t)) " " [:b n]])])
+     [:a.tag {:href (str "/tags/" (name t))} (str "#" (name t)) " " [:b n]])])
 
 (defn top-tags [tag-counts n]
   (when (seq tag-counts)
     (side-section "Top tags" (tag-cloud (take n tag-counts)))))
 
-;; --- related grid (post/entry footer) ------------------------------------
+;; --- ledger rows (year archive, related list) -----------------------------
+
+(defn index-row
+  "The one dense-list row: a right-aligned mono date, the type dot, then
+  the title. The year archive and the related list both render as columns
+  of these."
+  [{:keys [href date type title]}]
+  [:a.index-row {:href href}
+   [:span.meta date]
+   (dot type)
+   [:span.title title]])
 
 (defn related
   "Up to n other entries, most-shared-tags first (recency breaks ties)."
@@ -167,8 +186,7 @@
          (take n))))
 
 (defn related-item [e]
-  [:a.related-item {:href (:path e)}
-   (dot (:type e))
-   [:span.kind (name (:type e))]
-   [:span.title (entry-label e)]
-   [:span.when (util/short-date (:date e))]])
+  (index-row {:href (:path e)
+              :date (util/short-date (:date e))
+              :type (:type e)
+              :title (entry-label e)}))
