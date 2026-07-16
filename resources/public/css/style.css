@@ -261,7 +261,8 @@ a:hover { text-decoration: underline; }
   align-items: baseline;
 }
 .side-link + .side-link { margin-top: var(--sp3); }
-.side-link .dot { align-self: center; }
+/* Dot rides the first line (align-items: baseline above), not the centre
+   of a wrapped multi-line title. */
 .side-link .title { font: 400 var(--fs) var(--sans); line-height: var(--lh-tight); }
 
 /* --------------------------------------------------------------------------
@@ -603,4 +604,8 @@ a:hover { text-decoration: underline; }
   .cols { grid-template-columns: 1fr; }
   .main { border-right: 0; }
   .sidebar { border-top: 1px solid var(--hair); }
+  /* The nav wraps to several rows here; a tighter gap reads better and the
+     vertical divider doesn't survive the wrap, so drop it. */
+  .site-nav { gap: var(--sp2) var(--sp3); }
+  .nav-sep { display: none; }
 }
