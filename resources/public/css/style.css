@@ -38,7 +38,7 @@
   --on-accent: #0b1416;     /* text/glyph on a filled accent */
 
   /* One colour per entry type (nav words, dots, syntax) */
-  --post: #83a4e8;
+  --post: #a5a8f5;
   --link: #e8993d;
   --note: #c08cff;
   --quote: #63d081;
@@ -97,10 +97,10 @@
     --accent: #00778c;      /* deep teal — clears AA on the paper */
     --on-accent: #ffffff;
 
-    --post: #3663b0;
+    --post: #5257cf;
     --link: #9a5a00;
     --note: #8250df;
-    --quote: #1a7f37;
+    --quote: #378911;
     --release: #c2255c;
     --tool: #0a757c;
   }
