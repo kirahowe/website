@@ -1,17 +1,9 @@
-# website-v2
+# website
 
-A personal weblog — posts, notes, links, and quotes — rendered straight
-from an **Obsidian vault** by a small Clojure program running entirely
-under [babashka](https://babashka.org). No JVM, no database, no build
-step, and zero external dependencies (everything used, including
-nextjournal/markdown and clj-yaml, is built into bb ≥ 1.12.196).
+My personal weblog of posts, notes, links, quotes, and more, rendered from an Obsidian vault by a small Clojure program using [babashka](https://babashka.org).
+I wanted authoring content to be as easy as adding to my personal wiki (in Obsidian), with the tooling handling the complexity of transforming all those files into a website. The build process handles parsing frontmatter, `[[wikilinks]]`, pasted images, and organizing the content.
 
-The guiding rule: **you write in Obsidian's native dialect; the machine
-adapts.** YAML properties, `[[wikilinks]]`, pasted images — the site's
-indexer and renderer translate all of it at read time. Nothing in the
-vault exists for the machine's benefit.
-
-See [PLAN.md](PLAN.md) for the original architecture and its rationale.
+This project was written almost entirely by Claude (Opus 4.8 and Fable 5). See [PLAN.md](PLAN.md) for the original AI-generated architecture and its rationale.
 
 ## Quick start
 

@@ -166,7 +166,7 @@ Draft status is determined by **location, not a flag** — a file is a draft bec
 **Code repository** (this repo):
 
 ```
-website-v2/
+website/
 ├── bb.edn                      # Deps + tasks — the single entry point
 ├── src/
 │   └── site/
