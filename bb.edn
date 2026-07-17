@@ -40,11 +40,15 @@
        :requires ([site.author :as author])
        :task (apply author/new-draft *command-line-args*)}
 
-  publish {:doc "Publish a draft: bb publish <name> [--no-git] — lints it, moves it into today's date folder, commits, pushes"
+  drafts {:doc "List every draft, marking which are queued to publish: bb drafts"
+          :requires ([site.author :as author])
+          :task (apply author/list-drafts *command-line-args*)}
+
+  publish {:doc "Publish a draft: bb publish <name> [--no-git] — lints it, moves it into its date folder, commits, pushes; with no name, publishes every draft marked publish: true"
            :requires ([site.author :as author])
            :task (apply author/publish *command-line-args*)}
 
-  publish-queued {:doc "Publish every draft marked publish: true, then push: bb publish-queued [--no-git] (what the autopublish agent runs)"
+  publish-queued {:doc "Same as bare `bb publish`: publishes every draft marked publish: true, then pushes: bb publish-queued [--no-git] (the stable name the autopublish agent invokes)"
                   :requires ([site.author :as author])
                   :task (apply author/publish-queued *command-line-args*)}
 

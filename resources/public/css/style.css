@@ -43,7 +43,7 @@
   --link: #e8993d;
   --quote: #63d081;
   --release: #ff88a8;
-  --tool: #f0c94a;
+  --tool: #a5a8f5;
 
   /* Spacing scale — every gap/pad/margin references one of these */
   --sp1: 4px;
@@ -98,11 +98,11 @@
     --on-accent: #ffffff;
     --hit: rgba(0, 119, 140, .14);
 
-    --post: #5257cf;
-    --link: #9a5a00;
+    --post: #aa20e8;
+    --link: #c1750a;
     --quote: #378911;
-    --release: #c2255c;
-    --tool: #0a757c;
+    --release: #d91671;
+    --tool: #6d6dea;
   }
 }
 
@@ -226,7 +226,7 @@ a:hover { text-decoration: underline; }
   align-items: center;
   gap: var(--sp2) var(--sp4);
   margin-top: var(--sp4);
-  font: 500 var(--fs-sm) var(--mono);
+  font: 500 var(--fs) var(--mono);
 }
 .site-nav .type { color: var(--type-color); }
 

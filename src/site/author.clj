@@ -245,61 +245,47 @@
         (println (str "Date:      " date " (from the draft's date property)")))
       base)))
 
-(defn publish
-  "bb publish <name words...> [--no-git] — the manual publish: validates
-  the draft, lints it, and files it into its authored `date` property's
-  YYYY/MM/DD/ folder in the vault (today's, if it has none), then (unless
-  --no-git) mirrors the vault into the publish repo and pushes. The live
-  site picks it up on its next timed pull, or immediately if you restart
-  the machine."
-  [& args]
-  (let [no-git? (boolean (some #{"--no-git"} args))
-        fname (str/join " " (remove #(str/starts-with? % "--") args))]
-    (when (str/blank? fname)
-      (die "Usage: bb publish <draft name> [--no-git]"))
-    (let [cfg (config/load-config :dev)
-          root (:content-path cfg)
-          src (find-draft root fname)]
-      (when-not src
-        (die "No such draft: " fname))
-      ;; Lint against the full index; a problem elsewhere in the tree
-      ;; shouldn't block publishing this draft, just surface it.
-      (let [index (try (content/build-index cfg)
-                       (catch Exception e
-                         (warn "skipping lints — content tree has errors: " (ex-message e))
-                         nil))
-            base (try (publish-draft! cfg index src)
-                      (catch Exception e
-                        (die (ex-message e))))]
-        (if no-git?
-          (println "Skipped git (--no-git). Run `bb sync` when you're ready to push.")
-          (mirror-and-push! cfg (str "Publish " base)))))))
-
-(defn- queued-drafts
-  "drafts/*.md files with publish: true, paired with their authored date
-  (nil if absent). A draft whose workflow properties throw (e.g. a
-  garbled date) warns and is skipped rather than blocking the rest."
+(defn- draft-status
+  "Every drafts/*.md file paired with its authored workflow properties
+  (:date, :publish) and its :type — read leniently with
+  content/parse-frontmatter, never validated with check-type!, so a
+  typo'd type shows up rather than crashing the scan. A draft whose
+  frontmatter fails to parse (e.g. a garbled date property) carries
+  :error instead of :date/:publish/:type, so callers can flag it rather
+  than blow up. Used by both `bb drafts` (every draft) and the publish
+  queue (just the ones with publish: true)."
   [root]
   (let [dir (fs/path root "drafts")]
     (when (fs/exists? dir)
-      (keep (fn [f]
-              (try
-                (let [{:keys [date publish]} (content/workflow-properties (slurp (str f)) (str f))]
-                  (when publish {:file f :date date}))
-                (catch Exception e
-                  (warn "skipping " (fs/file-name f) " — " (ex-message e))
-                  nil)))
-            (fs/list-dir dir "*.md")))))
+      (map (fn [f]
+             (let [base (str/replace (fs/file-name f) #"\.md$" "")]
+               (try
+                 (let [raw (slurp (str f))
+                       {:keys [meta]} (content/parse-frontmatter raw (str f))
+                       {:keys [date publish]} (content/workflow-properties raw (str f))]
+                   {:file f :base base :date date :publish publish
+                    :type (or (:type meta) :post)})
+                 (catch Exception e
+                   {:file f :base base :error (ex-message e)}))))
+           (fs/list-dir dir "*.md")))))
 
-(defn publish-queued
-  "bb publish-queued [--no-git] — publishes every draft with publish: true
-  in its frontmatter, in authored-date order, then pushes once. This is
-  what the autopublish launchd agent runs unattended, so it never
-  publishes from a broken content tree, and one bad draft is warned about
-  and skipped rather than blocking the rest of the queue."
-  [& args]
-  (let [no-git? (boolean (some #{"--no-git"} args))
-        cfg (config/load-config :dev)
+(defn- queued-drafts
+  "drafts/*.md files with publish: true, paired with their authored date
+  (nil if absent). A draft whose workflow properties threw (e.g. a
+  garbled date) warns and is skipped rather than blocking the rest."
+  [root]
+  (keep (fn [{:keys [file date publish error]}]
+          (cond
+            error (do (warn "skipping " (fs/file-name file) " — " error) nil)
+            publish {:file file :date date}))
+        (draft-status root)))
+
+(defn- publish-queue!
+  "Publishes every queued draft, in authored-date order, then pushes
+  once. The shared core of bare `bb publish` and `bb publish-queued` —
+  see their docstrings for the user-facing behavior."
+  [no-git?]
+  (let [cfg (config/load-config :dev)
         root (:content-path cfg)
         index (try (content/build-index cfg)
                    (catch Exception e
@@ -307,17 +293,100 @@
         queued (sort-by (juxt (comp nil? :date) :date) (queued-drafts root))]
     (if (empty? queued)
       (println "No drafts queued (set the publish property to true to queue one).")
-      (let [published (keep (fn [{:keys [file]}]
+      (let [;; doall — this is side-effecting (moves files); --no-git skips
+            ;; the str/join that would otherwise force it, so every draft
+            ;; would stop getting published after the first one left lazy.
+            published (doall
+                       (keep (fn [{:keys [file]}]
                               (try
                                 (publish-draft! cfg index file)
                                 (catch Exception e
                                   (warn "failed to publish " (fs/file-name file) " — " (ex-message e))
                                   nil)))
-                            queued)]
+                            queued))]
         (when (seq published)
           (if no-git?
             (println "Skipped git (--no-git). Run `bb sync` when you're ready to push.")
             (mirror-and-push! cfg (str "Publish " (str/join ", " published)))))))))
+
+(defn publish
+  "bb publish [name words...] [--no-git] — the manual publish. Given a
+  name: validates that draft, lints it, and files it into its authored
+  `date` property's YYYY/MM/DD/ folder in the vault (today's, if it has
+  none). Given no name: publishes every draft marked publish: true
+  instead — the same as `bb publish-queued` (see `bb drafts` to preview
+  what that would do). Either way, unless --no-git, mirrors the vault
+  into the publish repo and pushes once; the live site picks it up on
+  its next timed pull, or immediately if you restart the machine."
+  [& args]
+  (let [no-git? (boolean (some #{"--no-git"} args))
+        fname (str/join " " (remove #(str/starts-with? % "--") args))]
+    (if (str/blank? fname)
+      (publish-queue! no-git?)
+      (let [cfg (config/load-config :dev)
+            root (:content-path cfg)
+            src (find-draft root fname)]
+        (when-not src
+          (die "No such draft: " fname "\nUsage: bb publish [<draft name>] [--no-git]"))
+        ;; Lint against the full index; a problem elsewhere in the tree
+        ;; shouldn't block publishing this draft, just surface it.
+        (let [index (try (content/build-index cfg)
+                         (catch Exception e
+                           (warn "skipping lints — content tree has errors: " (ex-message e))
+                           nil))
+              base (try (publish-draft! cfg index src)
+                        (catch Exception e
+                          (die (ex-message e))))]
+          (if no-git?
+            (println "Skipped git (--no-git). Run `bb sync` when you're ready to push.")
+            (mirror-and-push! cfg (str "Publish " base))))))))
+
+(defn publish-queued
+  "bb publish-queued [--no-git] — same as bare `bb publish`: publishes
+  every draft with publish: true in its frontmatter, in authored-date
+  order, then pushes once. Kept as its own task name because it's the
+  stable name the installed autopublish launchd agent invokes — the
+  agent's plist calls it by name, so it can't be renamed out from under
+  an install without reinstalling. Never publishes from a broken content
+  tree, and one bad draft is warned about and skipped rather than
+  blocking the rest of the queue."
+  [& args]
+  (publish-queue! (boolean (some #{"--no-git"} args))))
+
+(defn- draft-sort-key
+  "Sort key for `bb drafts`: queued drafts first (in the order `bb
+  publish` would publish them — authored date ascending, nil last), then
+  everything else, alphabetically by filename for a stable order."
+  [{:keys [publish date base]}]
+  [(not publish) (nil? date) date base])
+
+(defn- draft-line
+  "One line of `bb drafts` output for a draft-status entry: the queue
+  marker, its authored date (or that it has none), its type, and its
+  filename — or, if its frontmatter failed to parse, the error in place
+  of date/type."
+  [{:keys [base date publish type error]}]
+  (str (if publish "[queued] " "         ")
+       (if error
+         (str "ERROR: " error)
+         (str (format "%-10s" (if date (str date) "no date")) "  " (name type)))
+       "  " base))
+
+(defn list-drafts
+  "bb drafts — lists every draft in drafts/, queued ones first in the
+  order a bare `bb publish` would publish them, so you can see what it
+  (or `bb publish-queued`) would do before running it."
+  [& _]
+  (let [cfg (config/load-config :dev)
+        drafts (draft-status (:content-path cfg))]
+    (if (empty? drafts)
+      (println "No drafts.")
+      (do
+        (doseq [d (sort-by draft-sort-key drafts)]
+          (println (draft-line d)))
+        (println)
+        (println "Publish everything queued: bb publish")
+        (println "Publish just one draft:    bb publish <name>")))))
 
 ;; --- autopublish: the launchd agent that runs publish-queued ------------
 

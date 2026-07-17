@@ -3,7 +3,7 @@
 My personal weblog of posts, notes, links, quotes, and more, rendered from an Obsidian vault by a small Clojure program using [babashka](https://babashka.org).
 I wanted authoring content to be as easy as adding to my personal wiki (in Obsidian), with the tooling handling the complexity of transforming all those files into a website. The build process handles parsing frontmatter, `[[wikilinks]]`, pasted images, and organizing the content.
 
-This project was written almost entirely by Claude (Opus 4.8 and Fable 5). See [PLAN.md](PLAN.md) for the original AI-generated architecture and its rationale.
+This project was written almost entirely by Claude (Opus 4.8 and Fable 5). See [PLAN.md](PLAN.md) for the original AI-generated architecture and its rationale. More details about how it works are below, and instructions in case you ever want to clone this and up a similar website.
 
 ## Quick start
 
@@ -13,36 +13,29 @@ bb dev        # serve the vault configured in config/dev.edn at http://localhost
 bb test       # run the test suite
 ```
 
-(No vault yet? Point `:content-path` in `config/dev.edn` at `example-content`.)
+(To see the website with some realistic-looking fake data point `:content-path` in `config/dev.edn` at `example-content`.)
 
 ## How content reaches the site: iCloud vault + a separate git repo
 
-Two directories, and **git never lives inside iCloud** — that's what keeps
-iCloud from corrupting it:
+Two directories, and **git never lives inside iCloud** so that iCloud can't corrupt it.
 
 ```
-iCloud vault (source of truth)         Publish repo (transport, disposable)
-~/…/Obsidian/Documents/Blog/           ~/code/projects/kirahowe-content/
-├── drafts/       ← you write here      ├── .git/     ← OUTSIDE iCloud
-├── 2026/07/…     ← published           ├── 2026/07/…
-├── attachments/  ← pasted images       ├── attachments/
-├── pages/                              └── pages/
-├── templates/, dev.md  (never published)
-└── .obsidian/          (never published)
+iCloud vault (source of truth)            Publish repo (transport, disposable)
+~/…/Obsidian/Documents/Blog/              ~/code/projects/kirahowe-content/
+├── drafts/       ← you write here         ├── .git/     ← OUTSIDE iCloud
+├── 2026/07/…     ← published              ├── 2026/07/…
+├── attachments/  ← pasted images          ├── attachments/
+├── pages/                                 └── pages/
+├── templates/, dev.md  (never published)      │
+└── .obsidian/          (never published)      │
         │                                      │
         │  iCloud ⇄ phone                      │  git push ⇄ GitHub ⇄ server
         └──────────► bb publish / bb sync ─────┘
 ```
 
-- The **vault** is a plain Obsidian vault in iCloud (so your phone sees
-  it). It contains no `.git` — nothing git-related ever syncs to your
-  phone or gets mangled by iCloud.
-- The **publish repo** is a normal git checkout *outside* iCloud. It's a
-  mirror of the vault's publishable content and is disposable: if it ever
-  wedges, delete it and re-clone. `bb publish` / `bb sync` mirror the
-  vault into it and push; the server pulls from GitHub as usual.
-- Your Mac is the only bridge between the two sync systems, and only when
-  you run `bb publish` / `bb sync`.
+- The **vault** is a plain Obsidian vault in iCloud (so my phone can see it). It contains no `.git` so that nothing git-related ever syncs to the phone or gets mangled by iCloud.
+- The **publish repo** is a normal git checkout *outside* iCloud. It's a mirror of the vault's publishable content and is disposable: if it ever wedges, delete it and re-clone. `bb publish` / `bb sync` mirror the vault into it and push, the server pulls from GitHub as usual.
+- My mac is the only bridge between the two sync systems, and only when I run `bb publish` / `bb sync`.
 
 One-time setup:
 
@@ -99,6 +92,7 @@ bb new post My great idea      # scaffolds drafts/My great idea.md
 # ...write — with `bb dev` running, preview at localhost:8100/drafts/My great idea
 bb suggest-tags my-great-idea  # LLM-suggested tags, printed ready to paste
 bb reindex                     # optional: validate that everything parses
+bb drafts                      # see every draft, and which are queued (publish: true)
 bb publish my-great-idea       # lints, moves it into its date folder, mirrors + pushes
 ```
 
@@ -106,6 +100,8 @@ A file is a draft because it lives in `drafts/`; publishing is moving it
 into the date tree. No flags to forget. `bb publish` warns about
 unresolved wikilinks, missing attachments, missing or never-seen tags,
 and a link entry without a URL — but a warning never blocks a publish.
+Run it with no name and it publishes every queued draft instead (see
+"Publishing from your phone" below) — `bb drafts` shows what that would do.
 
 **Editing or deleting something already published?** Change it in Obsidian,
 then `bb sync` — it re-mirrors the vault into the publish repo and pushes,
@@ -122,6 +118,8 @@ Writing happens anywhere the vault syncs to — including the phone — but
 publishing still needs a git push, which only the Mac can do. The bridge
 is the `publish` property: flip it to `true` in Obsidian on your phone to
 queue a draft, and a launchd agent on the Mac notices and publishes it.
+The agent is optional, though — a bare `bb publish` flushes the queue by
+hand, any time, from the Mac.
 
 ```sh
 bb autopublish install     # once, on the Mac, from the project root
