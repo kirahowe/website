@@ -19,6 +19,7 @@
 
   test {:doc "Run the test suite"
         :requires ([clojure.test :as t]
+                   [site.author-test]
                    [site.config-test]
                    [site.content-test]
                    [site.routes-test]
@@ -42,6 +43,14 @@
   publish {:doc "Publish a draft: bb publish <name> [--no-git] — lints it, moves it into today's date folder, commits, pushes"
            :requires ([site.author :as author])
            :task (apply author/publish *command-line-args*)}
+
+  publish-queued {:doc "Publish every draft marked publish: true, then push: bb publish-queued [--no-git] (what the autopublish agent runs)"
+                  :requires ([site.author :as author])
+                  :task (apply author/publish-queued *command-line-args*)}
+
+  autopublish {:doc "Manage the launchd agent that runs publish-queued every 5 min: bb autopublish install|uninstall|status"
+               :requires ([site.author :as author])
+               :task (apply author/autopublish *command-line-args*)}
 
   suggest-tags {:doc "Suggest tags for a draft with the configured LLM: bb suggest-tags <name>"
                 :requires ([site.author :as author])

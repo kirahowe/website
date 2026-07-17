@@ -26,7 +26,8 @@
             [clojure.java.io :as io]
             [clojure.set :as set]
             [clojure.string :as str]
-            [site.util :as util]))
+            [site.util :as util])
+  (:import [java.time LocalDate ZoneOffset]))
 
 (def edn-delimiter ";;;")
 (def yaml-delimiter "---")
@@ -59,7 +60,7 @@
 (defn- normalize-yaml-meta
   "Obsidian properties → entry keys. Blank/empty properties are treated
   as absent; date and publish are workflow properties, not entry data
-  (the path is the date)."
+  (the path is the date; see workflow-properties)."
   [meta file]
   (when-not (map? meta)
     (throw (ex-info (str "Frontmatter must be a YAML map: " file)
@@ -96,6 +97,48 @@
     (if-let [[meta-str body] (split-frontmatter raw yaml-delimiter file)]
       {:meta (read-yaml-meta meta-str file) :body body}
       {:meta {} :body (str/trim raw)})))
+
+(defn- parse-workflow-date
+  "Normalizes a raw :date value into a LocalDate. clj-yaml parses an
+  unquoted `date: 2026-07-15` into a java.util.Date at UTC midnight — it
+  must be read back out in UTC, or the system zone shifts it to the
+  previous day. A quoted date, or an Obsidian \"Date & time\" property
+  (e.g. \"2026-07-15T09:30\"), arrives as a string instead."
+  [v file]
+  (cond
+    (nil? v) nil
+
+    (instance? java.util.Date v)
+    (.. ^java.util.Date v toInstant (atZone ZoneOffset/UTC) toLocalDate)
+
+    (string? v)
+    (let [s (str/trim v)]
+      (when-not (str/blank? s)
+        (let [candidate (if (re-find #"^\d{4}-\d{2}-\d{2}" s) (subs s 0 10) s)]
+          (try
+            (LocalDate/parse candidate)
+            (catch Exception e
+              (throw (ex-info (str "Unparseable date property in " file ": " (pr-str v))
+                              {:file file :value v} e)))))))
+
+    :else
+    (throw (ex-info (str "Unparseable date property in " file ": " (pr-str v))
+                    {:file file :value v}))))
+
+(defn workflow-properties
+  "Authoring-workflow data ({:date LocalDate-or-nil :publish boolean}) from
+  raw YAML frontmatter — the two properties normalize-yaml-meta deliberately
+  drops (the path is the date). Throws on an unparseable date so a typo'd
+  date fails a publish loudly rather than silently publishing under today."
+  [raw file]
+  (if-let [[meta-str] (split-frontmatter raw yaml-delimiter file)]
+    (let [meta (try (yaml/parse-string meta-str)
+                    (catch Exception e
+                      (throw (ex-info (str "Invalid YAML frontmatter in " file ": " (ex-message e))
+                                      {:file file} e))))]
+      {:date (parse-workflow-date (:date meta) file)
+       :publish (true? (:publish meta))})
+    {:date nil :publish false}))
 
 (defn check-type!
   "Resolves :type, defaulting to :post (a bare entry is a post), and

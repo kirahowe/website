@@ -14,13 +14,19 @@
 
 (defn frontmatter-template
   "YAML frontmatter, matching what Obsidian's Properties panel edits.
+  `date` defaults to today — the day you start the draft, but it's yours
+  to edit (e.g. to backdate something written over several days); `bb
+  publish` files the entry under it. `publish` starts false; flipping it
+  to true (e.g. from the phone) queues the draft for `bb publish-queued`.
   A post needs nothing beyond tags — the filename is the title."
   [type]
-  (case type
-    :post "---\ntags: []\n---\n\n"
-    :link "---\ntype: link\nlink: \nvia: \ntags: []\n---\n\n"
-    :quote "---\ntype: quote\nauthor: \nsource: \ntags: []\n---\n\n"
-    (str "---\ntype: " (name type) "\ntags: []\n---\n\n")))
+  (let [date (LocalDate/now)]
+    (case type
+      :post (str "---\ndate: " date "\ntags: []\npublish: false\n---\n\n")
+      :link (str "---\ntype: link\ndate: " date "\nlink: \nvia: \ntags: []\npublish: false\n---\n\n")
+      :quote (str "---\ntype: quote\ndate: " date "\nauthor: \nsource: \ntags: []\npublish: false\n---\n\n")
+      (:release :tool) (str "---\ntype: " (name type) "\ndate: " date "\nlink: \ntags: []\npublish: false\n---\n\n")
+      (str "---\ntype: " (name type) "\ndate: " date "\ntags: []\npublish: false\n---\n\n"))))
 
 (defn- die [& msg]
   (println (apply str msg))
@@ -179,12 +185,73 @@
     (mirror! (:content-path cfg) repo)
     (git-push! cfg repo message)))
 
+;; --- publishing -----------------------------------------------------------
+
+(defn strip-publish-property
+  "Removes any `publish:` line from a file's YAML frontmatter block only —
+  never from the body. The publish toggle is authoring workflow and
+  shouldn't leak into the public repo (the `date` property stays; it's
+  real entry data the site just chooses to ignore). EDN frontmatter and
+  bodies with no frontmatter pass through unchanged, byte-for-byte."
+  [raw]
+  (if-let [open (re-find #"^---[ \t]*\r?\n" raw)]
+    (let [after-open (subs raw (count open))
+          m (re-matcher #"(?m)^---[ \t]*\r?\n" after-open)]
+      (if (.find m)
+        (let [fm-end (.end m)
+              header (subs after-open 0 fm-end)
+              body (subs after-open fm-end)]
+          (str open
+               (str/replace header #"(?m)^[ \t]*publish[ \t]*:.*\r?\n" "")
+               body))
+        raw))
+    raw))
+
+(defn- publish-draft!
+  "Core of publishing one draft: validate, lint (when index is given),
+  file it under its authored `date` property (or today, if it has none),
+  strip the publish toggle, and remove it from drafts/. Returns the base
+  name on success. Throws rather than dying, so callers — the interactive
+  `bb publish` and the unattended `bb publish-queued` — decide how to
+  handle failure."
+  [cfg index src]
+  (let [root (:content-path cfg)
+        base (str/replace (fs/file-name src) #"\.md$" "")
+        raw (slurp (str src))
+        {:keys [meta]} (content/parse-frontmatter raw (str src))]
+    ;; Validate with the same parser the server uses — a broken file should
+    ;; fail here, not after it's live.
+    (content/check-type! cfg meta (str src))
+    (when index
+      (lint-draft! cfg index (get (:drafts index) base)))
+    (let [{authored-date :date} (content/workflow-properties raw (str src))
+          date (or authored-date (LocalDate/now))
+          y (.getYear date)
+          m (.getMonthValue date)
+          d (.getDayOfMonth date)
+          dir (fs/path root (str y) (format "%02d" m) (format "%02d" d))
+          target (fs/path dir (str base ".md"))
+          slug (util/slugify base)]
+      (when (fs/exists? target)
+        (throw (ex-info (str "Target already exists: " target) {:target (str target)})))
+      (fs/create-dirs dir)
+      ;; Not fs/move — the publish toggle must not leak into the public
+      ;; repo, so the file that lands in the date folder has it stripped.
+      (spit (str target) (strip-publish-property raw))
+      (fs/delete src)
+      (println "Published:" (str target))
+      (println "URL path:  " (str "/" y "/" (util/month-slug m) "/" d "/" slug))
+      (when authored-date
+        (println (str "Date:      " date " (from the draft's date property)")))
+      base)))
+
 (defn publish
   "bb publish <name words...> [--no-git] — the manual publish: validates
-  the draft, lints it, moves it into today's YYYY/MM/DD/ folder in the
-  vault, then (unless --no-git) mirrors the vault into the publish repo
-  and pushes. The live site picks it up on its next timed pull, or
-  immediately if you restart the machine."
+  the draft, lints it, and files it into its authored `date` property's
+  YYYY/MM/DD/ folder in the vault (today's, if it has none), then (unless
+  --no-git) mirrors the vault into the publish repo and pushes. The live
+  site picks it up on its next timed pull, or immediately if you restart
+  the machine."
   [& args]
   (let [no-git? (boolean (some #{"--no-git"} args))
         fname (str/join " " (remove #(str/starts-with? % "--") args))]
@@ -195,34 +262,171 @@
           src (find-draft root fname)]
       (when-not src
         (die "No such draft: " fname))
-      (let [base (str/replace (fs/file-name src) #"\.md$" "")]
-        ;; Validate with the same parser the server uses — a broken file
-        ;; should fail here, not after it's live.
-        (let [{:keys [meta]} (content/parse-frontmatter (slurp (str src)) (str src))]
-          (content/check-type! cfg meta (str src)))
-        ;; Lint against the full index; a problem elsewhere in the tree
-        ;; shouldn't block publishing this draft, just surface it.
-        (try
-          (let [index (content/build-index cfg)]
-            (lint-draft! cfg index (get (:drafts index) base)))
-          (catch Exception e
-            (warn "skipping lints — content tree has errors: " (ex-message e))))
-        (let [today (LocalDate/now)
-              y (.getYear today)
-              m (.getMonthValue today)
-              d (.getDayOfMonth today)
-              dir (fs/path root (str y) (format "%02d" m) (format "%02d" d))
-              target (fs/path dir (str base ".md"))
-              slug (util/slugify base)]
-          (when (fs/exists? target)
-            (die "Target already exists: " target))
-          (fs/create-dirs dir)
-          (fs/move src target)
-          (println "Published:" (str target))
-          (println "URL path:  " (str "/" y "/" (util/month-slug m) "/" d "/" slug))
+      ;; Lint against the full index; a problem elsewhere in the tree
+      ;; shouldn't block publishing this draft, just surface it.
+      (let [index (try (content/build-index cfg)
+                       (catch Exception e
+                         (warn "skipping lints — content tree has errors: " (ex-message e))
+                         nil))
+            base (try (publish-draft! cfg index src)
+                      (catch Exception e
+                        (die (ex-message e))))]
+        (if no-git?
+          (println "Skipped git (--no-git). Run `bb sync` when you're ready to push.")
+          (mirror-and-push! cfg (str "Publish " base)))))))
+
+(defn- queued-drafts
+  "drafts/*.md files with publish: true, paired with their authored date
+  (nil if absent). A draft whose workflow properties throw (e.g. a
+  garbled date) warns and is skipped rather than blocking the rest."
+  [root]
+  (let [dir (fs/path root "drafts")]
+    (when (fs/exists? dir)
+      (keep (fn [f]
+              (try
+                (let [{:keys [date publish]} (content/workflow-properties (slurp (str f)) (str f))]
+                  (when publish {:file f :date date}))
+                (catch Exception e
+                  (warn "skipping " (fs/file-name f) " — " (ex-message e))
+                  nil)))
+            (fs/list-dir dir "*.md")))))
+
+(defn publish-queued
+  "bb publish-queued [--no-git] — publishes every draft with publish: true
+  in its frontmatter, in authored-date order, then pushes once. This is
+  what the autopublish launchd agent runs unattended, so it never
+  publishes from a broken content tree, and one bad draft is warned about
+  and skipped rather than blocking the rest of the queue."
+  [& args]
+  (let [no-git? (boolean (some #{"--no-git"} args))
+        cfg (config/load-config :dev)
+        root (:content-path cfg)
+        index (try (content/build-index cfg)
+                   (catch Exception e
+                     (die "Content error, not publishing: " (ex-message e))))
+        queued (sort-by (juxt (comp nil? :date) :date) (queued-drafts root))]
+    (if (empty? queued)
+      (println "No drafts queued (set the publish property to true to queue one).")
+      (let [published (keep (fn [{:keys [file]}]
+                              (try
+                                (publish-draft! cfg index file)
+                                (catch Exception e
+                                  (warn "failed to publish " (fs/file-name file) " — " (ex-message e))
+                                  nil)))
+                            queued)]
+        (when (seq published)
           (if no-git?
             (println "Skipped git (--no-git). Run `bb sync` when you're ready to push.")
-            (mirror-and-push! cfg (str "Publish " base))))))))
+            (mirror-and-push! cfg (str "Publish " (str/join ", " published)))))))))
+
+;; --- autopublish: the launchd agent that runs publish-queued ------------
+
+(def ^:private autopublish-label "com.website.autopublish")
+
+(defn- autopublish-plist-path []
+  (fs/expand-home (str "~/Library/LaunchAgents/" autopublish-label ".plist")))
+
+(defn- autopublish-log-path []
+  (fs/expand-home "~/Library/Logs/website-autopublish.log"))
+
+(defn- uid []
+  (str/trim (:out (p/sh "id" "-u"))))
+
+(defn- launchd-target [u]
+  (str "gui/" u "/" autopublish-label))
+
+(defn- plist-xml [{:keys [bb-path work-dir log-path]}]
+  (str
+   "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+   "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+   "<plist version=\"1.0\">\n"
+   "<dict>\n"
+   "  <key>Label</key>\n"
+   "  <string>" autopublish-label "</string>\n"
+   "  <key>ProgramArguments</key>\n"
+   "  <array>\n"
+   "    <string>" bb-path "</string>\n"
+   "    <string>publish-queued</string>\n"
+   "  </array>\n"
+   "  <key>WorkingDirectory</key>\n"
+   "  <string>" work-dir "</string>\n"
+   "  <key>StartInterval</key>\n"
+   "  <integer>300</integer>\n"
+   "  <key>RunAtLoad</key>\n"
+   "  <true/>\n"
+   "  <key>StandardOutPath</key>\n"
+   "  <string>" log-path "</string>\n"
+   "  <key>StandardErrorPath</key>\n"
+   "  <string>" log-path "</string>\n"
+   "  <key>EnvironmentVariables</key>\n"
+   "  <dict>\n"
+   "    <key>PATH</key>\n"
+   "    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>\n"
+   "  </dict>\n"
+   "</dict>\n"
+   "</plist>\n"))
+
+(defn- autopublish-install! []
+  (when-not (fs/exists? "bb.edn")
+    (die "Run `bb autopublish install` from the project root (no bb.edn here)."))
+  (let [bb-path (some-> (fs/which "bb") str)]
+    (when-not bb-path
+      (die "Couldn't find `bb` on PATH."))
+    (let [work-dir (str (fs/cwd))
+          log-path (str (autopublish-log-path))
+          plist (str (autopublish-plist-path))
+          u (uid)]
+      (fs/create-dirs (fs/parent plist))
+      (spit plist (plist-xml {:bb-path bb-path :work-dir work-dir :log-path log-path}))
+      ;; Clear any old copy first; failure here just means there wasn't one.
+      (p/sh "launchctl" "bootout" (launchd-target u))
+      (let [{:keys [exit err]} (p/sh "launchctl" "bootstrap" (str "gui/" u) plist)]
+        (when-not (zero? exit)
+          (die "launchctl bootstrap failed: " (str/trim (str err)))))
+      (println "Installed" autopublish-label)
+      (println "Runs:" bb-path "publish-queued")
+      (println "Working directory:" work-dir)
+      (println "Every 5 minutes, and once now (RunAtLoad).")
+      (println "Log:" log-path)
+      (println "Uninstall with: bb autopublish uninstall"))))
+
+(defn- autopublish-uninstall! []
+  (let [u (uid)
+        plist (str (autopublish-plist-path))]
+    (p/sh "launchctl" "bootout" (launchd-target u))
+    (when (fs/exists? plist)
+      (fs/delete plist))
+    (println "Uninstalled" autopublish-label)))
+
+(defn- tail-lines [path n]
+  (when (fs/exists? path)
+    (take-last n (str/split-lines (slurp (str path))))))
+
+(defn- autopublish-status []
+  (let [u (uid)
+        {:keys [exit out]} (p/sh "launchctl" "print" (launchd-target u))]
+    (if-not (zero? exit)
+      (println "not installed (bb autopublish install)")
+      (do
+        (doseq [line (str/split-lines out)
+                :when (re-find #"^\s*(state|last exit code)\s*=" line)]
+          (println (str/trim line)))
+        (let [log (autopublish-log-path)]
+          (when (fs/exists? log)
+            (doseq [line (tail-lines log 5)]
+              (println line))))))))
+
+(defn autopublish
+  "bb autopublish [install|uninstall|status] — manages the launchd user
+  agent that runs `bb publish-queued` every 5 minutes, so flipping the
+  publish property on the phone reaches the live site without you
+  touching the Mac. Defaults to status."
+  [& args]
+  (case (first args)
+    "install" (autopublish-install!)
+    "uninstall" (autopublish-uninstall!)
+    (nil "status") (autopublish-status)
+    (die "Usage: bb autopublish [install|uninstall|status]")))
 
 (defn sync-content
   "bb sync — mirror the vault's publishable content into the publish repo

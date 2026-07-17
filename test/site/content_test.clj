@@ -153,6 +153,37 @@
         (is (= "/2026/jul/10/everything-fails"
                (get (:wikilinks post) "everything fails")))))))
 
+(deftest workflow-properties
+  (testing "unquoted YAML date parses as the authored calendar date (UTC, not system zone)"
+    (let [wp (content/workflow-properties "---\ndate: 2026-07-15\n---\nB" "t.md")]
+      (is (= (java.time.LocalDate/of 2026 7 15) (:date wp)))
+      (is (false? (:publish wp)))))
+
+  (testing "quoted date string"
+    (let [wp (content/workflow-properties "---\ndate: \"2026-07-15\"\n---\nB" "t.md")]
+      (is (= (java.time.LocalDate/of 2026 7 15) (:date wp)))))
+
+  (testing "Obsidian \"Date & time\" property"
+    (let [wp (content/workflow-properties "---\ndate: 2026-07-15T09:30\n---\nB" "t.md")]
+      (is (= (java.time.LocalDate/of 2026 7 15) (:date wp)))))
+
+  (testing "absent frontmatter"
+    (is (= {:date nil :publish false}
+           (content/workflow-properties "just text" "t.md"))))
+
+  (testing "EDN frontmatter carries no workflow properties"
+    (is (= {:date nil :publish false}
+           (content/workflow-properties ";;;\n{:type :post :date \"2026-07-15\" :publish true}\n;;;\nbody" "t.md"))))
+
+  (testing "publish: true/false/absent"
+    (is (true? (:publish (content/workflow-properties "---\npublish: true\n---\nB" "t.md"))))
+    (is (false? (:publish (content/workflow-properties "---\npublish: false\n---\nB" "t.md"))))
+    (is (false? (:publish (content/workflow-properties "---\ntags: []\n---\nB" "t.md")))))
+
+  (testing "a garbage date fails loudly instead of silently publishing under today"
+    (is (thrown-with-msg? Exception #"Unparseable date"
+                          (content/workflow-properties "---\ndate: July 15, 2026\n---\nB" "t.md")))))
+
 (deftest broken-content
   (let [dir (str (Files/createTempDirectory "content-test" (into-array FileAttribute [])))]
     (testing "unknown type in a dated entry fails indexing"

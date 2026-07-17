@@ -69,10 +69,21 @@ One-time setup:
 
 - **New note in `drafts/`.** The filename is the title. A bare note with
   no frontmatter publishes as a post — frontmatter is entirely optional.
+  `bb new` scaffolds it from the vault's `templates/` folder; on the
+  phone, Obsidian's *Insert template* command does the same — pick the
+  type and its properties (including `date` and `publish`, below) are
+  prefilled.
 - **Properties, not metadata.** Frontmatter is YAML — Obsidian's
   Properties panel. `tags` autocomplete against the vault; other entry
   types set `type: link` / `type: quote` plus their natural fields
   (`link`, `via`, `author`, `source`).
+- **`date` and `publish` are workflow properties, not entry data** — the
+  site itself ignores both (a published entry's date is its folder path).
+  `date` is set to today when the draft is created, but it's yours to
+  edit (e.g. to backdate something written over several days); `bb
+  publish` files the entry under it, falling back to today if it's
+  missing. `publish` starts `false`; see "Publishing from your phone"
+  below for what flipping it does.
 - **Link with `[[wikilinks]]`.** They resolve by filename to the entry's
   URL at render time. An unresolved link (e.g. to a still-unpublished
   draft) degrades to plain text — never a dead link — and `bb publish`
@@ -88,7 +99,7 @@ bb new post My great idea      # scaffolds drafts/My great idea.md
 # ...write — with `bb dev` running, preview at localhost:8100/drafts/My great idea
 bb suggest-tags my-great-idea  # LLM-suggested tags, printed ready to paste
 bb reindex                     # optional: validate that everything parses
-bb publish my-great-idea       # lints, moves into today's date folder, mirrors + pushes
+bb publish my-great-idea       # lints, moves it into its date folder, mirrors + pushes
 ```
 
 A file is a draft because it lives in `drafts/`; publishing is moving it
@@ -104,6 +115,37 @@ publishes; `bb sync` is for everything else.
 `bb publish` **is** the manual publish. The live site picks the push up
 on its next timed pull (≤ `:content-sync-seconds`); to go live right
 now, `fly apps restart <app>` — `bb publish` prints this command for you.
+
+## Publishing from your phone
+
+Writing happens anywhere the vault syncs to — including the phone — but
+publishing still needs a git push, which only the Mac can do. The bridge
+is the `publish` property: flip it to `true` in Obsidian on your phone to
+queue a draft, and a launchd agent on the Mac notices and publishes it.
+
+```sh
+bb autopublish install     # once, on the Mac, from the project root
+```
+
+That installs a user launchd agent that runs `bb publish-queued` every
+5 minutes: it publishes every queued draft under its authored `date`
+(oldest first), mirrors, and pushes — the same as running `bb publish`
+by hand, just unattended. A draft with a broken date property is warned
+about and skipped rather than blocking the rest of the queue, and the
+agent refuses to publish anything at all if the content tree doesn't
+index cleanly (the same stance `bb sync` takes).
+
+A few things follow from that being a Mac-local agent, not a server:
+
+- **The Mac has to be awake and signed into iCloud** for the vault to
+  have synced down the flipped `publish` property in the first place.
+- **Pushes use your normal git credentials** — an SSH key loaded into
+  Keychain works fine under launchd.
+- Once pushed, it's live within the usual content-sync window
+  (≤ `:content-sync-seconds`), same as any other publish.
+- Logs land at `~/Library/Logs/website-autopublish.log`.
+- `bb autopublish status` shows whether it's installed and running, plus
+  the tail of the log; `bb autopublish uninstall` removes it.
 
 ## Content layout
 
