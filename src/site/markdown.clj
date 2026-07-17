@@ -125,11 +125,12 @@
   [s]
   (max 1 (Math/round (/ (word-count s) 200.0))))
 
-(defn excerpt
-  "The first paragraph as plain text — markdown syntax stripped — for the
-  one-line previews in feed rows and listings."
+(defn plain
+  "A markdown string as plain text: images and embeds drop, links keep
+  their labels, syntax marks strip, whitespace collapses. Search snippets
+  run this over whole bodies; `excerpt` over the lede."
   [s]
-  (-> (lede s)
+  (-> (str s)
       (str/replace #"!\[\[[^\]]*\]\]" "")               ; ![[embeds]]
       (str/replace #"!\[[^\]]*\]\([^)]*\)" "")           ; ![alt](img)
       (str/replace #"\[\[[^\]|]+\|([^\]]+)\]\]" "$1")    ; [[t|label]] → label
@@ -138,6 +139,12 @@
       (str/replace #"[*_`>#]" "")                         ; emphasis / code / heading marks
       (str/replace #"\s+" " ")
       str/trim))
+
+(defn excerpt
+  "The first paragraph as plain text — markdown syntax stripped — for the
+  one-line previews in feed rows and listings."
+  [s]
+  (plain (lede s)))
 
 (defn- add-class [[tag & more] cls]
   (let [[attrs children] (if (map? (first more))

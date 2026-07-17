@@ -100,10 +100,17 @@
     (html (v.archive/tags-page config index))
 
     :search
-    (let [q (get (query-params req) "q")
-          q (when-not (str/blank? q) q)
-          results (if q (search/search index q) [])]
-      (html (v.search/search-page config q results) 200 no-store))
+    ;; ?q= is the query; ?type= and ?tag= are the facet filters the results
+    ;; page offers. An unknown type is ignored rather than 404ing.
+    (let [params (query-params req)
+          not-blank #(when-not (str/blank? %) %)
+          q (not-blank (get params "q"))
+          type (some->> (not-blank (get params "type")) keyword
+                        ((set (:entry-types config))))
+          tag (some-> (not-blank (get params "tag")) keyword)
+          matches (if q (search/search index q) [])]
+      (html (v.search/search-page config index {:q q :type type :tag tag} matches)
+            200 no-store))
 
     :draft
     ;; Drafts are a dev-mode concern only — the production server never

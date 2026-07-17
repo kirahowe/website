@@ -108,11 +108,44 @@
       (is (= 200 status))
       (is (str/includes? body "personal weblog"))))
 
-  (testing "search"
+  (testing "search: relevance order, highlights, facet rails"
     (let [{:keys [status body headers]} (GET "/search" "q=babashka")]
       (is (= 200 status))
       (is (= "no-store" (get headers "Cache-Control")))
-      (is (str/includes? body "Babashka"))))
+      (is (str/includes? body "sorted by relevance"))
+      ;; matched terms are marked, in titles and snippets
+      (is (str/includes? body "<mark class=\"hit\">Babashka</mark>"))
+      ;; results are the same cards the feed uses, one day group per hit
+      (is (str/includes? body "class=\"day-group\""))
+      (is (str/includes? body "min read]"))                ; post continuation link
+      ;; the title match ranks above the body-only matches
+      (is (< (str/index-of body "babashka.org")
+             (str/index-of body "/2026/jul/4/hello-world")))
+      ;; both rails render, with filter links carrying the query
+      (is (str/includes? body "Filter by type"))
+      (is (str/includes? body "Refine"))
+      (is (str/includes? body "/search?q=babashka&amp;type=link"))
+      (is (str/includes? body "/search?q=babashka&amp;tag=clojure"))))
+
+  (testing "search: a deep body match shows an ellipsised snippet"
+    (let [{:keys [body]} (GET "/search" "q=pipeline")]
+      (is (str/includes? body "<mark class=\"hit\">pipeline</mark>"))
+      (is (str/includes? body "… "))))
+
+  (testing "search: type and tag filters narrow the results"
+    (let [{:keys [body]} (GET "/search" "q=babashka&type=link")]
+      (is (str/includes? body "babashka.org"))                       ; the link stays
+      (is (not (str/includes? body "/2026/jul/4/hello-world")))      ; the post is filtered out
+      (is (str/includes? body "Found <b>2 links</b>")))
+    (let [{:keys [body]} (GET "/search" "q=babashka&tag=libraries")]
+      (is (str/includes? body "nextjournal/markdown"))
+      (is (not (str/includes? body "babashka.org"))))
+    ;; an unknown type is ignored, not an error
+    (is (= 200 (:status (GET "/search" "q=babashka&type=zebra")))))
+
+  (testing "search: blank prompt and empty result states"
+    (is (str/includes? (:body (GET "/search")) "Searches titles, tags"))
+    (is (str/includes? (:body (GET "/search" "q=xyzzy")) "Nothing found")))
 
   (testing "feed"
     (let [{:keys [status body headers]} (GET "/feed.xml")]

@@ -36,6 +36,7 @@
   --code-bg: rgba(255, 255, 255, .06);     /* inline code background */
   --accent: #64d1dd;        /* teal — every title, link, wordmark */
   --on-accent: #0b1416;     /* text/glyph on a filled accent */
+  --hit: rgba(100, 209, 221, .18);  /* matched-term wash on search results */
 
   /* One colour per entry type (nav words, dots, syntax) */
   --post: #a5a8f5;
@@ -95,6 +96,7 @@
     --code-bg: rgba(0, 0, 0, .05);
     --accent: #00778c;      /* deep teal — clears AA on the paper */
     --on-accent: #ffffff;
+    --hit: rgba(0, 119, 140, .14);
 
     --post: #5257cf;
     --link: #9a5a00;
@@ -134,8 +136,8 @@ a { color: var(--accent); text-decoration: none; text-underline-offset: 2px; }
 a:hover { text-decoration: underline; }
 
 /* Composite row links underline only their title, never the whole row */
-.brand:hover, .index-row:hover, .side-link:hover { text-decoration: none; }
-.index-row:hover .title, .side-link:hover .title { text-decoration: underline; }
+.brand:hover, .index-row:hover, .side-link:hover, .facet:hover { text-decoration: none; }
+.index-row:hover .title, .side-link:hover .title, .facet:hover .title { text-decoration: underline; }
 
 /* Muted chrome links warm to accent on hover */
 .tag, .day-heading a, .excerpt-more { color: var(--muted); }
@@ -534,35 +536,102 @@ a:hover { text-decoration: underline; }
 .tag-index { padding: var(--sp5) var(--gutter) var(--sp6); }
 .tag-index .tag-cloud { gap: var(--sp3) var(--sp4); }
 
-.search-form {
+/* Search — a command prompt over the whole site: a borderless query bar on
+   an accent baseline, relevance-ranked results with highlighted hits, and
+   facet rails (type, tag) that narrow without re-typing. */
+
+/* Everything in the bar sits on the query text's baseline — the > mark,
+   the clear ×, and the ENTER hint all read as one line of type. */
+.search-prompt {
   display: flex;
-  gap: var(--sp2);
-  padding: var(--sp5) var(--gutter) 0;
+  align-items: baseline;
+  gap: var(--sp3);
+  margin: var(--sp6) var(--gutter) 0;
+  padding-bottom: var(--sp3);
+  border-bottom: 2px solid var(--accent);
 }
-.search-form input {
+.prompt-mark { font: 600 var(--fs-lg) var(--mono); color: var(--accent); }
+.search-prompt input {
   flex: 1;
   min-width: 0;
-  padding: var(--sp2) var(--sp3);
-  font: 400 var(--fs) var(--mono);
-  color: var(--fg);
+  padding: 0;
+  border: 0;
+  font: 400 var(--fs-xl) var(--sans);
+  letter-spacing: var(--ls-tight);
+  color: var(--head);
   background: transparent;
-  border: 1px solid var(--hair2);
-  border-radius: var(--r);
+  -webkit-appearance: none;
+  appearance: none;
 }
-.search-form input::placeholder { color: var(--muted); }
-.search-form input:focus { outline: none; border-color: var(--accent); }
-.search-form button {
-  padding: var(--sp2) var(--sp4);
-  font: 500 var(--fs-sm) var(--mono);
-  color: var(--accent);
-  background: transparent;
-  border: 1px solid var(--accent);
-  border-radius: var(--r);
+/* No native clear button — the prompt styling is the whole affordance */
+.search-prompt input::-webkit-search-cancel-button,
+.search-prompt input::-webkit-search-decoration { -webkit-appearance: none; }
+.search-prompt input:focus { outline: none; }  /* the accent baseline is the focus cue */
+.search-prompt input::placeholder { color: var(--muted); }
+/* Clearing is a plain link back to the blank prompt — no JS. At 20px on
+   the shared baseline its ink rides above the ENTER caps; a 2px settle
+   centers the two. */
+.prompt-clear {
+  font: 400 var(--fs-lg) var(--mono);
+  line-height: 1;
+  color: var(--muted);
+  transform: translateY(2px);
+}
+.prompt-clear:hover { color: var(--accent); text-decoration: none; }
+.search-prompt button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp2);
+  padding: 0;
+  border: 0;
+  font: 600 var(--fs-sm) var(--mono);
+  text-transform: uppercase;
+  letter-spacing: var(--ls-caps);
+  color: var(--muted);
+  background: none;
   cursor: pointer;
-  transition: background .12s ease, color .12s ease;
 }
-.search-form button:hover { background: var(--accent); color: var(--on-accent); }
-.search-count { padding: var(--sp5) var(--gutter) 0; font: 400 var(--fs-sm) var(--mono); color: var(--muted); }
+/* The ↵ keeps caps tracking off and hugs its glyph so flex centering
+   lines it up with the word; a 1px lift centers it on the caps' optical
+   middle (its glyph mass hangs low on the baseline) */
+.search-prompt button span { line-height: 1; }
+.search-prompt button .key { letter-spacing: 0; transform: translateY(-1px); }
+.search-prompt button:hover { color: var(--accent); }
+
+.search-summary,
+.search-hint {
+  margin: 0;
+  padding: var(--sp5) var(--gutter);
+  font: 400 var(--fs-sm) var(--mono);
+  color: var(--muted);
+}
+.search-summary b { font-weight: 600; color: var(--head); }
+.search-summary .q { color: var(--accent); }
+
+/* A matched term, in a title or an excerpt: a soft accent-tinted panel.
+   Results themselves are ordinary feed cards (.day-group / .entry), one
+   per hit — relevance order, so each carries its own date heading. */
+.hit {
+  padding: 0 3px;
+  border-radius: var(--r-sm);
+  background: var(--hit);
+  color: inherit;
+}
+
+/* Facet rails: one row per choice — dot or hash, label, right-aligned count */
+.facet-list { display: grid; gap: var(--sp2); }
+.facet {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp2);
+  font: 400 var(--fs-sm) var(--mono);
+  color: var(--fg);
+}
+.facet .dot { align-self: center; }
+.facet .hash { color: var(--muted); }
+.facet .n { margin-left: auto; color: var(--muted); }
+.facet.active { font-weight: 600; color: var(--head); }
+.facet.active .n { font-weight: 600; color: var(--accent); }
 
 .empty { padding: var(--sp5) var(--gutter); color: var(--muted); }
 

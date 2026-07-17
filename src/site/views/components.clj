@@ -5,6 +5,7 @@
   sections, page-header, type-summary)."
   (:require [clojure.set :as set]
             [site.markdown :as markdown]
+            [site.search :as search]
             [site.util :as util]))
 
 (def type-order [:post :link :quote :release :tool])
@@ -58,6 +59,25 @@
 
 ;; --- feed row ------------------------------------------------------------
 
+(defn- highlight
+  "text → hiccup with search-term matches marked; the plain text when no
+  terms are active (the feed's usual case)."
+  [text terms]
+  (if (seq terms)
+    (for [{:keys [text hit?]} (search/match-segments text terms)]
+      (if hit? [:mark.hit text] text))
+    text))
+
+(defn- row-excerpt
+  "The prose a row previews: normally the entry's excerpt; under active
+  search terms, a snippet that follows the first hit into the body."
+  [entry terms]
+  (if (seq terms)
+    (search/snippet (markdown/excerpt (:body entry))
+                    (markdown/plain (:body entry))
+                    terms)
+    (markdown/excerpt (:body entry))))
+
 (defn- entry-foot
   "The dense foot under a feed row: the type (with its colour dot) and the
   entry's tags flowing together on a single wrapping line."
@@ -67,34 +87,40 @@
    (when (seq (:tags entry))
      (cons [:span.sep "/"] (tag-links (:tags entry))))])
 
-(defn- entry-title [entry]
+(defn- entry-title [entry terms]
   (when (:title entry)
-    [:h3.entry-title [:a {:href (outbound entry)} (:title entry)] (via-link entry)]))
+    [:h3.entry-title
+     [:a {:href (outbound entry)} (highlight (:title entry) terms)]
+     (via-link entry)]))
 
 (defn entry-row
   "One entry in the feed: a quote renders as a blockquote with a linked
   source; every other type renders as title + excerpt — with a reading-time
   link tacked onto the end of a post excerpt. Both close with the
-  type/tags foot."
-  [entry]
-  [:article.entry
-   (if (= :quote (:type entry))
-     (list
-      [:blockquote (markdown/excerpt (:body entry)) [:span.quote-close "”"]]
-      (quote-source entry))
-     (list
-      (entry-title entry)
-      [:p.entry-excerpt (markdown/excerpt (:body entry))
-       (when (= :post (:type entry))
-         (list " " [:a.excerpt-more {:href (:path entry)}
-                    (str "[…" (markdown/read-time (:body entry)) " min read]")]))]))
-   (entry-foot entry)])
+  type/tags foot. With {:terms [...]} (an active search), title and prose
+  matches are marked and the excerpt follows the hit into the body."
+  ([entry] (entry-row entry nil))
+  ([entry {:keys [terms]}]
+   [:article.entry
+    (if (= :quote (:type entry))
+      (list
+       [:blockquote (highlight (row-excerpt entry terms) terms) [:span.quote-close "”"]]
+       (quote-source entry))
+      (list
+       (entry-title entry terms)
+       [:p.entry-excerpt (highlight (row-excerpt entry terms) terms)
+        (when (= :post (:type entry))
+          (list " " [:a.excerpt-more {:href (:path entry)}
+                     (str "[…" (markdown/read-time (:body entry)) " min read]")]))]))
+    (entry-foot entry)]))
 
-(defn day-group [entries]
-  (let [date (:date (first entries))]
-    [:section.day-group
-     [:h2.day-heading [:a {:href (util/day-url date)} (util/format-date date)]]
-     (map entry-row entries)]))
+(defn day-group
+  ([entries] (day-group entries nil))
+  ([entries opts]
+   (let [date (:date (first entries))]
+     [:section.day-group
+      [:h2.day-heading [:a {:href (util/day-url date)} (util/format-date date)]]
+      (map #(entry-row % opts) entries)])))
 
 (defn feed
   "Entries (newest first) grouped under linked day headings — the shape the
