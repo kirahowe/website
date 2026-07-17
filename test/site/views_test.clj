@@ -36,6 +36,8 @@
       (is (str/includes? body "Babashka"))
       ;; feed previews are the first paragraph only, as plain-text excerpts
       (is (not (str/includes? body "where code sleeps")))
+      ;; ...but quotes are short-form: the whole body publishes to the feed
+      (is (str/includes? body "prerequisite for reliability"))
       (is (str/includes? body "min read"))                     ; reading-time hint
       (is (str/includes? body "Untitled entries are fine"))    ; untitled post excerpt shows
       ;; day headings link to the day archives
@@ -89,10 +91,18 @@
       (is (str/includes? body ">quote</a>"))
       (is (not (str/includes? body ">quotes</a>")))))
 
-  (testing "quote renders with attribution"
+  (testing "quote renders with attribution, full body, and one via credit"
     (let [{:keys [body]} (GET "/2026/jun/21/rich-hickey-on-simplicity")]
       (is (str/includes? body "<blockquote>"))
-      (is (str/includes? body "Rich Hickey"))))
+      (is (str/includes? body "Rich Hickey"))
+      (is (str/includes? body "prerequisite for reliability"))
+      ;; the via credit sits on the cite line — once, even on a titled quote
+      (is (str/includes? body "news.ycombinator.com"))
+      (is (= 1 (count (re-seq #"class=\"via\"" body))))))
+
+  (testing "a quote's via credit reaches the feed too"
+    (let [{:keys [body]} (GET "/quotes")]
+      (is (str/includes? body "news.ycombinator.com"))))
 
   (testing "link entry title points at the external URL"
     (let [{:keys [body]} (GET "/2025/aug/30/babashka")]

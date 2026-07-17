@@ -21,7 +21,9 @@
      [:h1 (if (:link-url entry)
             [:a {:href (:link-url entry)} title]
             title)
-      (c/via-link entry)])
+      ;; a quote's via credit sits on its source line, not the title
+      (when-not (= :quote (:type entry))
+        (c/via-link entry))])
    [:div.article-meta
     (util/format-date (:date entry))
     (cond
@@ -30,19 +32,10 @@
       (= :post (:type entry))
       (list [:span.sep "/"] (str (markdown/read-time (:body entry)) " min read")))]))
 
-(defn- quote-blockquote
-  "The quote body as a blockquote, with the closing Caveat mark tucked onto
-  the end of the last paragraph so it stays inline with the text."
-  [entry]
-  (let [paras (vec (rest (markdown/render (:body entry) (:wikilinks entry))))
-        paras (cond-> paras
-                (seq paras) (update (dec (count paras)) conj [:span.quote-close "”"]))]
-    (into [:blockquote] paras)))
-
 (defn- article-body [entry]
   (if (= :quote (:type entry))
     (list
-     (quote-blockquote entry)
+     (c/quote-blockquote entry)
      (c/quote-source entry))
     (markdown/render-article (:body entry) (:wikilinks entry))))
 

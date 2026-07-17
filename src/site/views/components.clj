@@ -41,21 +41,33 @@
   (for [t (sort-by name tags)]
     [:a.tag {:href (str "/tags/" (name t))} (str "#" (name t))]))
 
-(defn quote-source
-  "The \"— source\" line under a quote, linked when a URL is known. Shared
-  by the feed row and the entry page."
-  [{:keys [source source-url]}]
-  (when source
-    [:p.quote-cite "— " (if source-url
-                          [:a {:href source-url} source]
-                          source)]))
-
 (defn via-link
-  "The “(via)” credit link shown after an outbound entry's title when the
-  entry records where it was found."
+  "The “(via)” credit link shown after an outbound entry's title — or a
+  quote's source line — when the entry records where it was found."
   [entry]
   (when-let [via (:link-via entry)]
     [:span.via " (" [:a {:href via} "via"] ")"]))
+
+(defn quote-source
+  "The \"— source\" line under a quote, linked when a URL is known and
+  closing with the (via) credit when one is recorded. Shared by the feed
+  row and the entry page."
+  [{:keys [source source-url] :as entry}]
+  (when source
+    [:p.quote-cite "— " (if source-url
+                          [:a {:href source-url} source]
+                          source)
+     (via-link entry)]))
+
+(defn quote-blockquote
+  "The quote body as a blockquote — the full rendered markdown, with the
+  closing Caveat mark tucked onto the end of the last block so it stays
+  inline with the text. Shared by the feed row and the entry page."
+  [entry]
+  (let [paras (vec (rest (markdown/render (:body entry) (:wikilinks entry))))
+        paras (cond-> paras
+                (seq paras) (update (dec (count paras)) conj [:span.quote-close "”"]))]
+    (into [:blockquote] paras)))
 
 ;; --- feed row ------------------------------------------------------------
 
@@ -94,17 +106,20 @@
      (via-link entry)]))
 
 (defn entry-row
-  "One entry in the feed: a quote renders as a blockquote with a linked
-  source; every other type renders as title + excerpt — with a reading-time
-  link tacked onto the end of a post excerpt. Both close with the
-  type/tags foot. With {:terms [...]} (an active search), title and prose
-  matches are marked and the excerpt follows the hit into the body."
+  "One entry in the feed: a quote renders as a blockquote — its full body,
+  quotes being short-form — with a linked source; every other type renders
+  as title + excerpt, with a reading-time link tacked onto the end of a
+  post excerpt. Both close with the type/tags foot. With {:terms [...]}
+  (an active search), title and prose matches are marked and a quote
+  drops to an excerpt that follows the hit into the body."
   ([entry] (entry-row entry nil))
   ([entry {:keys [terms]}]
    [:article.entry
     (if (= :quote (:type entry))
       (list
-       [:blockquote (highlight (row-excerpt entry terms) terms) [:span.quote-close "”"]]
+       (if (seq terms)
+         [:blockquote (highlight (row-excerpt entry terms) terms) [:span.quote-close "”"]]
+         (quote-blockquote entry))
        (quote-source entry))
       (list
        (entry-title entry terms)

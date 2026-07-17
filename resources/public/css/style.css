@@ -385,6 +385,15 @@ a:hover { text-decoration: underline; }
   font: 400 var(--fs-sm) var(--mono);
   color: var(--muted);
 }
+/* Feed quotes carry their full body; space its blocks without disturbing
+   the row rhythm (the last block stays flush against the cite) */
+.entry blockquote p,
+.entry blockquote ul,
+.entry blockquote ol { margin: 0 0 var(--sp3); }
+.entry blockquote ul,
+.entry blockquote ol { padding-left: var(--sp5); }
+.entry blockquote li::marker { color: var(--muted); }
+.entry blockquote > :last-child { margin-bottom: 0; }
 
 /* Onward link from the home feed into the month archives */
 .feed-more {
