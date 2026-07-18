@@ -39,10 +39,10 @@
   --hit: rgba(100, 209, 221, .18);  /* matched-term wash on search results */
 
   /* One colour per entry type (nav words, dots, syntax) */
-  --post: #a5a8f5;
+  --post: #c77df5;
   --link: #e8993d;
   --quote: #63d081;
-  --release: #ff88a8;
+  --release: #ff7cb8;
   --tool: #a5a8f5;
 
   /* Spacing scale — every gap/pad/margin references one of these */
@@ -121,7 +121,7 @@
 *, *::before, *::after { box-sizing: border-box; }
 
 body {
-  max-width: 720px;
+  max-width: 800px;
   margin: 0 auto;
   font-family: var(--sans);
   font-size: var(--fs);
