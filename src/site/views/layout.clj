@@ -27,6 +27,14 @@
        "es.addEventListener('open',function(){if(opened)location.reload();opened=true});"
        "})();"))
 
+;; Privacy-friendly, self-hosted analytics (Umami). Emitted in the head of
+;; every page in production only — counting local `bb dev` views would skew
+;; the stats, so it is gated the same way livereload is (but inverted).
+(def ^:private analytics-script
+  [:script {:defer true
+            :src "https://kirasumami.pikapod.net/script.js"
+            :data-website-id "e54cf840-1328-45a5-a617-7f15ef917005"}])
+
 (defn- header [config home?]
   [:header.site-header
    [:a {:class (if home? "brand" "brand brand-sm") :href "/"} (h/raw @wordmark)]
@@ -85,7 +93,8 @@
                [:link {:rel "stylesheet" :href fonts}]
                [:link {:rel "stylesheet" :href "/css/style.css"}]
                [:link {:rel "alternate" :type "application/rss+xml"
-                       :title (:site-title config) :href "/feed.xml"}]]
+                       :title (:site-title config) :href "/feed.xml"}]
+               (when-not (:dev? config) analytics-script)]
               [:body
                (header config (nil? title))
                [:main content]
