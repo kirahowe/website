@@ -1,0 +1,239 @@
+-- allium: 3
+-- content.allium
+--
+-- Scope: The content & serving model for kirahowe.com — what the
+--   published site is made of and how visitors see it: entry display
+--   semantics, static pages, the URL scheme, archives, tag pages,
+--   search, and the RSS feed.
+-- Includes: visitor-facing surfaces over the shared Entry model,
+--   the Page entity, canonical URLs, 404 semantics, feed shape,
+--   search contract, caching posture.
+-- Excludes:
+--   - The publishing pipeline (publishing.allium)
+--   - Dev-only conveniences: live reload, per-request reindexing,
+--     /drafts previews
+--   - Frontmatter dialect details (YAML vs legacy EDN both parse to
+--     the same Entry; which dialect a file uses is implementation)
+--   - Search ranking internals (deliberately black-boxed: the
+--     contract is fixed, the scoring is free to evolve)
+-- Dependencies: the shared Entry model in entries.allium.
+--
+-- Deliberate decisions this spec makes that the implementation does
+-- not yet satisfy (elicited 2026-07-17):
+--   1. The site navigation lists only entry types that have at least
+--      one published entry (@guarantee NavHidesEmptyTypes). Today the
+--      nav links every configured type unconditionally, so an unused
+--      type is a permanent dead link to a 404.
+-- (The README's /notes drift was resolved the other way: no :note
+-- type exists or is planned; the README table was corrected.)
+
+use "./entries.allium" as entries
+
+------------------------------------------------------------
+-- External Entities
+------------------------------------------------------------
+
+-- Anyone reading the published site.
+external entity Visitor {}
+
+------------------------------------------------------------
+-- Entities and Variants
+------------------------------------------------------------
+
+-- A static page: pages/<slug>.md, served at /<slug> (e.g. /about).
+-- Pages have no draft stage and no date; they reach the site through
+-- the same mirror-and-push as entries.
+entity Page {
+    slug: String                    -- the filename (minus .md)
+    explicit_title: String?         -- the `title` property
+    body: String
+
+    -- Derived
+    display_title: explicit_title ?? capitalize(slug)   -- capitalize: black box
+}
+
+------------------------------------------------------------
+-- Config
+------------------------------------------------------------
+
+config {
+    home_entries: Integer = 10      -- the home feed shows at least this many recent
+                                    -- entries, rounded up to whole days
+    feed_entries: Integer = 20      -- how many recent entries the RSS feed carries
+}
+
+------------------------------------------------------------
+-- Rules
+------------------------------------------------------------
+
+rule VisitorSearches {
+    when: VisitorSearches(visitor, query, type_filter?, tag_filter?)
+    ensures: SearchResultsReturned(
+        visitor: visitor,
+        results: search_results(query, type_filter, tag_filter)
+    )
+    @guidance
+        -- search_results is a black box with a fixed contract: every
+        -- query term must appear somewhere in an entry (title, tags or
+        -- body); results cover published entries only, ranked by a
+        -- relevance measure that is free to evolve. type_filter and
+        -- tag_filter narrow the results; an unknown type_filter is
+        -- ignored rather than an error. Facet counts by type and tag
+        -- are offered alongside the results.
+}
+
+------------------------------------------------------------
+-- Surfaces
+------------------------------------------------------------
+
+-- The site as a whole: the home feed, navigation, and the promises
+-- the pipeline makes about it being up and fresh.
+surface PublishedSite {
+    facing visitor: Visitor
+
+    let published = entries/Entries where status = published
+
+    exposes:
+        for entry in published:
+            entry.display_title
+            entry.type
+            entry.tags
+            entry.published_date
+
+    @guarantee AlwaysUp
+        -- A failed content sync never takes the site down: the last
+        -- good index keeps serving, the sync retries every tick, and a
+        -- broken clone at boot serves an empty site rather than
+        -- crash-looping. (Backed by the Server rules in
+        -- publishing.allium.)
+    @guarantee EventualFreshness
+        -- A pushed change is live within publishing's
+        -- content_sync_interval of the push — no deploy, no webhook,
+        -- no manual step.
+    @guarantee NavHidesEmptyTypes
+        -- The navigation lists only entry types with at least one
+        -- published entry, in the configured nav order.
+    @guarantee CdnFriendly
+        -- Every public page carries CDN-friendly cache headers, so a
+        -- CDN in front absorbs traffic spikes; search results and
+        -- draft previews are never cached.
+    @guarantee StrayFilesAreHarmless
+        -- Markdown files that are neither dated entries, drafts nor
+        -- pages are ignored; a stray Obsidian file cannot break the
+        -- site. The server also refuses to index content whose entry
+        -- URLs collide (the last good index keeps serving).
+    @guidance
+        -- The home page shows at least config.home_entries recent
+        -- entries, rounded up to whole days, then links onward to the
+        -- month archives. Every page carries the self-hosted analytics
+        -- beacon. The production server exposes no admin surface.
+}
+
+-- A single published entry at its canonical URL.
+surface EntryPage {
+    facing visitor: Visitor
+
+    context entry: entries/Entry where status = published
+
+    exposes:
+        entry.display_title
+        entry.type
+        entry.body                   -- rendered; wikilinks resolved, images from /attachments/
+        entry.tags
+        entry.published_date
+        entry.link_url
+        entry.via_url
+        entry.attribution
+        entry.attribution_url
+
+    @guarantee CanonicalUrl
+        -- Exactly one canonical URL per entry:
+        -- /YYYY/<short month name>/<D>/<slug>. Other spellings of the
+        -- same date (e.g. numeric month, zero-padded day) permanently
+        -- redirect to it. A pinned_slug keeps a URL inherited from an
+        -- old blog working forever.
+    @guarantee WikilinksNeverDangle
+        -- [[wikilinks]] resolve by filename to the target entry's URL;
+        -- an unresolved link renders as plain text, never a dead link.
+    @guidance
+        -- Display follows the type: quotes render untitled (unless
+        -- explicit_title is set) with an attribution cite line linking
+        -- to attribution_url; links point out to link_url and credit
+        -- via_url on the cite line. Each entry links its newer and
+        -- older neighbours in date order.
+}
+
+-- Date, type and tag listings.
+surface Archives {
+    facing visitor: Visitor
+
+    let published = entries/Entries where status = published
+
+    exposes:
+        for entry in published:
+            entry.display_title
+            entry.type
+            entry.published_date
+            entry.tags
+
+    @guarantee EmptyArchivesAre404
+        -- An archive URL with no matching entries returns 404: an
+        -- empty year, month, day, type or tag page is
+        -- indistinguishable from a mistyped URL.
+    @guidance
+        -- /YYYY, /YYYY/<mon> and /YYYY/<mon>/<D> are the date
+        -- archives; /posts, /links, ... list by type (optionally
+        -- year-scoped as /YYYY/posts); /tags is the tag index with
+        -- counts, /tags/<tag> the entries for one tag (optionally
+        -- year-scoped as /tags/<tag>/YYYY). /archive redirects to the
+        -- most recent year that has content.
+}
+
+-- Full-text search.
+surface SearchPage {
+    facing visitor: Visitor
+
+    provides:
+        VisitorSearches(visitor, query, type_filter?, tag_filter?)
+
+    @guarantee NeverCached
+        -- Search responses are never cached.
+}
+
+-- The RSS feed at /feed.xml.
+surface Feed {
+    facing visitor: Visitor
+
+    let published = entries/Entries where status = published
+
+    exposes:
+        for entry in published:
+            entry.display_title
+            entry.body
+            entry.published_date
+
+    @guarantee FullBodies
+        -- Feed items carry the entry's full rendered body, wikilinks
+        -- resolved — no truncation, no click-through teaser.
+    @guarantee StableItemIdentity
+        -- Each item's identity is the entry's absolute canonical URL.
+    @guarantee UntitledItemsGetFallbackTitles
+        -- An untitled entry (a quote without an explicit title) gets a
+        -- generated item title from its type and date, e.g.
+        -- "Quote, July 4, 2026".
+    @guidance
+        -- RSS 2.0; the config.feed_entries most recent entries,
+        -- newest first.
+}
+
+-- Static pages such as /about.
+surface StaticPage {
+    facing visitor: Visitor
+
+    context page: Page
+
+    exposes:
+        page.slug                    -- doubles as the page's URL: /<slug>
+        page.display_title
+        page.body
+}

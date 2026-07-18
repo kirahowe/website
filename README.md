@@ -1,6 +1,6 @@
 # website
 
-My personal weblog of posts, notes, links, quotes, and more, rendered from an Obsidian vault by a small Clojure program using [babashka](https://babashka.org).
+My personal weblog of posts, links, quotes, and more, rendered from an Obsidian vault by a small Clojure program using [babashka](https://babashka.org).
 I wanted authoring content to be as easy as adding to my personal wiki (in Obsidian), with the tooling handling the complexity of transforming all those files into a website. The build process handles parsing frontmatter, `[[wikilinks]]`, pasted images, and organizing the content.
 
 This project was written almost entirely by Claude (Opus 4.8 and Fable 5). See [PLAN.md](PLAN.md) for the original AI-generated architecture and its rationale. More details about how it works are below, and instructions in case you ever want to clone this and up a similar website.
@@ -207,7 +207,7 @@ content repo on a timer.
 |-----|-------|
 | `/2026` · `/2026/jul` · `/2026/jul/4` | date archives |
 | `/2026/jul/4/hello-world` | single entry |
-| `/posts` · `/notes` · `/links` · `/quotes` · `/releases` · `/tools` | by type (`/2026/posts` filters by year) |
+| `/posts` · `/links` · `/quotes` · `/releases` · `/tools` | by type (`/2026/posts` filters by year) |
 | `/tags` · `/tags/clojure` · `/tags/clojure/2026` | by tag |
 | `/search?q=...` | full-text search |
 | `/feed.xml` | RSS |

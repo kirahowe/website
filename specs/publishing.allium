@@ -1,0 +1,477 @@
+-- allium: 3
+-- publishing.allium
+--
+-- Scope: The authoring & publishing pipeline for kirahowe.com — how an
+--   entry travels from the Obsidian vault's drafts/ folder to the live
+--   site.
+-- Includes: the Entry draft lifecycle (draft -> queued -> published),
+--   the pre-publish lint pass, manual publish and the publish queue,
+--   the vault -> public-content mirror and push, the unattended
+--   autopublish agent, and the server's timed content pull.
+-- Excludes:
+--   - Rendering, URL scheme, archives, feeds, search (the content &
+--     serving model — a separate spec if ever needed)
+--   - Dev-only conveniences: live reload, per-request reindexing,
+--     /drafts previews
+--   - LLM tag suggestions (bb suggest-tags)
+--   - pages/ and attachments/ (mirrored alongside entries, but with no
+--     lifecycle of their own)
+-- Dependencies: the shared Entry model in entries.allium.
+--
+-- Deliberate decisions this spec makes that the implementation does not
+-- yet satisfy (elicited 2026-07-17):
+--   1. A queued draft that fails to publish must fail *noticeably*
+--      (@guarantee FailuresAreNoticeable) — a log line alone is not
+--      enough — while never blocking the rest of the queue.
+--   2. No two published entries may share a slug and a date
+--      (invariant NoUrlCollisions); publishing into a collision is
+--      blocked, not merely warned. Today only exact-filename collisions
+--      are caught.
+--   3. Manual single publish refuses on a broken content tree, the same
+--      as the queue flush (@guarantee NoPublishFromBrokenTree). Today
+--      it proceeds and merely skips lints.
+
+use "./entries.allium" as entries
+
+------------------------------------------------------------
+-- External Entities
+------------------------------------------------------------
+
+-- The site's single author. Identity is managed outside the system:
+-- the author is whoever holds the vault and the Mac.
+external entity Author {}
+
+-- The environment the production server runs in: the platform that
+-- boots it (Fly) and the public content repo it pulls from.
+external entity HostEnvironment {}
+
+------------------------------------------------------------
+-- Enumerations
+------------------------------------------------------------
+
+-- Pre-publish lint findings. Advisory only: they warn, never block.
+enum LintFinding {
+    unresolved_wikilink      -- a [[target]] that resolves to nothing; renders as plain text
+  | missing_attachment       -- an embedded image absent from attachments/
+  | untagged                 -- the entry has no tags
+  | link_without_url         -- a link-ish entry with no outbound URL
+}
+
+-- Reasons a queued draft can fail to publish. Unlike lint findings,
+-- these must reach the author noticeably (see FailuresAreNoticeable).
+enum PublishFailure {
+    broken_workflow_properties  -- the date/publish properties don't parse
+  | url_collision               -- an already-published entry has the same slug and date
+}
+
+------------------------------------------------------------
+-- Entities and Variants
+------------------------------------------------------------
+
+-- The Entry entity itself lives in entries.allium (shared with the
+-- content & serving spec); this module governs its lifecycle.
+
+-- The launchd user agent on the author's Mac. Exists only while
+-- installed; installing creates it, uninstalling removes it.
+entity AutopublishAgent {
+    next_run_at: Timestamp
+}
+
+-- A lint finding produced during a publish. Advisory: producing one
+-- never blocks the publish that raised it.
+entity LintWarning {
+    entry: entries/Entry
+    finding: LintFinding
+    raised_at: Timestamp
+}
+
+-- A publish failure the author must be able to see. Unlike a
+-- LintWarning, raising one means the entry did NOT publish.
+-- (How and when notices are cleared is an open question.)
+entity PublishFailureNotice {
+    entry: entries/Entry
+    reason: PublishFailure
+    raised_at: Timestamp
+}
+
+-- The production server. Created at boot; serves the published entries
+-- of the content revision it last indexed successfully.
+entity Server {
+    served_rev: String?                  -- null until the first successful index: an empty site, not a crash
+    next_sync_at: Timestamp
+}
+
+------------------------------------------------------------
+-- Config
+------------------------------------------------------------
+
+config {
+    autopublish_interval: Duration = 5.minutes       -- the agent's StartInterval
+    content_sync_interval: Duration = 300.seconds    -- :content-sync-seconds in config/prod.edn
+}
+
+------------------------------------------------------------
+-- Rules
+------------------------------------------------------------
+
+-- Drafting ---------------------------------------------------------
+
+rule AuthorCreatesDraft {
+    when: AuthorCreatesDraft(author, new_title, type)
+    let existing_drafts = entries/Entries where status in {draft, queued} and file_title = new_title
+    requires: existing_drafts.count = 0
+    ensures: entries/Entry.created(
+        file_title: new_title,
+        type: type,
+        body: "",
+        tags: {},
+        authored_date: now,              -- today; the author may edit it before publishing
+        content_valid: true,
+        workflow_properties_valid: true,
+        status: draft
+    )
+    @guidance
+        -- `bb new <type> <title>` on the Mac, or Obsidian's Insert
+        -- template on any device — both scaffold the same properties.
+}
+
+rule AuthorEditsEntry {
+    when: AuthorEditsEntry(author, entry)
+    ensures: EntryContentChanged(entry: entry)
+    @guidance
+        -- Obsidian is the editor; any field (body, tags, properties,
+        -- authored date) may change, and edits can render the file's
+        -- content or workflow properties invalid until fixed. A change
+        -- to a published entry reaches the live site on the next
+        -- AuthorSyncsContent.
+}
+
+rule AuthorDeletesEntry {
+    when: AuthorDeletesEntry(author, entry)
+    ensures: not exists entry
+    @guidance
+        -- Deleting a published entry removes it from the site on the
+        -- next AuthorSyncsContent — deletions propagate.
+}
+
+-- Queueing (any device, including the phone) -----------------------
+
+rule AuthorQueuesDraft {
+    when: AuthorQueuesDraft(author, entry)
+    requires: entry.status = draft
+    ensures: entry.status = queued
+}
+
+rule AuthorUnqueuesDraft {
+    when: AuthorUnqueuesDraft(author, entry)
+    requires: entry.status = queued
+    ensures: entry.status = draft
+}
+
+-- Publishing -------------------------------------------------------
+
+rule AuthorPublishesDraft {
+    when: AuthorPublishesDraft(author, entry)
+    let broken_files = entries/Entries where content_valid = false
+    requires: entry.status in {draft, queued}
+    requires: broken_files.count = 0                 -- same broken-tree gate as the flush
+    ensures:
+        PublishAttempted(entry: entry)
+        ContentPushed()
+}
+
+rule AuthorFlushesQueue {
+    when: AuthorFlushesQueue(author)
+    ensures: PublishQueueFlushRequested()
+}
+
+rule FlushPublishQueue {
+    when: PublishQueueFlushRequested()
+    let broken_files = entries/Entries where content_valid = false
+    requires: broken_files.count = 0                 -- never publish anything from a broken tree
+    let queue = entries/Entries where status = queued
+    ensures:
+        for entry in queue:
+            if entry.workflow_properties_valid:
+                PublishAttempted(entry: entry)
+            else:
+                PublishFailureNotice.created(entry: entry, reason: broken_workflow_properties, raised_at: now)
+        if queue.count > 0:
+            ContentPushed()                           -- one push covers the whole flush
+    @guidance
+        -- Attempts run oldest authored date first, undated drafts last.
+        -- One failing draft never blocks the others.
+}
+
+rule FlushRefusedOnBrokenTree {
+    when: PublishQueueFlushRequested()
+    let broken_files = entries/Entries where content_valid = false
+    requires: broken_files.count > 0
+    ensures: FlushRefused()                           -- the author is told nothing was published, and why
+}
+
+rule PublishEntry {
+    when: PublishAttempted(entry)
+    let target_date = entry.authored_date ?? now      -- undated drafts file under today
+    let collisions = entries/Entries where status = published and published_date = target_date and slug = entry.slug
+    requires: entry.status in {draft, queued}
+    requires: collisions.count = 0
+    ensures:
+        -- The lint pass: findings warn, never block.
+        if unresolved_wikilinks(entry).count > 0:
+            LintWarning.created(entry: entry, finding: unresolved_wikilink, raised_at: now)
+        if missing_attachments(entry).count > 0:
+            LintWarning.created(entry: entry, finding: missing_attachment, raised_at: now)
+        if entry.tags.count = 0:
+            LintWarning.created(entry: entry, finding: untagged, raised_at: now)
+        if entry.type in {link, release, tool} and entry.link_url = null:
+            LintWarning.created(entry: entry, finding: link_without_url, raised_at: now)
+        entry.status = published
+        entry.published_date = target_date
+    @guidance
+        -- Publishing is moving the file into its YYYY/MM/DD folder — the
+        -- path is the date — and stripping the `publish` workflow
+        -- property; `date` stays, but the site ignores it.
+        -- unresolved_wikilinks and missing_attachments are black box
+        -- checks against the rest of the content tree.
+}
+
+rule PublishBlockedByCollision {
+    when: PublishAttempted(entry)
+    let target_date = entry.authored_date ?? now
+    let collisions = entries/Entries where status = published and published_date = target_date and slug = entry.slug
+    requires: entry.status in {draft, queued}
+    requires: collisions.count > 0
+    ensures: PublishFailureNotice.created(entry: entry, reason: url_collision, raised_at: now)
+    @guidance
+        -- The entry stays where it was (still queued, if it was); the
+        -- rest of a flush is unaffected.
+}
+
+-- Syncing published content ----------------------------------------
+
+rule AuthorSyncsContent {
+    when: AuthorSyncsContent(author)
+    let broken_files = entries/Entries where content_valid = false
+    requires: broken_files.count = 0                 -- never push a broken index
+    ensures: ContentPushed()
+    @guidance
+        -- Mirrors the vault's publishable content (date tree, pages/,
+        -- attachments/) into the public content store and pushes.
+        -- Deletions propagate. drafts/, templates/, dev.md and
+        -- .obsidian/ never cross the boundary. Pushing when nothing
+        -- changed is a friendly no-op.
+}
+
+-- The autopublish agent --------------------------------------------
+
+rule AuthorInstallsAutopublish {
+    when: AuthorInstallsAutopublish(author)
+    ensures:
+        for a in AutopublishAgents:                   -- reinstalling replaces any existing agent
+            not exists a
+        AutopublishAgent.created(next_run_at: now)    -- and runs once immediately
+}
+
+rule AuthorUninstallsAutopublish {
+    when: AuthorUninstallsAutopublish(author)
+    ensures:
+        for a in AutopublishAgents:
+            not exists a
+}
+
+rule AutopublishTick {
+    when: agent: AutopublishAgent.next_run_at <= now
+    ensures:
+        agent.next_run_at = now + config.autopublish_interval
+        PublishQueueFlushRequested()
+    @guidance
+        -- Runs on the author's Mac, not a server. The Mac must be awake
+        -- and signed into iCloud for the phone's queue flips to have
+        -- synced down, and pushes use the author's normal git
+        -- credentials.
+}
+
+-- The production server --------------------------------------------
+
+rule ServerBoots {
+    when: ServerBoots(_)
+    ensures:
+        let server = Server.created(served_rev: null, next_sync_at: now)
+    @guidance
+        -- next_sync_at = now: the first tick fires immediately, cloning
+        -- and indexing the content. Until an index succeeds the site
+        -- serves empty rather than crash-looping.
+}
+
+rule ServerSyncTick {
+    when: server: Server.next_sync_at <= now
+    ensures:
+        server.next_sync_at = now + config.content_sync_interval
+        ContentRefreshAttempted(server: server)
+    @guidance
+        -- The refresh (a pull, or a clone if the checkout is missing,
+        -- then a reindex if the revision moved) happens outside the
+        -- system; its outcome arrives as ContentRefreshSucceeded or
+        -- ContentRefreshFailed.
+}
+
+rule ServerAdoptsNewContent {
+    when: ContentRefreshSucceeded(server, rev)
+    requires: server.served_rev = null or server.served_rev != rev
+    ensures: server.served_rev = rev
+}
+
+rule ServerToleratesFailedRefresh {
+    when: ContentRefreshFailed(server, reason)
+    ensures: RefreshFailureLogged(server: server, reason: reason)
+    @guidance
+        -- The served index is untouched — the last good content keeps
+        -- serving — and the next tick retries, so a bad push heals
+        -- itself once the content is fixed.
+}
+
+------------------------------------------------------------
+-- Invariants
+------------------------------------------------------------
+
+-- No two published entries may collide on a URL. This is stronger than
+-- the implementation today, which only prevents exact-filename
+-- collisions: distinct titles that slugify identically must also be
+-- blocked (see PublishBlockedByCollision).
+invariant NoUrlCollisions {
+    for a in entries/Entries:
+        for b in entries/Entries:
+            a != b and a.status = published and b.status = published
+                implies not (a.slug = b.slug and a.published_date = b.published_date)
+}
+
+invariant AtMostOneAutopublishAgent {
+    AutopublishAgents.count <= 1
+}
+
+------------------------------------------------------------
+-- Surfaces
+------------------------------------------------------------
+
+-- The bb tasks on the Mac: bb new / drafts / publish / sync.
+surface AuthoringCli {
+    facing author: Author
+
+    let drafts = entries/Entries where status in {draft, queued}
+    let warnings = LintWarnings
+
+    exposes:
+        for entry in drafts:
+            entry.file_title
+            entry.type
+            entry.status
+            entry.authored_date
+        for warning in warnings:
+            warning.entry.file_title
+            warning.finding
+
+    provides:
+        AuthorCreatesDraft(author, title, type)
+        AuthorPublishesDraft(author, entry)
+        AuthorFlushesQueue(author)
+        AuthorSyncsContent(author)
+
+    @guarantee WarningsNeverBlock
+        -- Lint findings warn; none of them ever prevents a publish.
+    @guarantee NoPublishFromBrokenTree
+        -- No publish path — manual or flush — publishes anything while
+        -- the content tree does not index cleanly.
+    @guarantee PublishTogglePrivate
+        -- The `publish` workflow property never reaches public content.
+    @guarantee PushFailureIsRecoverable
+        -- A publish whose push fails leaves everything committed
+        -- locally and tells the author how to recover; nothing is lost.
+    @guidance
+        -- The draft list shows queued drafts first, in the order a
+        -- flush would publish them: authored date ascending, undated
+        -- last — a preview of exactly what a bare `bb publish` will do.
+}
+
+-- Obsidian, on any device the vault syncs to — including the phone.
+surface VaultEditing {
+    facing author: Author
+
+    context entry: entries/Entry
+
+    exposes:
+        entry.file_title
+        entry.type
+        entry.body
+        entry.tags
+        entry.authored_date
+        entry.status
+
+    provides:
+        AuthorEditsEntry(author, entry)
+        AuthorDeletesEntry(author, entry)
+        AuthorQueuesDraft(author, entry) when entry.status = draft
+        AuthorUnqueuesDraft(author, entry) when entry.status = queued
+
+    @guidance
+        -- Queueing is flipping the `publish` property in Obsidian's
+        -- Properties panel — the phone-friendly publish path. The flip
+        -- reaches the Mac via vault sync; publishing itself still
+        -- happens there.
+}
+
+-- bb autopublish install / uninstall / status.
+surface AutopublishManagement {
+    facing author: Author
+
+    let agents = AutopublishAgents
+    let notices = PublishFailureNotices
+
+    exposes:
+        agents.count                     -- installed or not; status also shows run state and log tail
+        for notice in notices:
+            notice.entry.file_title
+            notice.reason
+            notice.raised_at
+
+    provides:
+        AuthorInstallsAutopublish(author)
+        AuthorUninstallsAutopublish(author)
+
+    timeout:
+        AutopublishTick
+
+    @guarantee FailuresAreNoticeable
+        -- Every PublishFailureNotice is surfaced to the author
+        -- noticeably, even when the flush ran unattended. A line in a
+        -- log file does not satisfy this.
+}
+
+-- The server's side of the pipeline: what boots it and where its
+-- content refresh outcomes come from.
+surface ServerRuntime {
+    facing host: HostEnvironment
+
+    provides:
+        ServerBoots(host)
+        ContentRefreshSucceeded(server, rev)
+        ContentRefreshFailed(server, reason)
+
+    @guidance
+        -- The boot comes from the platform starting the machine; the
+        -- refresh outcomes come from the git pull against the public
+        -- content repo. ContentRefreshAttempted going out and these
+        -- coming back is the entire conversation.
+}
+
+-- The visitor-facing PublishedSite surface lives in content.allium,
+-- which owns the serving model; its AlwaysUp / EventualFreshness
+-- guarantees are backed by the Server rules above.
+
+------------------------------------------------------------
+-- Open Questions
+------------------------------------------------------------
+
+open question "What form must a noticeable publish failure take when the flush runs unattended — a macOS notification, a failure marker in bb drafts, something else? Today it is only a log line, which this spec rejects."
+open question "A failed queued draft stays queued and is re-attempted on every flush. Is retry-forever acceptable once failures are noticeable, or should a repeatedly failing draft eventually be de-queued?"
+open question "When is a PublishFailureNotice cleared — when its entry later publishes successfully, when the draft is de-queued, or only by the author acknowledging it?"

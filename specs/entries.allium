@@ -1,0 +1,58 @@
+-- allium: 3
+-- entries.allium
+--
+-- Scope: The core Entry model shared by the publishing pipeline
+--   (publishing.allium) and the content & serving model
+--   (content.allium). This module declares what an entry IS; the
+--   importing modules say how it moves (publishing) and how it is
+--   served (content).
+-- Dependencies: none. Imported via `use "./entries.allium"`.
+
+------------------------------------------------------------
+-- Enumerations
+------------------------------------------------------------
+
+-- Mirrors :entry-types in config/config.edn — the authoritative list,
+-- in nav order. An unknown type in a content file fails indexing
+-- loudly rather than silently coining a new type.
+enum EntryType { post | link | quote | release | tool }
+
+------------------------------------------------------------
+-- Entities and Variants
+------------------------------------------------------------
+
+entity Entry {
+    file_title: String              -- the filename (minus .md): the entry's identity in
+                                    -- the vault, and how [[wikilinks]] address it
+    type: EntryType                 -- defaults to post when the file declares nothing
+    body: String
+    tags: Set<String>
+    explicit_title: String?         -- the `title` property; without it quotes stay untitled
+    pinned_slug: String?            -- the `slug` property: pins a URL (e.g. one inherited
+                                    -- from an old blog); otherwise the slug is derived
+    link_url: String?               -- `link`: the outbound URL for link-ish types
+    via_url: String?                -- `via`: credit for where a link was found
+    attribution: String?            -- `author`: who a quote is from
+    attribution_url: String?        -- `source`: the URL a quote's cite line links to
+    authored_date: Timestamp?       -- the workflow `date` property, day precision; set at
+                                    -- creation, the author's to edit (e.g. backdating)
+    content_valid: Boolean          -- the file parses with the server's own parser
+    workflow_properties_valid: Boolean  -- the `date`/`publish` property pair parses
+    status: draft | queued | published
+    published_date: Timestamp when status = published
+                                    -- day precision; realised as the YYYY/MM/DD folder
+                                    -- path, the site's authoritative date for the entry
+
+    transitions status {
+        draft -> queued             -- the author flips the `publish` property to true
+        queued -> draft             -- ...or back to false
+        draft -> published          -- manual `bb publish <name>`
+        queued -> published         -- a queue flush (bare `bb publish` or the agent)
+        terminal: published         -- un-publishing is deleting, not a transition
+    }
+
+    -- Derived
+    slug: pinned_slug ?? slugify(file_title)     -- slugify: black box, lowercase-kebab
+    is_untitled: type = quote and explicit_title = null
+    display_title: explicit_title ?? file_title  -- meaningful only when not is_untitled
+}
