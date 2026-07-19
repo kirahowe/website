@@ -96,12 +96,22 @@ bb drafts                      # see every draft, and which are queued (publish:
 bb publish my-great-idea       # lints, moves it into its date folder, mirrors + pushes
 ```
 
+Don't feel like typing a name? Run these with no argument and they hand
+you a menu instead (↑/↓ or j/k, Enter to pick, q/Esc to cancel):
+`bb new` picks an entry type (and then asks for an optional title),
+`bb suggest-tags` lists the drafts that still have no tags, and `bb
+publish` lists every draft — with a shortcut at the top to flush the whole
+queue at once. It's a tiny pure-babashka picker (`src/site/charm.clj`), no
+`gum`/`fzf` to install.
+
 A file is a draft because it lives in `drafts/`; publishing is moving it
 into the date tree. No flags to forget. `bb publish` warns about
 unresolved wikilinks, missing attachments, missing or never-seen tags,
 and a link entry without a URL — but a warning never blocks a publish.
-Run it with no name and it publishes every queued draft instead (see
-"Publishing from your phone" below) — `bb drafts` shows what that would do.
+Run it with no name at a terminal and it offers the picker above; with no
+name in a script (or the launchd agent) it publishes every queued draft
+instead (see "Publishing from your phone" below) — `bb drafts` shows what
+that would do.
 
 **Editing or deleting something already published?** Change it in Obsidian,
 then `bb sync` — it re-mirrors the vault into the publish repo and pushes,
@@ -118,8 +128,8 @@ Writing happens anywhere the vault syncs to — including the phone — but
 publishing still needs a git push, which only the Mac can do. The bridge
 is the `publish` property: flip it to `true` in Obsidian on your phone to
 queue a draft, and a launchd agent on the Mac notices and publishes it.
-The agent is optional, though — a bare `bb publish` flushes the queue by
-hand, any time, from the Mac.
+The agent is optional, though — a bare `bb publish` at the Mac's terminal
+lets you pick a draft (or the flush-the-queue shortcut) by hand, any time.
 
 ```sh
 bb autopublish install     # once, on the Mac, from the project root

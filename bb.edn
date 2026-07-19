@@ -20,6 +20,7 @@
   test {:doc "Run the test suite"
         :requires ([clojure.test :as t]
                    [site.author-test]
+                   [site.charm-test]
                    [site.config-test]
                    [site.content-test]
                    [site.routes-test]
@@ -36,7 +37,7 @@
                            "clj-kondo --lint src test --fail-level error")]
                 (System/exit exit))}
 
-  new {:doc "Scaffold a new draft: bb new <type> <title words...>"
+  new {:doc "Scaffold a new draft: bb new [type] [title words...] — with no type, pick one from the configured entry types"
        :requires ([site.author :as author])
        :task (apply author/new-draft *command-line-args*)}
 
@@ -44,7 +45,7 @@
           :requires ([site.author :as author])
           :task (apply author/list-drafts *command-line-args*)}
 
-  publish {:doc "Publish a draft: bb publish <name> [--no-git] — lints it, moves it into its date folder, commits, pushes; with no name, publishes every draft marked publish: true"
+  publish {:doc "Publish a draft: bb publish [<name>] [--no-git] — lints it, moves it into its date folder, commits, pushes; with no name at a terminal, pick a draft (or flush the queue); with no name in a script, publishes every draft marked publish: true"
            :requires ([site.author :as author])
            :task (apply author/publish *command-line-args*)}
 
@@ -56,7 +57,7 @@
                :requires ([site.author :as author])
                :task (apply author/autopublish *command-line-args*)}
 
-  suggest-tags {:doc "Suggest tags for a draft with the configured LLM: bb suggest-tags <name>"
+  suggest-tags {:doc "Suggest tags for a draft with the configured LLM: bb suggest-tags [<name>] — with no name, pick from drafts that have no tags yet"
                 :requires ([site.author :as author])
                 :task (apply author/suggest-tags *command-line-args*)}
 
