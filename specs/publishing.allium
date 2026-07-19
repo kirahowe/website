@@ -18,18 +18,20 @@
 --     lifecycle of their own)
 -- Dependencies: the shared Entry model in entries.allium.
 --
--- Deliberate decisions this spec makes that the implementation does not
--- yet satisfy (elicited 2026-07-17):
---   1. A queued draft that fails to publish must fail *noticeably*
---      (@guarantee FailuresAreNoticeable) — a log line alone is not
---      enough — while never blocking the rest of the queue.
---   2. No two published entries may share a slug and a date
---      (invariant NoUrlCollisions); publishing into a collision is
---      blocked, not merely warned. Today only exact-filename collisions
---      are caught.
---   3. Manual single publish refuses on a broken content tree, the same
---      as the queue flush (@guarantee NoPublishFromBrokenTree). Today
---      it proceeds and merely skips lints.
+-- The three decisions elicited 2026-07-17 where this spec was stricter
+-- than the implementation are now all implemented (2026-07-18/19):
+--   - Publishing into a URL collision is blocked (invariant
+--     NoUrlCollisions, rule PublishBlockedByCollision).
+--   - Manual single publish refuses on a broken content tree, the same
+--     as the flush (@guarantee NoPublishFromBrokenTree).
+--   - A queued draft that fails to publish fails noticeably (@guarantee
+--     FailuresAreNoticeable) without blocking the rest of the queue.
+-- A PublishFailureNotice is realized as a macOS desktop notification
+-- fired by the flush (immediate, so an unattended run is noticeable)
+-- plus a marker `bb drafts` derives and shows (durable). Both are
+-- derived from the filesystem + index — there is no persisted notice —
+-- so a notice self-clears the moment its draft publishes, is de-queued,
+-- or the colliding entry moves. See the resolved open questions below.
 
 use "./entries.allium" as entries
 
@@ -86,8 +88,9 @@ entity LintWarning {
 }
 
 -- A publish failure the author must be able to see. Unlike a
--- LintWarning, raising one means the entry did NOT publish.
--- (How and when notices are cleared is an open question.)
+-- LintWarning, raising one means the entry did NOT publish. Realized as
+-- a notification + a derived `bb drafts` marker; self-clearing (see the
+-- resolved decisions at the foot of this file).
 entity PublishFailureNotice {
     entry: entries/Entry
     reason: PublishFailure
@@ -469,9 +472,20 @@ surface ServerRuntime {
 -- guarantees are backed by the Server rules above.
 
 ------------------------------------------------------------
--- Open Questions
+-- Resolved Decisions (were open questions; Kira, 2026-07-19)
 ------------------------------------------------------------
 
-open question "What form must a noticeable publish failure take when the flush runs unattended — a macOS notification, a failure marker in bb drafts, something else? Today it is only a log line, which this spec rejects."
-open question "A failed queued draft stays queued and is re-attempted on every flush. Is retry-forever acceptable once failures are noticeable, or should a repeatedly failing draft eventually be de-queued?"
-open question "When is a PublishFailureNotice cleared — when its entry later publishes successfully, when the draft is de-queued, or only by the author acknowledging it?"
+-- Notice form: both a macOS desktop notification (fired by the flush, so
+-- an unattended run is noticeable at once) AND a marker in `bb drafts`
+-- (durable, seen whenever the author next checks). Not a log line, which
+-- this spec rejects.
+--
+-- Retry policy: retry forever. A failed queued draft stays queued and is
+-- re-attempted on every flush. Now that failures are noticeable, this is
+-- acceptable; the author intervenes when they see the notice. No
+-- auto-de-queue, no failure count.
+--
+-- Clearing: self-clearing. Because the notice is derived, not persisted,
+-- it disappears on its own the moment its draft publishes successfully,
+-- is de-queued, or the colliding entry moves — never a stale notice, no
+-- acknowledgement step.

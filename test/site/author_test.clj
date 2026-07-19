@@ -1,6 +1,8 @@
 (ns site.author-test
-  (:require [clojure.test :refer [deftest is testing]]
-            [site.author :as author])
+  (:require [babashka.fs :as fs]
+            [clojure.test :refer [deftest is testing]]
+            [site.author :as author]
+            [site.content :as content])
   (:import [java.time LocalDate]))
 
 (deftest strip-publish-property
@@ -34,6 +36,75 @@
     (is (= "---\ntags: []\n---\nBody, no trailing newline"
            (author/strip-publish-property
             "---\ntags: []\npublish: false\n---\nBody, no trailing newline")))))
+
+(deftest publish-refuses-url-collisions
+  ;; "Hello World" is already published; "Hello world" is a different
+  ;; filename that slugifies to the same slug, so publishing it on the
+  ;; same date would silently collide on the URL. It must throw (the
+  ;; queue flush turns that into a warn-and-skip), and the draft must
+  ;; stay where it was.
+  (let [root (fs/create-temp-dir)
+        cfg {:content-path (str root) :entry-types [:post]}
+        draft (fs/path root "drafts" "Hello world.md")]
+    (try
+      (fs/create-dirs (fs/path root "2026" "07" "04"))
+      (spit (str (fs/path root "2026" "07" "04" "Hello World.md"))
+            "---\ntags: [test]\n---\n\nAlready live.\n")
+      (fs/create-dirs (fs/parent draft))
+      (spit (str draft)
+            "---\ndate: 2026-07-04\ntags: [test]\npublish: true\n---\n\nWould collide.\n")
+      (let [index (content/build-index cfg)]
+        (is (thrown-with-msg? Exception #"URL collision: /2026/jul/4/hello-world"
+                              (#'author/publish-draft! cfg index draft)))
+        (is (fs/exists? draft)))
+      (finally
+        (fs/delete-tree root)))))
+
+(deftest target-url-derivation
+  (testing "the URL is the authored date plus the filename slug"
+    (is (= "/2026/jul/4/my-post"
+           (#'author/target-url {:base "My Post" :date (LocalDate/of 2026 7 4) :meta {}}))))
+  (testing "a slug property pins the URL instead"
+    (is (= "/2026/jul/4/legacy-path"
+           (#'author/target-url {:base "My Post" :date (LocalDate/of 2026 7 4)
+                                 :meta {:slug "legacy-path"}})))))
+
+(deftest publish-failure-detection
+  (let [root (fs/create-temp-dir)
+        cfg {:content-path (str root) :entry-types [:post]}]
+    (try
+      (fs/create-dirs (fs/path root "2026" "07" "04"))
+      (spit (str (fs/path root "2026" "07" "04" "Taken.md"))
+            "---\ntags: [x]\n---\n\nLive.\n")
+      (let [index (content/build-index cfg)]
+        (testing "a queued draft whose URL is already published is a collision"
+          (is (= :url-collision
+                 (#'author/publish-failure
+                  index {:base "taken" :date (LocalDate/of 2026 7 4) :meta {} :publish true}))))
+        (testing "a queued draft with a free URL has no failure"
+          (is (nil? (#'author/publish-failure
+                     index {:base "fresh" :date (LocalDate/of 2026 7 4) :meta {} :publish true}))))
+        (testing "unparseable workflow properties are a broken-properties failure"
+          (is (= :broken-workflow-properties
+                 (#'author/publish-failure
+                  index {:base "oops" :error "Unparseable date property" :publish true})))))
+      (finally
+        (fs/delete-tree root)))))
+
+(deftest broken-draft-still-reports-queued
+  ;; A queued draft with a garbled date must still be recognisable as
+  ;; queued, so an unattended flush can notify about it rather than
+  ;; silently skip it — the date and the publish toggle fail independently.
+  (let [root (fs/create-temp-dir)]
+    (try
+      (fs/create-dirs (fs/path root "drafts"))
+      (spit (str (fs/path root "drafts" "Bad.md"))
+            "---\ndate: July 15 2026\npublish: true\ntags: []\n---\n\nBody\n")
+      (let [status (first (#'author/draft-status root))]
+        (is (:error status))            ; the date failed to parse
+        (is (true? (:publish status)))) ; ...but we still know it was queued
+      (finally
+        (fs/delete-tree root)))))
 
 (deftest draft-sort-key
   (testing "queued drafts sort before non-queued ones"
@@ -70,4 +141,10 @@
   (testing "a draft with unparseable workflow properties shows the error, not a crash"
     (is (= "         ERROR: Unparseable date property in x.md: \"July 15, 2026\"  Bad draft"
            (#'author/draft-line {:base "Bad draft"
-                                  :error "Unparseable date property in x.md: \"July 15, 2026\""})))))
+                                  :error "Unparseable date property in x.md: \"July 15, 2026\""}))))
+
+  (testing "a queued draft that would collide names the URL already taken"
+    (is (= "[queued] 2026-07-04  post  Dupe  ⚠ URL already taken: /2026/jul/4/dupe"
+           (#'author/draft-line {:base "Dupe" :date (LocalDate/of 2026 7 4)
+                                  :publish true :type :post
+                                  :collides-with "/2026/jul/4/dupe"})))))

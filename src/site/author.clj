@@ -35,6 +35,24 @@
 (defn- warn [& msg]
   (println (apply str "⚠ " msg)))
 
+(defn- applescript-str
+  "A string quoted for embedding in an AppleScript literal."
+  [s]
+  (str "\"" (-> (str s) (str/replace "\\" "\\\\") (str/replace "\"" "\\\"")) "\""))
+
+(defn- notify!
+  "Best-effort macOS desktop notification. Never throws and never blocks —
+  a missing osascript or a failed notification must not break a publish
+  run — so anything that goes wrong here is swallowed. This is what makes
+  an unattended flush's failures noticeable, rather than a log line the
+  author never reads."
+  [title message]
+  (try
+    (p/sh "osascript" "-e"
+          (str "display notification " (applescript-str message)
+               " with title " (applescript-str title)))
+    (catch Exception _ nil)))
+
 (defn reindex
   "bb reindex — parse and index every content file, failing loudly on any
   problem. Run it to validate the whole tree locally; the server does
@@ -208,7 +226,7 @@
     raw))
 
 (defn- publish-draft!
-  "Core of publishing one draft: validate, lint (when index is given),
+  "Core of publishing one draft: validate, refuse URL collisions, lint,
   file it under its authored `date` property (or today, if it has none),
   strip the publish toggle, and remove it from drafts/. Returns the base
   name on success. Throws rather than dying, so callers — the interactive
@@ -222,8 +240,6 @@
     ;; Validate with the same parser the server uses — a broken file should
     ;; fail here, not after it's live.
     (content/check-type! cfg meta (str src))
-    (when index
-      (lint-draft! cfg index (get (:drafts index) base)))
     (let [{authored-date :date} (content/workflow-properties raw (str src))
           date (or authored-date (LocalDate/now))
           y (.getYear date)
@@ -231,78 +247,118 @@
           d (.getDayOfMonth date)
           dir (fs/path root (str y) (format "%02d" m) (format "%02d" d))
           target (fs/path dir (str base ".md"))
-          slug (util/slugify base)]
+          ;; The same slug the server will derive: a `slug` property pins
+          ;; it, otherwise it comes from the filename.
+          slug (or (:slug meta) (util/slugify base))
+          url (util/entry-url {:date {:year y :month m :day d} :slug slug})]
+      ;; No two published entries may share a URL (slug + date) — distinct
+      ;; titles that slugify identically collide too, not just files with
+      ;; the same name.
+      (when-let [existing (get (:by-path index) url)]
+        (throw (ex-info (str "URL collision: " url " already belongs to " (:file existing))
+                        {:reason :url-collision :url url :existing (:file existing)})))
       (when (fs/exists? target)
         (throw (ex-info (str "Target already exists: " target) {:target (str target)})))
+      (lint-draft! cfg index (get (:drafts index) base))
       (fs/create-dirs dir)
       ;; Not fs/move — the publish toggle must not leak into the public
       ;; repo, so the file that lands in the date folder has it stripped.
       (spit (str target) (strip-publish-property raw))
       (fs/delete src)
       (println "Published:" (str target))
-      (println "URL path:  " (str "/" y "/" (util/month-slug m) "/" d "/" slug))
+      (println "URL path:  " url)
       (when authored-date
         (println (str "Date:      " date " (from the draft's date property)")))
       base)))
 
 (defn- draft-status
   "Every drafts/*.md file paired with its authored workflow properties
-  (:date, :publish) and its :type — read leniently with
+  (:date, :publish), its :type and its parsed :meta — read leniently with
   content/parse-frontmatter, never validated with check-type!, so a
   typo'd type shows up rather than crashing the scan. A draft whose
   frontmatter fails to parse (e.g. a garbled date property) carries
-  :error instead of :date/:publish/:type, so callers can flag it rather
-  than blow up. Used by both `bb drafts` (every draft) and the publish
-  queue (just the ones with publish: true)."
+  :error in place of :date/:type, but still reports :publish (the toggle
+  and the date fail independently) so a queued-but-broken draft is
+  recognisably queued. Used by both `bb drafts` (every draft) and the
+  publish queue (just the ones with publish: true)."
   [root]
   (let [dir (fs/path root "drafts")]
     (when (fs/exists? dir)
       (map (fn [f]
-             (let [base (str/replace (fs/file-name f) #"\.md$" "")]
+             (let [base (str/replace (fs/file-name f) #"\.md$" "")
+                   raw (try (slurp (str f)) (catch Exception _ nil))]
                (try
-                 (let [raw (slurp (str f))
-                       {:keys [meta]} (content/parse-frontmatter raw (str f))
+                 (let [{:keys [meta]} (content/parse-frontmatter raw (str f))
                        {:keys [date publish]} (content/workflow-properties raw (str f))]
                    {:file f :base base :date date :publish publish
-                    :type (or (:type meta) :post)})
+                    :type (or (:type meta) :post) :meta meta})
                  (catch Exception e
-                   {:file f :base base :error (ex-message e)}))))
+                   {:file f :base base :error (ex-message e)
+                    :publish (content/queued-flag raw (str f))}))))
            (fs/list-dir dir "*.md")))))
 
-(defn- queued-drafts
-  "drafts/*.md files with publish: true, paired with their authored date
-  (nil if absent). A draft whose workflow properties threw (e.g. a
-  garbled date) warns and is skipped rather than blocking the rest."
-  [root]
-  (keep (fn [{:keys [file date publish error]}]
-          (cond
-            error (do (warn "skipping " (fs/file-name file) " — " error) nil)
-            publish {:file file :date date}))
-        (draft-status root)))
+(defn- target-url
+  "The canonical URL a draft would publish to: its authored date (or
+  today) and its slug — a `slug` property pins it, else the filename
+  slugifies. The same slug + date the server derives and that
+  publish-draft! guards against colliding."
+  [{:keys [base date meta]}]
+  (let [d (or date (LocalDate/now))]
+    (util/entry-url {:date {:year (.getYear d) :month (.getMonthValue d)
+                            :day (.getDayOfMonth d)}
+                     :slug (or (:slug meta) (util/slugify base))})))
+
+(defn- publish-failure
+  "Why a queued draft would fail to publish right now, or nil if it would
+  succeed: :broken-workflow-properties (its date/publish won't parse) or
+  :url-collision (an already-published entry owns the URL it would land
+  at). Purely derived — no persisted state — so a failure clears itself
+  once the draft is fixed, un-queued, published, or the colliding entry
+  moves. Both the flush (to notify) and `bb drafts` (to mark) read it."
+  [index {:keys [error] :as d}]
+  (cond
+    error :broken-workflow-properties
+    (get (:by-path index) (target-url d)) :url-collision))
+
+(defn- failure-blurb [reason]
+  (case reason
+    :url-collision "its URL (slug + date) is already taken"
+    :broken-workflow-properties "its date/publish properties won't parse"
+    "publishing threw"))
 
 (defn- publish-queue!
   "Publishes every queued draft, in authored-date order, then pushes
-  once. The shared core of bare `bb publish` and `bb publish-queued` —
-  see their docstrings for the user-facing behavior."
+  once. A draft that fails to publish never blocks the rest: it's warned
+  about and — because the flush may be running unattended (the autopublish
+  agent) — raised as a desktop notification too, so the failure is
+  noticeable rather than buried in a log. The shared core of bare `bb
+  publish` and `bb publish-queued`."
   [no-git?]
   (let [cfg (config/load-config :dev)
         root (:content-path cfg)
         index (try (content/build-index cfg)
                    (catch Exception e
                      (die "Content error, not publishing: " (ex-message e))))
-        queued (sort-by (juxt (comp nil? :date) :date) (queued-drafts root))]
+        queued (sort-by (juxt (comp nil? :date) :date)
+                        (filter :publish (draft-status root)))
+        fail! (fn [{:keys [base] :as d} detail]
+                (warn "failed to publish " base " — " detail)
+                (notify! "Publish failed"
+                         (str base " — " (failure-blurb (publish-failure index d)))))]
     (if (empty? queued)
       (println "No drafts queued (set the publish property to true to queue one).")
       (let [;; doall — this is side-effecting (moves files); --no-git skips
             ;; the str/join that would otherwise force it, so every draft
             ;; would stop getting published after the first one left lazy.
             published (doall
-                       (keep (fn [{:keys [file]}]
-                              (try
-                                (publish-draft! cfg index file)
-                                (catch Exception e
-                                  (warn "failed to publish " (fs/file-name file) " — " (ex-message e))
-                                  nil)))
+                       (keep (fn [{:keys [file error] :as d}]
+                              (if error
+                                (do (fail! d error) nil)
+                                (try
+                                  (publish-draft! cfg index file)
+                                  (catch Exception e
+                                    (fail! d (ex-message e))
+                                    nil))))
                             queued))]
         (when (seq published)
           (if no-git?
@@ -315,7 +371,8 @@
   `date` property's YYYY/MM/DD/ folder in the vault (today's, if it has
   none). Given no name: publishes every draft marked publish: true
   instead — the same as `bb publish-queued` (see `bb drafts` to preview
-  what that would do). Either way, unless --no-git, mirrors the vault
+  what that would do). Neither path publishes anything while the content
+  tree has errors. Either way, unless --no-git, mirrors the vault
   into the publish repo and pushes once; the live site picks it up on
   its next timed pull, or immediately if you restart the machine."
   [& args]
@@ -328,12 +385,11 @@
             src (find-draft root fname)]
         (when-not src
           (die "No such draft: " fname "\nUsage: bb publish [<draft name>] [--no-git]"))
-        ;; Lint against the full index; a problem elsewhere in the tree
-        ;; shouldn't block publishing this draft, just surface it.
+        ;; The same broken-tree gate as the queue flush: nothing
+        ;; publishes while the content tree doesn't index cleanly.
         (let [index (try (content/build-index cfg)
                          (catch Exception e
-                           (warn "skipping lints — content tree has errors: " (ex-message e))
-                           nil))
+                           (die "Content error, not publishing: " (ex-message e))))
               base (try (publish-draft! cfg index src)
                         (catch Exception e
                           (die (ex-message e))))]
@@ -364,26 +420,36 @@
   "One line of `bb drafts` output for a draft-status entry: the queue
   marker, its authored date (or that it has none), its type, and its
   filename — or, if its frontmatter failed to parse, the error in place
-  of date/type."
-  [{:keys [base date publish type error]}]
+  of date/type. A queued draft that would collide on its URL carries the
+  clash appended, so the preview shows what a flush would refuse."
+  [{:keys [base date publish type error collides-with]}]
   (str (if publish "[queued] " "         ")
        (if error
          (str "ERROR: " error)
          (str (format "%-10s" (if date (str date) "no date")) "  " (name type)))
-       "  " base))
+       "  " base
+       (when collides-with (str "  ⚠ URL already taken: " collides-with))))
 
 (defn list-drafts
   "bb drafts — lists every draft in drafts/, queued ones first in the
   order a bare `bb publish` would publish them, so you can see what it
-  (or `bb publish-queued`) would do before running it."
+  (or `bb publish-queued`) would do before running it — including a queued
+  draft that would fail to publish because its URL is already taken."
   [& _]
   (let [cfg (config/load-config :dev)
+        ;; The index lets us flag URL collisions; if the tree won't build
+        ;; the listing still works, just without collision markers.
+        index (try (content/build-index cfg) (catch Exception _ nil))
         drafts (draft-status (:content-path cfg))]
     (if (empty? drafts)
       (println "No drafts.")
       (do
         (doseq [d (sort-by draft-sort-key drafts)]
-          (println (draft-line d)))
+          (println (draft-line
+                    (cond-> d
+                      (and index (:publish d) (not (:error d))
+                           (= :url-collision (publish-failure index d)))
+                      (assoc :collides-with (target-url d))))))
         (println)
         (println "Publish everything queued: bb publish")
         (println "Publish just one draft:    bb publish <name>")))))

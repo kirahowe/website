@@ -55,6 +55,9 @@
             (let [index (if (:dev? config)
                           (content/build-index config)
                           @index-atom)
+                  ;; The header renders from config alone, but which nav
+                  ;; links exist depends on the content — hand it along.
+                  config (assoc config :nav-types (:nav-types index))
                   match (routes/match-route config (routes/path-segments uri))]
               (if match
                 (handlers/handle config index match req)

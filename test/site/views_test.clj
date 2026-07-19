@@ -185,6 +185,21 @@
     (is (not (str/includes? (:body (GET "/feed.xml")) "isn't ready")))
     (is (not (str/includes? (:body (GET "/search" "q=brewing")) "isn't ready")))))
 
+(deftest nav-hides-empty-types
+  ;; :essay is a configured type with no published entries — the nav
+  ;; must not link it (the link would be a permanent 404), while types
+  ;; with entries keep their links.
+  (let [cfg (update config :entry-types conj :essay)
+        h (app/make-app cfg (atom (content/build-index cfg)))
+        body (:body (h {:request-method :get :uri "/"}))]
+    (is (not (str/includes? body "\"/essays\"")))
+    (is (str/includes? body "\"/posts\""))
+    (is (str/includes? body "\"/tools\"")))
+  (testing "the 404 page's nav hides them too"
+    (let [{:keys [status body]} (GET "/nope")]
+      (is (= 404 status))
+      (is (str/includes? body "\"/posts\"")))))
+
 (deftest home-limits-to-whole-days
   (let [h (app/make-app (assoc config :home-entries 2)
                         (atom (content/build-index config)))

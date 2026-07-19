@@ -18,14 +18,10 @@
 --     contract is fixed, the scoring is free to evolve)
 -- Dependencies: the shared Entry model in entries.allium.
 --
--- Deliberate decisions this spec makes that the implementation does
--- not yet satisfy (elicited 2026-07-17):
---   1. The site navigation lists only entry types that have at least
---      one published entry (@guarantee NavHidesEmptyTypes). Today the
---      nav links every configured type unconditionally, so an unused
---      type is a permanent dead link to a 404.
--- (The README's /notes drift was resolved the other way: no :note
--- type exists or is planned; the README table was corrected.)
+-- (Two drifts elicited 2026-07-17 are resolved: the nav now hides
+-- entry types with no published entries — @guarantee NavHidesEmptyTypes,
+-- implemented 2026-07-18 — and the README's /notes table was corrected;
+-- no :note type exists or is planned.)
 
 use "./entries.allium" as entries
 

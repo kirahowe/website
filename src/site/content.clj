@@ -140,6 +140,18 @@
        :publish (true? (:publish meta))})
     {:date nil :publish false}))
 
+(defn queued-flag
+  "Just the `publish` boolean from raw YAML frontmatter, read leniently —
+  false on anything unparseable. Unlike workflow-properties it never
+  throws, so a draft with a garbled *date* still reports whether it was
+  queued (the date and the publish toggle fail independently)."
+  [raw file]
+  (boolean
+   (try
+     (when-let [[meta-str] (split-frontmatter raw yaml-delimiter file)]
+       (true? (:publish (yaml/parse-string meta-str))))
+     (catch Exception _ false))))
+
 (defn check-type!
   "Resolves :type, defaulting to :post (a bare entry is a post), and
   validates it against the configured :entry-types. Fails loudly so a
@@ -290,8 +302,8 @@
 (def empty-index
   "What the server serves when content is unavailable at boot — the sync
   loop replaces it as soon as a pull succeeds."
-  {:entries [] :by-path {} :by-type {} :by-year {} :by-month {} :by-day {}
-   :by-tag {} :tag-counts [] :months [] :drafts {} :pages {}})
+  {:entries [] :by-path {} :by-type {} :nav-types [] :by-year {} :by-month {}
+   :by-day {} :by-tag {} :tag-counts [] :months [] :drafts {} :pages {}})
 
 (defn build-index
   "Content repo → the in-memory index every request reads from."
@@ -304,10 +316,14 @@
                             {:paths (vec dupes)})))
         wikilinks (wikilink-targets entries)
         entries (mapv #(assoc % :wikilinks wikilinks) (link-neighbors entries))
-        drafts (update-vals drafts #(assoc % :wikilinks wikilinks))]
+        drafts (update-vals drafts #(assoc % :wikilinks wikilinks))
+        by-type (group-by :type entries)]
     {:entries entries
      :by-path (into {} (map (juxt :path identity)) entries)
-     :by-type (group-by :type entries)
+     :by-type by-type
+     ;; entry types with at least one published entry, in configured
+     ;; order — what the nav links (an empty type's listing is a 404)
+     :nav-types (filterv by-type (:entry-types config))
      :by-year (group-by #(-> % :date :year) entries)
      :by-month (group-by (fn [e] [(-> e :date :year) (-> e :date :month)]) entries)
      ;; months that have content, newest first — drives month-to-month nav
