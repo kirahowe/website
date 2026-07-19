@@ -1,9 +1,9 @@
-(ns site.charm-test
+(ns site.tui-test
   (:require [clojure.test :refer [deftest is testing]]
-            [site.charm :as charm]))
+            [site.tui :as tui]))
 
 (deftest parse-choice
-  (let [parse #'charm/parse-choice]
+  (let [parse #'tui/parse-choice]
     (testing "a valid 1-based number maps to a 0-based index"
       (is (= 0 (parse 3 "1")))
       (is (= 2 (parse 3 "3"))))
@@ -24,7 +24,7 @@
       (is (nil? (parse 3 "99"))))))
 
 (deftest read-key-classification
-  (let [read-key #'charm/read-key
+  (let [read-key #'tui/read-key
         feed (fn [bytes]
                (read-key (java.io.ByteArrayInputStream.
                           (byte-array (map unchecked-byte bytes)))))]
@@ -55,18 +55,18 @@
   (testing "an empty option list returns nil without prompting"
     ;; Short-circuits before any terminal check, so this holds with or
     ;; without a tty.
-    (is (nil? (charm/choose []))))
+    (is (nil? (tui/choose []))))
 
   ;; Force the numbered path so the test is deterministic whether or not
   ;; the runner has a real terminal (an arrow-key path would block on tty
   ;; input).
-  (with-redefs [charm/interactive? (constantly false)]
+  (with-redefs [tui/interactive? (constantly false)]
     (testing "the numbered path returns the element behind a valid number"
-      (is (= "b" (with-in-str "2\n" (charm/choose ["a" "b" "c"])))))
+      (is (= "b" (with-in-str "2\n" (tui/choose ["a" "b" "c"])))))
 
     (testing "a blank answer cancels to nil"
-      (is (nil? (with-in-str "\n" (charm/choose ["a" "b" "c"])))))
+      (is (nil? (with-in-str "\n" (tui/choose ["a" "b" "c"])))))
 
     (testing "a single option is still confirmed, never auto-selected"
-      (is (= "only" (with-in-str "1\n" (charm/choose ["only"]))))
-      (is (nil? (with-in-str "\n" (charm/choose ["only"])))))))
+      (is (= "only" (with-in-str "1\n" (tui/choose ["only"]))))
+      (is (nil? (with-in-str "\n" (tui/choose ["only"])))))))

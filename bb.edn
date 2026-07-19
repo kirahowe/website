@@ -20,7 +20,7 @@
   test {:doc "Run the test suite"
         :requires ([clojure.test :as t]
                    [site.author-test]
-                   [site.charm-test]
+                   [site.tui-test]
                    [site.config-test]
                    [site.content-test]
                    [site.routes-test]
