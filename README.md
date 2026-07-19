@@ -99,7 +99,8 @@ bb publish my-great-idea       # lints, moves it into its date folder, mirrors +
 Don't feel like typing a name? Run these with no argument and they hand
 you a menu instead (↑/↓ or j/k, Enter to pick, q/Esc to cancel):
 `bb new` picks an entry type (and then asks for an optional title),
-`bb suggest-tags` lists the drafts that still have no tags, and `bb
+`bb suggest-tags` lists every draft or published entry that still has no
+tags (a post can go out untagged and want tags after the fact), and `bb
 publish` lists every draft — with a shortcut at the top to flush the whole
 queue at once. It's a tiny pure-babashka picker (`src/site/tui.clj`), no
 `gum`/`fzf` to install.

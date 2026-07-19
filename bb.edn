@@ -57,7 +57,7 @@
                :requires ([site.author :as author])
                :task (apply author/autopublish *command-line-args*)}
 
-  suggest-tags {:doc "Suggest tags for a draft with the configured LLM: bb suggest-tags [<name>] — with no name, pick from drafts that have no tags yet"
+  suggest-tags {:doc "Suggest tags for a draft with the configured LLM: bb suggest-tags [<name>] — with no name, pick from any draft or published entry that has no tags yet"
                 :requires ([site.author :as author])
                 :task (apply author/suggest-tags *command-line-args*)}
 

@@ -669,33 +669,58 @@
     (println "tags:")
     (doseq [t tags] (println (str "  - " t)))))
 
-(defn- pick-untagged-draft
-  "Interactive picker for `bb suggest-tags` with no name: the drafts that
-  have no tags yet, alphabetical, rendered with their type. Returns the
-  chosen draft's file, or nil (nothing to tag, or the author cancelled)."
-  [root]
-  (let [candidates (->> (draft-status root)
-                        (remove :error)
-                        (filter (comp empty? :tags))
+(defn- untagged-published
+  "Published entries with no tags yet, as picker candidates: an absolute
+  :file (the index stores paths relative to the content root), a display
+  :base, its :type, and :published? to flag it in the list. Reads the
+  content index; if that won't build, warns and yields nothing so the
+  picker still offers drafts."
+  [cfg]
+  (try
+    (->> (:entries (content/build-index cfg))
+         (filter (comp empty? :tags))
+         (map (fn [{:keys [file file-title type]}]
+                {:file (fs/path (:content-path cfg) file)
+                 :base file-title
+                 :type type
+                 :published? true})))
+    (catch Exception e
+      (warn "couldn't scan published entries for missing tags: " (ex-message e))
+      nil)))
+
+(defn- pick-untagged
+  "Interactive picker for `bb suggest-tags` with no name: every draft or
+  published entry that has no tags yet, alphabetical, rendered with its
+  type (published ones flagged — an entry can go out untagged and want
+  tags after the fact). Returns the chosen file, or nil (nothing to tag,
+  or the author cancelled)."
+  [cfg root]
+  (let [drafts (->> (draft-status root)
+                    (remove :error)
+                    (filter (comp empty? :tags))
+                    (map #(assoc (select-keys % [:file :base :type]) :published? false)))
+        candidates (->> (concat drafts (untagged-published cfg))
                         (sort-by :base))]
     (if (empty? candidates)
-      (do (println "No drafts are missing tags.") nil)
+      (do (println "Nothing is missing tags.") nil)
       (some-> (tui/choose candidates
-                          :label "Draft to tag (no tags yet):"
-                          :render (fn [{:keys [base type]}]
-                                    (format "%-7s %s" (name type) base)))
+                          :label "Entry to tag (no tags yet):"
+                          :render (fn [{:keys [base type published?]}]
+                                    (format "%-7s %s%s" (name type) base
+                                            (if published? "  ·  published" ""))))
               :file))))
 
 (defn suggest-tags
   "bb suggest-tags [draft name] — has the configured LLM read a draft and
   propose tags, printed as a YAML block ready to paste into the draft's
-  properties. With no name, pick from the drafts that have no tags yet."
+  properties. With no name, pick from any draft or published entry that
+  has no tags yet."
   [& args]
   (let [cfg (config/load-config :dev)
         root (:content-path cfg)
         fname (str/join " " args)
         src (if (str/blank? fname)
-              (pick-untagged-draft root)
+              (pick-untagged cfg root)
               (or (find-draft root fname)
                   (die "No such draft: " fname)))]
     (when src
