@@ -1,7 +1,7 @@
-(ns site.charm
-  "Small interactive terminal helpers for the babashka authoring tasks —
-  a picker (`choose`) and a line prompt (`input`). Pure babashka: no gum,
-  no fzf, no dependencies, matching the project's zero-dependency ethos.
+(ns site.tui
+  "Small interactive terminal (TUI) helpers for the babashka authoring
+  tasks — a picker (`choose`) and a line prompt (`input`). Pure babashka:
+  no gum, no fzf, no dependencies, matching the project's zero-dep ethos.
   On a real terminal `choose` draws an arrow-key menu (↑/↓ or j/k, Enter
   to pick, q/Esc to cancel); with no tty (a pipe, CI, a redirect) it falls
   back to numbered entry, so the same call works everywhere."

@@ -6,7 +6,7 @@
   (:require [babashka.fs :as fs]
             [babashka.process :as p]
             [clojure.string :as str]
-            [site.charm :as charm]
+            [site.tui :as tui]
             [site.config :as config]
             [site.content :as content]
             [site.markdown :as markdown]
@@ -61,9 +61,9 @@
         [type-str & title-words] args
         type (if type-str
                (keyword (str/replace type-str #"^:" ""))
-               (charm/choose (:entry-types cfg)
-                             :label "Entry type:"
-                             :render name))]
+               (tui/choose (:entry-types cfg)
+                           :label "Entry type:"
+                           :render name))]
     ;; Validate the type before prompting for a title, so cancelling the
     ;; picker (or a typo'd type) exits without a spurious title prompt.
     (when-not type
@@ -77,7 +77,7 @@
                   ;; behavior: fall through to the type+date default name.
                   type-str nil
                   ;; Fully interactive (`bb new`) — offer to name it now.
-                  :else (charm/input "Title (optional): "))
+                  :else (tui/input "Title (optional): "))
           fname (-> (or title (str (name type) " " (LocalDate/now)))
                     (str/replace "/" "-"))
           target (fs/path (:content-path cfg) "drafts" (str fname ".md"))]
@@ -378,7 +378,7 @@
                      (if (= o publish-all-queued)
                        (str "▶ Publish all " (count queued) " queued")
                        (str (if (:publish o) "[queued] " "         ") (:base o))))
-            choice (charm/choose options :label "Publish which draft?" :render render)]
+            choice (tui/choose options :label "Publish which draft?" :render render)]
         (cond
           (nil? choice) (println "Nothing selected.")
           (= choice publish-all-queued) (publish-queue! no-git?)
@@ -401,7 +401,7 @@
         fname (str/join " " (remove #(str/starts-with? % "--") args))]
     (cond
       (not (str/blank? fname)) (publish-named! fname no-git?)
-      (charm/interactive?) (publish-interactive! no-git?)
+      (tui/interactive?) (publish-interactive! no-git?)
       :else (publish-queue! no-git?))))
 
 (defn publish-queued
@@ -610,10 +610,10 @@
                         (sort-by :base))]
     (if (empty? candidates)
       (do (println "No drafts are missing tags.") nil)
-      (some-> (charm/choose candidates
-                            :label "Draft to tag (no tags yet):"
-                            :render (fn [{:keys [base type]}]
-                                      (format "%-7s %s" (name type) base)))
+      (some-> (tui/choose candidates
+                          :label "Draft to tag (no tags yet):"
+                          :render (fn [{:keys [base type]}]
+                                    (format "%-7s %s" (name type) base)))
               :file))))
 
 (defn suggest-tags

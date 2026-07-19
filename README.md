@@ -101,7 +101,7 @@ you a menu instead (↑/↓ or j/k, Enter to pick, q/Esc to cancel):
 `bb new` picks an entry type (and then asks for an optional title),
 `bb suggest-tags` lists the drafts that still have no tags, and `bb
 publish` lists every draft — with a shortcut at the top to flush the whole
-queue at once. It's a tiny pure-babashka picker (`src/site/charm.clj`), no
+queue at once. It's a tiny pure-babashka picker (`src/site/tui.clj`), no
 `gum`/`fzf` to install.
 
 A file is a draft because it lives in `drafts/`; publishing is moving it
