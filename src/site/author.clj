@@ -6,6 +6,7 @@
   (:require [babashka.fs :as fs]
             [babashka.process :as p]
             [clojure.string :as str]
+            [site.charm :as charm]
             [site.config :as config]
             [site.content :as content]
             [site.markdown :as markdown]
@@ -51,20 +52,33 @@
         (die "Content error: " (ex-message e))))))
 
 (defn new-draft
-  "bb new <type> <title words...> — scaffolds drafts/<Title>.md in the
+  "bb new [type] [title words...] — scaffolds drafts/<Title>.md in the
   content repo. The filename is the title, exactly as Obsidian would
-  create it."
+  create it. With no type, pick one from the configured entry types; when
+  invoked with nothing at all, it then also prompts for an optional title."
   [& args]
   (let [cfg (config/load-config :dev)
         [type-str & title-words] args
-        type (when type-str (keyword (str/replace type-str #"^:" "")))
-        title (when (seq title-words) (str/join " " title-words))]
+        type (if type-str
+               (keyword (str/replace type-str #"^:" ""))
+               (charm/choose (:entry-types cfg)
+                             :label "Entry type:"
+                             :render name))]
+    ;; Validate the type before prompting for a title, so cancelling the
+    ;; picker (or a typo'd type) exits without a spurious title prompt.
     (when-not type
       (die "Usage: bb new <type> <title words...>"))
     (when-not ((set (:entry-types cfg)) type)
       (die "Unknown type " type ". Allowed: "
            (str/join ", " (map name (:entry-types cfg)))))
-    (let [fname (-> (or title (str (name type) " " (LocalDate/now)))
+    (let [title (cond
+                  (seq title-words) (str/join " " title-words)
+                  ;; `bb new post` (type given, no title) keeps its old
+                  ;; behavior: fall through to the type+date default name.
+                  type-str nil
+                  ;; Fully interactive (`bb new`) — offer to name it now.
+                  :else (charm/input "Title (optional): "))
+          fname (-> (or title (str (name type) " " (LocalDate/now)))
                     (str/replace "/" "-"))
           target (fs/path (:content-path cfg) "drafts" (str fname ".md"))]
       (when (fs/exists? target)
@@ -252,8 +266,9 @@
   typo'd type shows up rather than crashing the scan. A draft whose
   frontmatter fails to parse (e.g. a garbled date property) carries
   :error instead of :date/:publish/:type, so callers can flag it rather
-  than blow up. Used by both `bb drafts` (every draft) and the publish
-  queue (just the ones with publish: true)."
+  than blow up. Used by `bb drafts` (every draft), the publish queue
+  (just the ones with publish: true), and the interactive pickers (which
+  also read :tags — nil-safe: a draft with none carries an empty vec)."
   [root]
   (let [dir (fs/path root "drafts")]
     (when (fs/exists? dir)
@@ -264,7 +279,8 @@
                        {:keys [meta]} (content/parse-frontmatter raw (str f))
                        {:keys [date publish]} (content/workflow-properties raw (str f))]
                    {:file f :base base :date date :publish publish
-                    :type (or (:type meta) :post)})
+                    :type (or (:type meta) :post)
+                    :tags (vec (:tags meta))})
                  (catch Exception e
                    {:file f :base base :error (ex-message e)}))))
            (fs/list-dir dir "*.md")))))
@@ -309,37 +325,84 @@
             (println "Skipped git (--no-git). Run `bb sync` when you're ready to push.")
             (mirror-and-push! cfg (str "Publish " (str/join ", " published)))))))))
 
+(defn- draft-sort-key
+  "Sort key for `bb drafts` and the interactive publish picker: queued
+  drafts first (in the order `bb publish` would publish them — authored
+  date ascending, nil last), then everything else, alphabetically by
+  filename for a stable order."
+  [{:keys [publish date base]}]
+  [(not publish) (nil? date) date base])
+
+(defn- publish-named!
+  "Publish one draft by name: find it, lint against the full index (a
+  problem elsewhere in the tree surfaces but doesn't block this draft),
+  file it, and — unless --no-git — mirror and push. The core of both `bb
+  publish <name>` and picking a single draft interactively."
+  [fname no-git?]
+  (let [cfg (config/load-config :dev)
+        root (:content-path cfg)
+        src (find-draft root fname)]
+    (when-not src
+      (die "No such draft: " fname "\nUsage: bb publish [<draft name>] [--no-git]"))
+    (let [index (try (content/build-index cfg)
+                     (catch Exception e
+                       (warn "skipping lints — content tree has errors: " (ex-message e))
+                       nil))
+          base (try (publish-draft! cfg index src)
+                    (catch Exception e
+                      (die (ex-message e))))]
+      (if no-git?
+        (println "Skipped git (--no-git). Run `bb sync` when you're ready to push.")
+        (mirror-and-push! cfg (str "Publish " base))))))
+
+(def ^:private publish-all-queued
+  "Sentinel option offered at the top of the interactive publish picker
+  when drafts are queued — selecting it flushes the whole queue."
+  ::publish-all-queued)
+
+(defn- publish-interactive!
+  "The picker behind a bare, interactive `bb publish`: choose a single
+  draft to publish, or — when any are queued — the queue-flush shortcut at
+  the top (equivalent to bare `bb publish` in a script). Drafts are listed
+  in the same order `bb drafts` shows them."
+  [no-git?]
+  (let [cfg (config/load-config :dev)
+        drafts (->> (draft-status (:content-path cfg))
+                    (remove :error)
+                    (sort-by draft-sort-key))
+        queued (filter :publish drafts)]
+    (if (empty? drafts)
+      (println "No drafts to publish (bb new <type> to start one).")
+      (let [options (concat (when (seq queued) [publish-all-queued]) drafts)
+            render (fn [o]
+                     (if (= o publish-all-queued)
+                       (str "▶ Publish all " (count queued) " queued")
+                       (str (if (:publish o) "[queued] " "         ") (:base o))))
+            choice (charm/choose options :label "Publish which draft?" :render render)]
+        (cond
+          (nil? choice) (println "Nothing selected.")
+          (= choice publish-all-queued) (publish-queue! no-git?)
+          :else (publish-named! (:base choice) no-git?))))))
+
 (defn publish
   "bb publish [name words...] [--no-git] — the manual publish. Given a
   name: validates that draft, lints it, and files it into its authored
   `date` property's YYYY/MM/DD/ folder in the vault (today's, if it has
-  none). Given no name: publishes every draft marked publish: true
-  instead — the same as `bb publish-queued` (see `bb drafts` to preview
-  what that would do). Either way, unless --no-git, mirrors the vault
-  into the publish repo and pushes once; the live site picks it up on
-  its next timed pull, or immediately if you restart the machine."
+  none). Given no name at an interactive terminal: presents a picker of
+  every draft (queued ones marked, with a shortcut to flush the whole
+  queue) so you needn't type a name. Given no name with no terminal (a
+  script, the launchd agent's context): publishes every draft marked
+  publish: true, the same as `bb publish-queued`. Either way, unless
+  --no-git, mirrors the vault into the publish repo and pushes once; the
+  live site picks it up on its next timed pull, or immediately if you
+  restart the machine."
   [& args]
   (let [no-git? (boolean (some #{"--no-git"} args))
         fname (str/join " " (remove #(str/starts-with? % "--") args))]
-    (if (str/blank? fname)
-      (publish-queue! no-git?)
-      (let [cfg (config/load-config :dev)
-            root (:content-path cfg)
-            src (find-draft root fname)]
-        (when-not src
-          (die "No such draft: " fname "\nUsage: bb publish [<draft name>] [--no-git]"))
-        ;; Lint against the full index; a problem elsewhere in the tree
-        ;; shouldn't block publishing this draft, just surface it.
-        (let [index (try (content/build-index cfg)
-                         (catch Exception e
-                           (warn "skipping lints — content tree has errors: " (ex-message e))
-                           nil))
-              base (try (publish-draft! cfg index src)
-                        (catch Exception e
-                          (die (ex-message e))))]
-          (if no-git?
-            (println "Skipped git (--no-git). Run `bb sync` when you're ready to push.")
-            (mirror-and-push! cfg (str "Publish " base))))))))
+    (cond
+      (not (str/blank? fname)) (publish-named! fname no-git?)
+      (charm/interactive?) (publish-interactive! no-git?)
+      :else (publish-queue! no-git?))))
 
 (defn publish-queued
   "bb publish-queued [--no-git] — same as bare `bb publish`: publishes
@@ -352,13 +415,6 @@
   blocking the rest of the queue."
   [& args]
   (publish-queue! (boolean (some #{"--no-git"} args))))
-
-(defn- draft-sort-key
-  "Sort key for `bb drafts`: queued drafts first (in the order `bb
-  publish` would publish them — authored date ascending, nil last), then
-  everything else, alphabetically by filename for a stable order."
-  [{:keys [publish date base]}]
-  [(not publish) (nil? date) date base])
 
 (defn- draft-line
   "One line of `bb drafts` output for a draft-status entry: the queue
@@ -521,32 +577,56 @@
       (die "LLM command failed (" cmd " -p): " (str/trim (str err))))
     out))
 
+(defn- suggest-tags-for!
+  "Have the configured LLM read one draft and print proposed tags as a
+  YAML block ready to paste into its properties."
+  [cfg src]
+  (let [base (str/replace (fs/file-name src) #"\.md$" "")
+        {:keys [body]} (content/parse-frontmatter (slurp (str src)) (str src))
+        prompt (str "Suggest 3-7 topic tags for this blog entry. Tags are short, "
+                    "lowercase, kebab-case (e.g. data-engineering, llms, clojure). "
+                    "Reply with only the tags, one per line — no other text.\n\n"
+                    "Title: " base "\n\n" body)
+        tags (->> (str/split-lines (ask-llm cfg prompt))
+                  (map #(-> % str/trim (str/replace #"^[-*#]\s*" "") (str/replace #"^`|`$" "")))
+                  (remove str/blank?)
+                  (map util/slugify)
+                  distinct
+                  (take 10))]
+    (when (empty? tags)
+      (die "The LLM returned no usable tags."))
+    (println (str "Suggested tags for \"" base "\":\n"))
+    (println "tags:")
+    (doseq [t tags] (println (str "  - " t)))))
+
+(defn- pick-untagged-draft
+  "Interactive picker for `bb suggest-tags` with no name: the drafts that
+  have no tags yet, alphabetical, rendered with their type. Returns the
+  chosen draft's file, or nil (nothing to tag, or the author cancelled)."
+  [root]
+  (let [candidates (->> (draft-status root)
+                        (remove :error)
+                        (filter (comp empty? :tags))
+                        (sort-by :base))]
+    (if (empty? candidates)
+      (do (println "No drafts are missing tags.") nil)
+      (some-> (charm/choose candidates
+                            :label "Draft to tag (no tags yet):"
+                            :render (fn [{:keys [base type]}]
+                                      (format "%-7s %s" (name type) base)))
+              :file))))
+
 (defn suggest-tags
-  "bb suggest-tags <draft name> — has the configured LLM read the draft
-  and propose tags, printed as a YAML block ready to paste into the
-  draft's properties."
+  "bb suggest-tags [draft name] — has the configured LLM read a draft and
+  propose tags, printed as a YAML block ready to paste into the draft's
+  properties. With no name, pick from the drafts that have no tags yet."
   [& args]
-  (let [fname (str/join " " args)]
-    (when (str/blank? fname)
-      (die "Usage: bb suggest-tags <draft name>"))
-    (let [cfg (config/load-config :dev)
-          src (find-draft (:content-path cfg) fname)]
-      (when-not src
-        (die "No such draft: " fname))
-      (let [base (str/replace (fs/file-name src) #"\.md$" "")
-            {:keys [body]} (content/parse-frontmatter (slurp (str src)) (str src))
-            prompt (str "Suggest 3-7 topic tags for this blog entry. Tags are short, "
-                        "lowercase, kebab-case (e.g. data-engineering, llms, clojure). "
-                        "Reply with only the tags, one per line — no other text.\n\n"
-                        "Title: " base "\n\n" body)
-            tags (->> (str/split-lines (ask-llm cfg prompt))
-                      (map #(-> % str/trim (str/replace #"^[-*#]\s*" "") (str/replace #"^`|`$" "")))
-                      (remove str/blank?)
-                      (map util/slugify)
-                      distinct
-                      (take 10))]
-        (when (empty? tags)
-          (die "The LLM returned no usable tags."))
-        (println (str "Suggested tags for \"" base "\":\n"))
-        (println "tags:")
-        (doseq [t tags] (println (str "  - " t)))))))
+  (let [cfg (config/load-config :dev)
+        root (:content-path cfg)
+        fname (str/join " " args)
+        src (if (str/blank? fname)
+              (pick-untagged-draft root)
+              (or (find-draft root fname)
+                  (die "No such draft: " fname)))]
+    (when src
+      (suggest-tags-for! cfg src))))
