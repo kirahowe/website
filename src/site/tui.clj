@@ -71,12 +71,35 @@
                      :other))
                  :esc)
       (= b 32) :space
+      (= b (int \+)) :add
       (#{(int \k) (int \K)} b) :up
       (#{(int \j) (int \J)} b) :down
       (#{(int \a) (int \A)} b) :all
       (#{(int \q) (int \Q)} b) :quit
       (#{(int \n) (int \N)} b) :none
       :else :other)))
+
+(defn- read-raw-line
+  "Read a line from the raw tty stream `in`, echoing as we type (cbreak
+  mode is no-echo) and honoring backspace. Returns the typed string, or nil
+  if cancelled with Esc/Ctrl-C. Byte-oriented — meant for short ASCII input
+  like a tag; non-ASCII may echo as mojibake but the caller normalizes it."
+  [in]
+  (loop [sb (StringBuilder.)]
+    (let [b (.read in)]
+      (cond
+        (or (neg? b) (= b 3) (= b 27)) nil
+        (or (= b 10) (= b 13)) (do (print "\n") (flush) (str sb))
+        (or (= b 127) (= b 8)) (do (when (pos? (.length sb))
+                                     (.deleteCharAt sb (dec (.length sb)))
+                                     (print "\b \b")
+                                     (flush))
+                                   (recur sb))
+        (>= b 32) (do (.append sb (char b))
+                      (print (char b))
+                      (flush)
+                      (recur sb))
+        :else (recur sb)))))
 
 ;; --- rendering ----------------------------------------------------------
 
@@ -193,7 +216,7 @@
 
 ;; --- multi-select -------------------------------------------------------
 
-(defn- multi-lines [label render options idx selected]
+(defn- multi-lines [label render add? options idx selected]
   (-> [label]
       (into (map-indexed
              (fn [i o]
@@ -203,33 +226,60 @@
                    (str reverse-video " ❯ " text " " reset)
                    (str "   " text))))
              options))
-      (conj "   ␣ toggle · ↵ confirm · a all · n none · esc cancel")))
+      (conj (str "   ␣ toggle · " (when add? "+ add · ") "↵ confirm · a all · n none · esc cancel"))))
 
-(defn- render-multi! [label render options idx selected first?]
-  (let [lines (multi-lines label render options idx selected)]
-    (when-not first?
-      (print (cursor-up (count lines))))
-    (doseq [ln lines]
-      (print (str clear-line ln "\n")))
-    (flush)))
+(defn- draw-block!
+  "Redraw a block of `lines` in place, moving up over the `prev` lines drawn
+  last time and clearing each. Clears any surplus when the block shrank (an
+  added-tag prompt that came to nothing), leaving the cursor just below the
+  block. Returns the new line count to pass back as `prev`."
+  [lines prev]
+  (when (pos? prev)
+    (print (cursor-up prev)))
+  (doseq [ln lines]
+    (print (str clear-line ln "\n")))
+  (let [extra (max 0 (- prev (count lines)))]
+    (dotimes [_ extra]
+      (print (str clear-line "\n")))
+    (when (pos? extra)
+      (print (cursor-up extra))))
+  (flush)
+  (count lines))
 
-(defn- choose-many-arrows [options label render preselected]
+(defn- choose-many-arrows [options label render add preselected]
   (with-open [in (io/input-stream "/dev/tty")]
     (with-cbreak
       (fn []
         (print hide-cursor)
         (flush)
-        (loop [idx 0 selected preselected first? true]
-          (render-multi! label render options idx selected first?)
-          (case (read-key in)
-            :up (recur (mod (dec idx) (count options)) selected false)
-            :down (recur (mod (inc idx) (count options)) selected false)
-            :space (recur idx (if (selected idx) (disj selected idx) (conj selected idx)) false)
-            :all (recur idx (set (range (count options))) false)
-            :none (recur idx #{} false)
-            :enter (mapv options (sort selected))
-            (:quit :esc :interrupt :eof) nil
-            (recur idx selected false)))))))
+        (loop [options options idx 0 selected preselected prev 0]
+          (let [n (draw-block! (multi-lines label render add options idx selected) prev)]
+            (case (read-key in)
+              :up (recur options (mod (dec idx) (max 1 (count options))) selected n)
+              :down (recur options (mod (inc idx) (max 1 (count options))) selected n)
+              :space (recur options idx
+                            (if (< idx (count options))
+                              (if (selected idx) (disj selected idx) (conj selected idx))
+                              selected)
+                            n)
+              :all (recur options idx (set (range (count options))) n)
+              :none (recur options idx #{} n)
+              :add (if-not add
+                     (recur options idx selected n)
+                     (do
+                       (print "  + add tag: ")
+                       (flush)
+                       (let [val (some-> (read-raw-line in) add)
+                             at (when val (first (keep-indexed #(when (= %2 val) %1) options)))]
+                         (cond
+                           (nil? val) (recur options idx selected (inc n))
+                           at (recur options at (conj selected at) (inc n))
+                           :else (let [options' (conj options val)
+                                       i (dec (count options'))]
+                                   (recur options' i (conj selected i) (inc n)))))))
+              :enter (mapv options (sort selected))
+              (:quit :esc :interrupt :eof) nil
+              (recur options idx selected n))))))))
 
 (defn- parse-choices
   "Parse a numbered multi-select reply into a set of 0-based indices in
@@ -262,13 +312,17 @@
     :label     heading printed above the list (default \"Select:\")
     :render    element → display string (default `str`)
     :preselect :all (default) or :none — the initial selection
-  Draws a checkbox menu on a real terminal (␣ toggles, a/n select all/none,
-  Enter confirms, q/Esc cancels) and falls back to numbered entry
-  otherwise. An empty `options` returns an empty vector without prompting."
-  [options & {:keys [label render preselect] :or {label "Select:" render str preselect :all}}]
+    :add       optional (String -> element-or-nil) fn; when given, `+`
+               prompts for a line, and the fn's non-nil result is appended
+               (or re-selected, if already present) and selected
+  Draws a checkbox menu on a real terminal (␣ toggles, + adds, a/n select
+  all/none, Enter confirms, q/Esc cancels) and falls back to numbered entry
+  otherwise. An empty `options` with no `:add` returns an empty vector
+  without prompting."
+  [options & {:keys [label render preselect add] :or {label "Select:" render str preselect :all}}]
   (let [options (vec options)
         preselected (if (= preselect :none) #{} (set (range (count options))))]
     (cond
-      (empty? options) []
-      (interactive?) (choose-many-arrows options label render preselected)
+      (and (empty? options) (not (and add (interactive?)))) []
+      (interactive?) (choose-many-arrows options label render add preselected)
       :else (choose-many-numbered options label render))))

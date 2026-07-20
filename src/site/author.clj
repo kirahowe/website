@@ -661,8 +661,9 @@
        "that capture what it is about.\n\n"
        "Rules:\n"
        "- Output ONLY the tags, one per line.\n"
-       "- Each tag is lowercase kebab-case, e.g. data-engineering, llms, clojure.\n"
-       "- Favour broad, reusable topics over hyper-specific phrases.\n"
+       "- Each tag is lowercase kebab-case, e.g. software-engineering, llms, clojure.\n"
+       "- You may invent new, specific tags whenever they fit — you are not limited to "
+       "any existing vocabulary, and a precise new tag beats a vague familiar one.\n"
        "- No preamble, no numbering, no bullets, no commentary — nothing but the tags.\n\n"
        "Title: " title "\n\n"
        body))
@@ -732,12 +733,13 @@
         had (map name (:tags meta))
         reply (tui/spin (str "Asking " (or (:llm-command cfg) "claude") " for tags…")
                         #(ask-llm cfg (tag-prompt base body)))
-        suggested (remove (set had) (parse-tags reply))]
+        suggested (vec (remove (set had) (parse-tags reply)))]
     (when (empty? suggested)
-      (die "The LLM returned no usable tags."))
+      (warn "The LLM returned no usable tags — add your own with +, or cancel."))
     (let [chosen (tui/choose-many suggested
                                   :label (str "Tags for \"" base "\":")
-                                  :render identity)]
+                                  :render identity
+                                  :add (fn [s] (not-empty (util/slugify s))))]
       (cond
         (nil? chosen) (println "Cancelled — no tags added.")
         (empty? chosen) (println "Nothing selected — no tags added.")
