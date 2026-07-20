@@ -24,4 +24,4 @@ COPY example-content ./example-content
 
 EXPOSE 8080
 
-ENTRYPOINT ["bb", "run"]
+ENTRYPOINT ["bb", "prod"]

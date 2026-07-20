@@ -202,7 +202,7 @@ Three committed files under `config/`, no environment variables, no secrets:
 - **`config/dev.edn`** — merged in by `bb dev` and the authoring tasks:
   your vault path, `:content-git-url nil` (no git syncing locally),
   personal `:llm-command` override, `:port 8100`.
-- **`config/prod.edn`** — merged in by `bb run`: the clone target, the
+- **`config/prod.edn`** — merged in by `bb prod`: the clone target, the
   content repo URL, the sync interval, `:port 8080` (what Fly routes to).
 
 The port is environment-specific, so dev and prod never collide on one.
@@ -256,4 +256,4 @@ fly deploy
   clone at boot serves an empty site rather than crash-looping.
 
 Running anywhere else is the same idea without the Fly wrapper: the same
-config files, and just `bb run`.
+config files, and just `bb prod`.

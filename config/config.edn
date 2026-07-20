@@ -1,6 +1,6 @@
 {;; Base configuration — applies in every environment. Environment
  ;; specifics (where the content lives, git syncing) are in dev.edn and
- ;; prod.edn; `bb dev` and `bb run` pick the right one.
+ ;; prod.edn; `bb dev` and `bb prod` pick the right one.
 
  ;; Displayed in the site header and the feed
  :site-title "Kira Howe"

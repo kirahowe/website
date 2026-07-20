@@ -3,7 +3,7 @@
   config/config.edn is the base that always applies (site identity, entry
   types). On top of it, exactly one environment file is merged:
   config/dev.edn (`bb dev` — your vault, no git syncing) or config/prod.edn
-  (`bb run` — the cloned content repo). The port is environment-specific
+  (`bb prod` — the cloned content repo). The port is environment-specific
   (dev 8100, prod 8080). Dev-only behavior follows the environment, so dev
   and prod can't drift apart on a forgotten flag."
   (:require [clojure.edn :as edn]

@@ -9,9 +9,9 @@
        :requires ([site.core :as core])
        :task (core/start! {:env :dev :block? true})}
 
-  run {:doc "Start the production server (config/config.edn + config/prod.edn)"
-       :requires ([site.core :as core])
-       :task (core/start! {:env :prod :block? true})}
+  prod {:doc "Start the production server (config/config.edn + config/prod.edn)"
+        :requires ([site.core :as core])
+        :task (core/start! {:env :prod :block? true})}
 
   reindex {:doc "Validate + index all content, failing loudly on broken files"
            :requires ([site.author :as author])

@@ -37,7 +37,7 @@
     :env    — :dev (config/config.edn + config/dev.edn; reindex every
               request, drafts visible) or :prod (config/config.edn +
               config/prod.edn). Defaults to :prod.
-    :block? — park the calling thread (for `bb dev` / `bb run`)"
+    :block? — park the calling thread (for `bb dev` / `bb prod`)"
   ([] (start! {}))
   ([opts]
    (let [cfg (config/load-config (or (:env opts) :prod))
