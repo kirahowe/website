@@ -652,19 +652,34 @@
       (die "LLM command failed (" cmd " -p): " (str/trim (str err))))
     out))
 
+(defn- existing-tags
+  "Tags already in use across the site, most-used first, as strings — the
+  vocabulary we hand the tagging model so it can reuse a fitting tag.
+  Best-effort: yields nothing if the content index won't build, so a broken
+  file elsewhere never blocks a suggestion."
+  [cfg]
+  (try
+    (map (comp name first) (:tag-counts (content/build-index cfg)))
+    (catch Exception _ nil)))
+
 (defn- tag-prompt
   "Prompt for the tagging model. Strict about output shape — the parser
   still guards against stray prose, but a clear contract keeps the model
-  from wrapping the tags in commentary in the first place."
-  [title body]
+  from wrapping the tags in commentary in the first place. `existing` is
+  the site's current tag vocabulary (may be empty), shown so the model can
+  reuse a fitting tag instead of coining a near-duplicate."
+  [title body existing]
   (str "You are tagging an entry on a personal blog. Choose 2-8 topic tags "
        "that capture what it is about.\n\n"
        "Rules:\n"
        "- Output ONLY the tags, one per line.\n"
        "- Each tag is lowercase kebab-case, e.g. software-engineering, llms, clojure.\n"
-       "- Prefer specific, descriptive tags; invent new ones freely where they "
-       "fit, rather than forcing a broad, generic label.\n"
+       "- You may invent new, specific tags whenever they fit. You are not necessarily "
+       "limited to the existing vocabulary, but you may also use existing tags where appropriate.\n"
        "- No preamble, no numbering, no bullets, no commentary — nothing but the tags.\n\n"
+       (when (seq existing)
+         (str "The existing vocabulary — tags already used on the site:\n"
+              (str/join ", " existing) "\n\n"))
        "Title: " title "\n\n"
        body))
 
@@ -732,7 +747,7 @@
         {:keys [meta body]} (content/parse-frontmatter raw (str src))
         had (map name (:tags meta))
         reply (tui/spin (str "Asking " (or (:llm-command cfg) "claude") " for tags…")
-                        #(ask-llm cfg (tag-prompt base body)))
+                        #(ask-llm cfg (tag-prompt base body (existing-tags cfg))))
         suggested (vec (remove (set had) (parse-tags reply)))]
     (when (empty? suggested)
       (warn "The LLM returned no usable tags — add your own with +, or cancel."))
