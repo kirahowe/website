@@ -657,13 +657,13 @@
   still guards against stray prose, but a clear contract keeps the model
   from wrapping the tags in commentary in the first place."
   [title body]
-  (str "You are tagging an entry on a personal blog. Choose 3-7 topic tags "
+  (str "You are tagging an entry on a personal blog. Choose 2-8 topic tags "
        "that capture what it is about.\n\n"
        "Rules:\n"
        "- Output ONLY the tags, one per line.\n"
        "- Each tag is lowercase kebab-case, e.g. software-engineering, llms, clojure.\n"
-       "- You may invent new, specific tags whenever they fit — you are not limited to "
-       "any existing vocabulary, and a precise new tag beats a vague familiar one.\n"
+       "- Prefer specific, descriptive tags; invent new ones freely where they "
+       "fit, rather than forcing a broad, generic label.\n"
        "- No preamble, no numbering, no bullets, no commentary — nothing but the tags.\n\n"
        "Title: " title "\n\n"
        body))
