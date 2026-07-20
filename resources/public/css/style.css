@@ -359,6 +359,18 @@ a:hover { text-decoration: underline; }
 }
 .excerpt-more { font: 400 var(--fs-sm) var(--mono); white-space: nowrap; }
 
+/* link / release / tool feed cards carry their full body — the comment
+   prose (muted, like an excerpt) plus any pull-quote, which reads as a
+   conventional left-rule blockquote (styled below) */
+.entry-body {
+  font: 400 var(--fs) var(--sans);
+  line-height: var(--lh);
+  color: var(--fg);
+}
+.entry-body > * { margin: 0 0 var(--sp3); }
+.entry-body > :last-child { margin-bottom: 0; }
+.entry-body p { opacity: .82; }
+
 .entry-foot {
   display: flex;
   flex-wrap: wrap;
@@ -416,7 +428,17 @@ a:hover { text-decoration: underline; }
 .entry blockquote li::marker { color: var(--muted); }
 .entry blockquote > :last-child { margin-bottom: 0; }
 
-/* Onward link from the home feed into the month archives */
+/* A link/release/tool pull-quote is a conventional blockquote — a left
+   rule and a modest indent, not the hanging Caveat mark that signs a quote
+   entry. It also restores symmetric vertical space: the shared rule above
+   zeroes the margin for quote rows, which otherwise left the quote flush
+   against the comment that follows it. */
+.entry-body blockquote {
+  margin: var(--sp4) 0;
+  padding-left: var(--sp4);
+  border-left: 2px solid var(--quote);
+}
+.entry-body blockquote::before { content: none; }
 .feed-more {
   display: inline-block;
   margin: var(--sp5) var(--gutter) 0;

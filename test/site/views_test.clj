@@ -38,6 +38,9 @@
       (is (not (str/includes? body "where code sleeps")))
       ;; ...but quotes are short-form: the whole body publishes to the feed
       (is (str/includes? body "prerequisite for reliability"))
+      ;; ...as do links (and releases/tools): a pull-quote in a link body
+      ;; survives into the feed as a blockquote, not dropped by the excerpt
+      (is (str/includes? body "a lousy data structure"))
       (is (str/includes? body "min read"))                     ; reading-time hint
       (is (str/includes? body "Untitled entries are fine"))    ; untitled post excerpt shows
       ;; day headings link to the day archives

@@ -105,22 +105,44 @@
      [:a {:href (outbound entry)} (highlight (:title entry) terms)]
      (via-link entry)]))
 
+(def ^:private full-body-types
+  "Short-form outbound entries whose whole body — a comment plus, often, a
+  pulled blockquote — belongs in the feed. A one-line excerpt would keep
+  only the first paragraph and silently drop any pull-quote."
+  #{:link :release :tool})
+
+(defn- entry-body
+  "A short-form entry's full rendered body for a feed row: its block
+  children (the comment paragraph and any blockquote) lifted out of the
+  render wrapper, so quotes survive where `excerpt` would drop them."
+  [entry]
+  (into [:div.entry-body] (rest (markdown/render (:body entry) (:wikilinks entry)))))
+
 (defn entry-row
-  "One entry in the feed: a quote renders as a blockquote — its full body,
-  quotes being short-form — with a linked source; every other type renders
-  as title + excerpt, with a reading-time link tacked onto the end of a
-  post excerpt. Both close with the type/tags foot. With {:terms [...]}
-  (an active search), title and prose matches are marked and a quote
-  drops to an excerpt that follows the hit into the body."
+  "One entry in the feed. Short-form types carry their whole body: a quote
+  as a blockquote with a linked source; a link/release/tool as its comment
+  plus any pull-quote. A post renders as title + excerpt with a
+  reading-time link. Every row closes with the type/tags foot. With
+  {:terms [...]} (an active search), title and prose matches are marked and
+  the full-body types drop to an excerpt that follows the hit into the
+  body — keeping match highlighting and a compact result."
   ([entry] (entry-row entry nil))
   ([entry {:keys [terms]}]
    [:article.entry
-    (if (= :quote (:type entry))
+    (cond
+      (= :quote (:type entry))
       (list
        (if (seq terms)
          [:blockquote (highlight (row-excerpt entry terms) terms) [:span.quote-close "”"]]
          (quote-blockquote entry))
        (quote-source entry))
+
+      (and (full-body-types (:type entry)) (not (seq terms)))
+      (list
+       (entry-title entry terms)
+       (entry-body entry))
+
+      :else
       (list
        (entry-title entry terms)
        [:p.entry-excerpt (highlight (row-excerpt entry terms) terms)
