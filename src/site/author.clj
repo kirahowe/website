@@ -868,20 +868,39 @@
        "Title: " title "\n\n"
        body))
 
+(defn- slug-collision-fn
+  "A lookup: slug → the published entry it would collide with, or nil. The
+  key is the draft's URL (its authored `date`, or today, + slug) — exactly
+  what publish-draft! guards against, so two entries sharing a slug on
+  different dates don't count. Best-effort: if the content index won't build
+  it treats nothing as taken, leaving the publish step as the backstop."
+  [cfg date]
+  (let [by-path (try (:by-path (content/build-index cfg)) (catch Exception _ nil))
+        y (.getYear date) m (.getMonthValue date) d (.getDayOfMonth date)]
+    (fn [slug]
+      (when by-path
+        (get by-path (util/entry-url {:date {:year y :month m :day d} :slug slug}))))))
+
 (defn- suggest-slug-for!
   "Ask the configured LLM for slug candidates for one draft, let the author
   pick one (or type their own with +), then write it to the draft's `slug`
-  property. Falls back to printing the line to paste by hand if the file has
-  no YAML frontmatter to edit."
+  property. Never offers — and refuses a typed — slug that would collide
+  with an existing entry's URL. Falls back to printing the line to paste by
+  hand if the file has no YAML frontmatter to edit."
   [cfg src]
   (let [base (str/replace (fs/file-name src) #"\.md$" "")
         raw (slurp (str src))
         {:keys [meta body]} (content/parse-frontmatter raw (str src))
         current (or (:slug meta) (util/slugify base))
+        date (or (try (:date (content/workflow-properties raw (str src)))
+                      (catch Exception _ nil))
+                 (LocalDate/now))
+        collides (slug-collision-fn cfg date)
         reply (tui/spin (str "Asking " (or (:llm-command cfg) "claude") " for slugs…")
                         #(ask-llm cfg (slug-prompt base body)))
-        ;; Slugs clean up exactly like tags — kebab-case, one per line.
-        suggested (vec (remove #{current} (parse-tags reply)))
+        ;; Slugs clean up exactly like tags — kebab-case, one per line —
+        ;; then drop the current slug and any that would collide.
+        suggested (vec (remove #(or (= % current) (collides %)) (parse-tags reply)))
         chosen (tui/choose suggested
                            :label (str "Slug for \"" base "\" (now: " current "):")
                            :render identity
@@ -889,6 +908,8 @@
     (cond
       (nil? chosen) (println "Cancelled — slug unchanged.")
       (= chosen current) (println "Slug unchanged.")
+      (collides chosen) (die "Slug \"" chosen "\" would collide with "
+                             (:path (collides chosen)) " — nothing written.")
       :else
       (if-let [updated (set-slug raw chosen)]
         (do (spit (str src) updated)

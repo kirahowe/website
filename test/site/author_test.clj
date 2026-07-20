@@ -204,3 +204,20 @@
     (testing "a file with no YAML frontmatter to edit returns nil"
       (is (nil? (set-slug ";;;\n{:type :post}\n;;;\n\nBody\n" "x")))
       (is (nil? (set-slug "just a bare body\n" "x"))))))
+
+(deftest slug-collision-fn
+  (let [slug-collision-fn #'author/slug-collision-fn
+        jul19 (LocalDate/of 2026 7 19)]
+    (with-redefs [content/build-index
+                  (fn [_] {:by-path {"/2026/jul/19/taken" {:path "/2026/jul/19/taken"}}})]
+      (let [collides (slug-collision-fn {} jul19)]
+        (testing "a slug whose date+slug URL is taken returns the clashing entry"
+          (is (= "/2026/jul/19/taken" (:path (collides "taken")))))
+        (testing "a free slug is nil"
+          (is (nil? (collides "free"))))
+        (testing "the same slug on a different date does not collide (URL differs)"
+          (is (nil? ((slug-collision-fn {} (LocalDate/of 2025 1 1)) "taken"))))))
+
+    (testing "best-effort: a content index that won't build treats nothing as taken"
+      (with-redefs [content/build-index (fn [_] (throw (ex-info "boom" {})))]
+        (is (nil? ((slug-collision-fn {} jul19) "anything")))))))
