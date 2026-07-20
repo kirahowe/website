@@ -48,7 +48,7 @@
      (when (seq rel)
        [:section.section
         [:h2 "Related"]
-        [:div.related (map c/related-item rel)]])
+        (c/entry-list rel)])
      [:section.section
       [:p.bio (or (:bio config) default-bio)]
       [:a.more {:href "/about"} (str "More about " (first-name config) " →")]]]))

@@ -187,13 +187,6 @@
 (defn side-link [{:keys [path title type]}]
   [:a.side-link {:href path} (when type (dot type)) [:span.title title]])
 
-(defn recent-links
-  "The N most recent titled entries, each with its type dot."
-  [entries n]
-  (side-section "Recent"
-                (for [e (take n (filter :title entries))]
-                  (side-link {:path (:path e) :title (entry-label e) :type (:type e)}))))
-
 (defn tag-cloud
   "Tag links with counts — the sidebar widget and the tags index share it."
   [tag-counts]
@@ -205,17 +198,30 @@
   (when (seq tag-counts)
     (side-section "Top tags" (tag-cloud (take n tag-counts)))))
 
-;; --- ledger rows (year archive, related list) -----------------------------
+;; --- ledger rows (year archive, related list, sidebar recents) ------------
 
 (defn index-row
   "The one dense-list row: a right-aligned mono date, the type dot, then
-  the title. The year archive and the related list both render as columns
+  the title. The year archive and the entry-list both render as columns
   of these."
   [{:keys [href date type title]}]
   [:a.index-row {:href href}
    [:span.meta date]
    (dot type)
    [:span.title title]])
+
+(defn entry-list
+  "The dense ledger shared by the related grid and the sidebar recents: each
+  entry as a `mono date | dot | title` row, the date carrying its year. One
+  component — the CSS sizes it to its container (the wide post-footer
+  truncates titles, the narrow sidebar wraps them)."
+  [entries]
+  (into [:div.entry-list]
+        (for [e entries]
+          (index-row {:href (:path e)
+                      :date (util/full-date (:date e))
+                      :type (:type e)
+                      :title (entry-label e)}))))
 
 (defn related
   "Up to n other entries, most-shared-tags first (recency breaks ties)."
@@ -226,8 +232,9 @@
          (sort-by #(- (count (set/intersection tags (set (:tags %))))))
          (take n))))
 
-(defn related-item [e]
-  (index-row {:href (:path e)
-              :date (util/short-date (:date e))
-              :type (:type e)
-              :title (entry-label e)}))
+(defn recent-links
+  "The N most recent titled entries as an entry-list — the same ledger the
+  related list uses, sitting in the sidebar."
+  [entries n]
+  (side-section "Recent"
+                (entry-list (take n (filter :title entries)))))

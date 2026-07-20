@@ -65,11 +65,11 @@
 
   /* Type scale — one base reading size + a few steps. Every font-size
      references one of these; no bespoke px sizes live in the rules below. */
-  --fs-sm: 12px;    /* the mono metadata layer: nav, feet, meta, tags, code */
-  --fs: 14px;       /* base reading text: body, articles, excerpts, quotes */
-  --fs-md: 16px;    /* entry titles, article h3, lead paragraph */
-  --fs-lg: 20px;    /* article h2, month name */
-  --fs-xl: 28px;    /* display: page-header h1, article h1 */
+  --fs-sm: 13px;    /* the mono metadata layer: nav, feet, meta, tags, code */
+  --fs: 16px;       /* base reading text: body, articles, excerpts, quotes */
+  --fs-md: 18px;    /* entry titles, article h3, lead paragraph */
+  --fs-lg: 22px;    /* article h2, month name */
+  --fs-xl: 32px;    /* display: page-header h1, article h1 */
 
   /* Line heights — two predictable steps. Reading prose gets the roomy one;
      headings, titles and dense rows get the tight one. Single-line chrome
@@ -121,7 +121,7 @@
 *, *::before, *::after { box-sizing: border-box; }
 
 body {
-  max-width: 800px;
+  max-width: 860px;
   margin: 0 auto;
   font-family: var(--sans);
   font-size: var(--fs);
@@ -198,6 +198,27 @@ a:hover { text-decoration: underline; }
   line-height: var(--lh-tight);
 }
 
+/* The related list and the sidebar recents are both entry-lists: the ledger
+   row, but the date now carries its year, so the date column widens to fit
+   "Dec 30, 2026". */
+.entry-list .index-row { grid-template-columns: 6.5em auto 1fr; }
+
+/* In the sidebar the row flows as one line of inline content — date, dot,
+   title — so a long title wraps the full width, its later lines running back
+   under the date rather than indenting under a title column. */
+.side .entry-list .index-row {
+  display: block;
+  padding: var(--sp2) 0;
+  line-height: var(--lh-tight);
+}
+.side .entry-list .index-row .meta { margin-right: var(--sp2); }
+.side .entry-list .index-row .dot { margin-right: var(--sp2); vertical-align: middle; }
+.side .entry-list .index-row .title {
+  display: inline;
+  overflow: visible;
+  white-space: normal;
+}
+
 /* --------------------------------------------------------------------------
    Header — wordmark + colour-coded nav (the nav doubles as the type legend)
    -------------------------------------------------------------------------- */
@@ -243,7 +264,7 @@ a:hover { text-decoration: underline; }
 
 .cols {
   display: grid;
-  grid-template-columns: 1fr 240px;
+  grid-template-columns: 1fr 300px;
 }
 .main { border-right: 1px solid var(--hair); }
 .sidebar { min-width: 0; }
@@ -369,13 +390,13 @@ a:hover { text-decoration: underline; }
   position: absolute;
   left: calc(var(--sp1) * -1);
   top: .5em;
-  font: 700 44px/0 var(--script);
+  font: 700 50px/0 var(--script);
   font-style: normal;
   color: var(--quote);
 }
 .quote-close {
   margin-left: var(--sp1);
-  font: 700 44px/0 var(--script);
+  font: 700 50px/0 var(--script);
   font-style: normal;
   vertical-align: -.5em;
   color: var(--quote);

@@ -63,11 +63,12 @@
   [{:keys [year month day]}]
   (str (month-name month) " " day ", " year))
 
-(defn short-date
-  "{:year 2026 :month 7 :day 4} → \"Jul 4\" — the compact form used in
-  related-entry rows."
-  [{:keys [month day]}]
-  (str (str/capitalize (month-slug month)) " " day))
+(defn full-date
+  "{:year 2026 :month 7 :day 4} → \"Jul 4, 2026\" — the compact-but-complete
+  form used in dense ledger rows (the related list, the sidebar recents),
+  where the list spans years so the year has to be there."
+  [{:keys [year month day]}]
+  (str (str/capitalize (month-slug month)) " " day ", " year))
 
 (defn ordinal
   "1 → \"1st\", 2 → \"2nd\", 11 → \"11th\", 23 → \"23rd\"."
