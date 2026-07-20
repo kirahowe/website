@@ -649,27 +649,105 @@
       (die "LLM command failed (" cmd " -p): " (str/trim (str err))))
     out))
 
+(defn- tag-prompt
+  "Prompt for the tagging model. Strict about output shape — the parser
+  still guards against stray prose, but a clear contract keeps the model
+  from wrapping the tags in commentary in the first place."
+  [title body]
+  (str "You are tagging an entry on a personal blog. Choose 3-7 topic tags "
+       "that capture what it is about.\n\n"
+       "Rules:\n"
+       "- Output ONLY the tags, one per line.\n"
+       "- Each tag is lowercase kebab-case, e.g. data-engineering, llms, clojure.\n"
+       "- Favour broad, reusable topics over hyper-specific phrases.\n"
+       "- No preamble, no numbering, no bullets, no commentary — nothing but the tags.\n\n"
+       "Title: " title "\n\n"
+       body))
+
+(defn- tag-line?
+  "Whether a cleaned line plausibly *is* a tag rather than the model's
+  prose: a short run (≤4 words) of letters, digits, spaces and hyphens,
+  with no sentence punctuation. Drops leakage like \"Let me just give
+  tags:\" or \"data-engineering? No\" before it can be slugified to junk."
+  [s]
+  (boolean (re-matches #"(?i)[a-z0-9]+(?:[ -][a-z0-9]+){0,3}" s)))
+
+(defn- parse-tags
+  "Turn the model's reply into a clean, de-duplicated tag list: strip list
+  markers and stray quoting, keep only lines that look like tags, slugify."
+  [raw]
+  (->> (str/split-lines raw)
+       (map #(-> %
+                 str/trim
+                 (str/replace #"^(?:[-*#>]|\d+[.)])\s+" "")
+                 (str/replace #"[`\"']" "")
+                 str/trim))
+       (filter tag-line?)
+       (map util/slugify)
+       (remove str/blank?)
+       distinct
+       (take 10)))
+
+(defn- render-tags-yaml
+  "Tags as an Obsidian-style YAML block list (what the Properties panel
+  writes), including the trailing newline."
+  [tags]
+  (apply str "tags:\n" (map #(str "  - " % "\n") tags)))
+
+(defn- set-tags
+  "Return `raw` with its YAML frontmatter's `tags` property set to `tags`,
+  replacing any existing tags block (inline `tags: []` or a block list) or
+  appending one if absent. Only the frontmatter header is touched; the body
+  passes through unchanged. Returns nil when `raw` has no YAML frontmatter
+  to edit, so the caller can fall back to printing for a manual paste."
+  [raw tags]
+  (when-let [open (re-find #"^---[ \t]*\r?\n" raw)]
+    (let [after-open (subs raw (count open))
+          m (re-matcher #"(?m)^---[ \t]*\r?\n" after-open)]
+      (when (.find m)
+        (let [props (subs after-open 0 (.start m))
+              closing (subs after-open (.start m) (.end m))
+              body (subs after-open (.end m))
+              block (render-tags-yaml tags)
+              tags-re #"(?m)^[ \t]*tags[ \t]*:[^\n]*(?:\r?\n[ \t]+-[^\n]*)*\r?\n?"
+              props' (if (re-find tags-re props)
+                       (str/replace-first props tags-re block)
+                       (str props
+                            (when-not (or (str/blank? props) (str/ends-with? props "\n")) "\n")
+                            block))]
+          (str open props' closing body))))))
+
 (defn- suggest-tags-for!
-  "Have the configured LLM read one draft and print proposed tags as a
-  YAML block ready to paste into its properties."
+  "Ask the configured LLM for tags for one entry, let the author pick which
+  to keep, then write them into the entry's frontmatter (merging with any it
+  already has). Falls back to printing a YAML block to paste by hand if the
+  file has no YAML frontmatter to edit."
   [cfg src]
   (let [base (str/replace (fs/file-name src) #"\.md$" "")
-        {:keys [body]} (content/parse-frontmatter (slurp (str src)) (str src))
-        prompt (str "Suggest 3-7 topic tags for this blog entry. Tags are short, "
-                    "lowercase, kebab-case (e.g. data-engineering, llms, clojure). "
-                    "Reply with only the tags, one per line — no other text.\n\n"
-                    "Title: " base "\n\n" body)
-        tags (->> (str/split-lines (ask-llm cfg prompt))
-                  (map #(-> % str/trim (str/replace #"^[-*#]\s*" "") (str/replace #"^`|`$" "")))
-                  (remove str/blank?)
-                  (map util/slugify)
-                  distinct
-                  (take 10))]
-    (when (empty? tags)
+        raw (slurp (str src))
+        {:keys [meta body]} (content/parse-frontmatter raw (str src))
+        had (map name (:tags meta))
+        reply (tui/spin (str "Asking " (or (:llm-command cfg) "claude") " for tags…")
+                        #(ask-llm cfg (tag-prompt base body)))
+        suggested (remove (set had) (parse-tags reply))]
+    (when (empty? suggested)
       (die "The LLM returned no usable tags."))
-    (println (str "Suggested tags for \"" base "\":\n"))
-    (println "tags:")
-    (doseq [t tags] (println (str "  - " t)))))
+    (let [chosen (tui/choose-many suggested
+                                  :label (str "Tags for \"" base "\":")
+                                  :render identity)]
+      (cond
+        (nil? chosen) (println "Cancelled — no tags added.")
+        (empty? chosen) (println "Nothing selected — no tags added.")
+        :else
+        (let [merged (distinct (concat had chosen))]
+          (if-let [updated (set-tags raw merged)]
+            (do
+              (spit (str src) updated)
+              (println (str "Added to " base ":"))
+              (doseq [t chosen] (println (str "  + " t))))
+            (do
+              (warn "No YAML frontmatter to edit — paste this into " base ":")
+              (print (render-tags-yaml merged)))))))))
 
 (defn- untagged-published
   "Published entries with no tags yet, as picker candidates: an absolute
@@ -713,10 +791,10 @@
               :file))))
 
 (defn suggest-tags
-  "bb suggest-tags [draft name] — has the configured LLM read a draft and
-  propose tags, printed as a YAML block ready to paste into the draft's
-  properties. With no name, pick from any draft or published entry that
-  has no tags yet."
+  "bb suggest-tags [draft name] — has the configured LLM read a draft,
+  propose tags, and (after you pick which to keep) write them into the
+  draft's frontmatter. With no name, pick from any draft or published
+  entry that has no tags yet."
   [& args]
   (let [cfg (config/load-config :dev)
         root (:content-path cfg)

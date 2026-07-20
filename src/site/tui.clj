@@ -1,9 +1,10 @@
 (ns site.tui
   "Small interactive terminal (TUI) helpers for the babashka authoring
-  tasks — a picker (`choose`) and a line prompt (`input`). Pure babashka:
-  no gum, no fzf, no dependencies, matching the project's zero-dep ethos.
-  On a real terminal `choose` draws an arrow-key menu (↑/↓ or j/k, Enter
-  to pick, q/Esc to cancel); with no tty (a pipe, CI, a redirect) it falls
+  tasks — a single-pick menu (`choose`), a multi-select (`choose-many`), a
+  line prompt (`input`), and a `spin`ner for slow work. Pure babashka: no
+  gum, no fzf, no dependencies, matching the project's zero-dep ethos. On a
+  real terminal the pickers draw an arrow-key menu (↑/↓ or j/k, Enter to
+  pick, q/Esc to cancel); with no tty (a pipe, CI, a redirect) they fall
   back to numbered entry, so the same call works everywhere."
   (:require [babashka.process :as p]
             [clojure.java.io :as io]
@@ -69,9 +70,12 @@
                      (case (long b2) 65 :up, 66 :down, :other)
                      :other))
                  :esc)
+      (= b 32) :space
       (#{(int \k) (int \K)} b) :up
       (#{(int \j) (int \J)} b) :down
+      (#{(int \a) (int \A)} b) :all
       (#{(int \q) (int \Q)} b) :quit
+      (#{(int \n) (int \N)} b) :none
       :else :other)))
 
 ;; --- rendering ----------------------------------------------------------
@@ -154,3 +158,117 @@
   (print prompt)
   (flush)
   (some-> (read-line) str/trim not-empty))
+
+;; --- spinner ------------------------------------------------------------
+
+(def ^:private spinner-frames ["⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏"])
+
+(defn spin
+  "Run thunk `f` while animating a spinner labelled `msg` on the terminal,
+  returning f's value. With no terminal (a pipe, CI) it prints `msg` once
+  and just runs f — no animation. The spinner line is cleared before
+  returning so the caller's own output starts on a clean line.
+
+  Deliberately does not hide the cursor: callers reach for `spin` around
+  work that may `System/exit` on failure, which skips `finally`, and a
+  stranded hidden cursor is worse than a visible one on the spinner line."
+  [msg f]
+  (if-not (interactive?)
+    (do (println msg) (f))
+    (let [running (atom true)
+          animation (future
+                      (loop [i 0]
+                        (when @running
+                          (print (str "\r" (nth spinner-frames (mod i (count spinner-frames))) " " msg))
+                          (flush)
+                          (Thread/sleep 90)
+                          (recur (inc i)))))]
+      (try
+        (f)
+        (finally
+          (reset! running false)
+          @animation
+          (print (str "\r" clear-line))
+          (flush))))))
+
+;; --- multi-select -------------------------------------------------------
+
+(defn- multi-lines [label render options idx selected]
+  (-> [label]
+      (into (map-indexed
+             (fn [i o]
+               (let [box (if (selected i) "◉" "◯")
+                     text (str box " " (render o))]
+                 (if (= i idx)
+                   (str reverse-video " ❯ " text " " reset)
+                   (str "   " text))))
+             options))
+      (conj "   ␣ toggle · ↵ confirm · a all · n none · esc cancel")))
+
+(defn- render-multi! [label render options idx selected first?]
+  (let [lines (multi-lines label render options idx selected)]
+    (when-not first?
+      (print (cursor-up (count lines))))
+    (doseq [ln lines]
+      (print (str clear-line ln "\n")))
+    (flush)))
+
+(defn- choose-many-arrows [options label render preselected]
+  (with-open [in (io/input-stream "/dev/tty")]
+    (with-cbreak
+      (fn []
+        (print hide-cursor)
+        (flush)
+        (loop [idx 0 selected preselected first? true]
+          (render-multi! label render options idx selected first?)
+          (case (read-key in)
+            :up (recur (mod (dec idx) (count options)) selected false)
+            :down (recur (mod (inc idx) (count options)) selected false)
+            :space (recur idx (if (selected idx) (disj selected idx) (conj selected idx)) false)
+            :all (recur idx (set (range (count options))) false)
+            :none (recur idx #{} false)
+            :enter (mapv options (sort selected))
+            (:quit :esc :interrupt :eof) nil
+            (recur idx selected false)))))))
+
+(defn- parse-choices
+  "Parse a numbered multi-select reply into a set of 0-based indices in
+  [0, n). Accepts space- or comma-separated numbers; a blank line selects
+  everything (matching the arrow menu's all-preselected default); a lone
+  `-` or `none` selects nothing."
+  [n s]
+  (let [t (some-> s str/trim)]
+    (cond
+      (str/blank? t) (set (range n))
+      (#{"-" "none"} t) #{}
+      :else (into #{}
+                  (comp (map parse-long)
+                        (remove nil?)
+                        (map dec)
+                        (filter #(and (nat-int? %) (< % n))))
+                  (str/split t #"[,\s]+")))))
+
+(defn- choose-many-numbered [options label render]
+  (println label)
+  (doseq [[i o] (map-indexed vector options)]
+    (println (format "  %2d. %s" (inc i) (render o))))
+  (print "Numbers (space-separated; Enter = all, - = none): ")
+  (flush)
+  (mapv options (sort (parse-choices (count options) (read-line)))))
+
+(defn choose-many
+  "Multi-select `options`, returning a vector of the chosen elements (which
+  may be empty), or nil if the author cancels. Options map:
+    :label     heading printed above the list (default \"Select:\")
+    :render    element → display string (default `str`)
+    :preselect :all (default) or :none — the initial selection
+  Draws a checkbox menu on a real terminal (␣ toggles, a/n select all/none,
+  Enter confirms, q/Esc cancels) and falls back to numbered entry
+  otherwise. An empty `options` returns an empty vector without prompting."
+  [options & {:keys [label render preselect] :or {label "Select:" render str preselect :all}}]
+  (let [options (vec options)
+        preselected (if (= preselect :none) #{} (set (range (count options))))]
+    (cond
+      (empty? options) []
+      (interactive?) (choose-many-arrows options label render preselected)
+      :else (choose-many-numbered options label render))))

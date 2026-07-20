@@ -1,5 +1,6 @@
 (ns site.author-test
   (:require [babashka.fs :as fs]
+            [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
             [site.author :as author]
             [site.content :as content])
@@ -148,3 +149,40 @@
            (#'author/draft-line {:base "Dupe" :date (LocalDate/of 2026 7 4)
                                   :publish true :type :post
                                   :collides-with "/2026/jul/4/dupe"})))))
+
+(deftest parse-tags
+  (let [parse #'author/parse-tags]
+    (testing "clean one-per-line reply: markers, numbering, quoting, case handled"
+      (is (= ["data-engineering" "llms" "clojure" "workflow" "tools"]
+             (parse "data-engineering\nLLMs\n- clojure\n1. workflow\n`tools`"))))
+
+    (testing "the model's prose is dropped, real tags survive"
+      (is (= ["open-source" "llms" "kernel-development"]
+             (parse (str "Data engineering? No, this is about open source.\n"
+                         "Let me just give tags:\n"
+                         "open-source\nllms\nkernel-development")))))
+
+    (testing "duplicates collapse and the list is capped at ten"
+      (is (= ["a" "b"] (parse "a\nA\nb\na")))
+      (is (= 10 (count (parse (str/join "\n" (map #(str "t" %) (range 15))))))))))
+
+(deftest set-tags
+  (let [set-tags #'author/set-tags]
+    (testing "an empty inline tags: [] becomes a block list, body untouched"
+      (is (= "---\ndate: 2026-07-19\ntags:\n  - llms\n  - open-source\npublish: false\n---\n\nBody stays put.\n"
+             (set-tags "---\ndate: 2026-07-19\ntags: []\npublish: false\n---\n\nBody stays put.\n"
+                       ["llms" "open-source"]))))
+
+    (testing "an existing block list is replaced; a tags: line in the body is left alone"
+      (let [out (set-tags "---\ntype: link\ntags:\n  - old\npublish: false\n---\n\ntags: not-frontmatter\n"
+                          ["old" "new"])]
+        (is (re-find #"tags:\n  - old\n  - new\n" out))
+        (is (re-find #"\ntags: not-frontmatter\n" out))))
+
+    (testing "no tags property present: one is appended to the header"
+      (is (re-find #"publish: false\ntags:\n  - added\n---"
+                   (set-tags "---\ndate: 2026-07-19\npublish: false\n---\n\nBody\n" ["added"]))))
+
+    (testing "a file with no YAML frontmatter to edit returns nil"
+      (is (nil? (set-tags ";;;\n{:type :post :tags []}\n;;;\n\nBody\n" ["x"])))
+      (is (nil? (set-tags "just a bare body\n" ["x"]))))))
