@@ -638,13 +638,16 @@
 (defn- ask-llm
   "Runs the configured :llm-command through an interactive shell so
   aliases and shell functions (like a wrapped `claude`) resolve; the
-  prompt goes in on stdin. `-i` also turns on job control (monitor), which
-  deadlocks over the controlling terminal once we capture stdout — so we
-  unset it, keeping only the rc-file sourcing we actually want."
+  prompt goes in on stdin. `+m` disables job control at invocation: an
+  interactive shell otherwise grabs the controlling terminal's foreground
+  process group at startup, which both deadlocks the captured subprocess
+  and (once the spinner is drawing) gets us SIGTTOU'd — suspended — for
+  writing to a terminal we no longer own. Unsetting monitor from inside the
+  command string is too late; the grab already happened."
   [cfg prompt]
   (let [cmd (or (:llm-command cfg) "claude")
         {:keys [exit out err]} (p/sh {:in prompt :out :string :err :string}
-                                     "zsh" "-ic" (str "unsetopt monitor; " cmd " -p"))]
+                                     "zsh" "+m" "-ic" (str cmd " -p"))]
     (when-not (zero? exit)
       (die "LLM command failed (" cmd " -p): " (str/trim (str err))))
     out))
