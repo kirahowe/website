@@ -39,9 +39,9 @@
   --hit: rgba(100, 209, 221, .18);  /* matched-term wash on search results */
 
   /* One colour per entry type (nav words, dots, syntax) */
-  --post: #c77df5;
-  --link: #e8993d;
-  --quote: #63d081;
+  --post: #cd9ce9;
+  --link: #e79f4e;
+  --quote: #8fdf9a;
   --release: #ff7cb8;
   --tool: #a5a8f5;
 
