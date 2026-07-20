@@ -13,6 +13,9 @@
  ;; whole days, then links onward to the month archives.
  :home-entries 10
 
+ ;; How many recent entries the RSS feed (/feed.xml) carries, newest first.
+ :feed-entries 20
+
  ;; Entry types that may appear in frontmatter, in nav order.
  ;; A typo'd type in a content file fails indexing loudly.
  :entry-types [:post :link :quote :release :tool]

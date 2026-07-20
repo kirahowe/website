@@ -7,6 +7,8 @@
   (:import [java.time ZonedDateTime ZoneOffset]
            [java.time.format DateTimeFormatter]))
 
+(def default-feed-entries 20)
+
 (defn- rfc-1123 [{:keys [year month day]}]
   (.format DateTimeFormatter/RFC_1123_DATE_TIME
            (ZonedDateTime/of year month day 12 0 0 0 ZoneOffset/UTC)))
@@ -27,13 +29,15 @@
      [:description (str (h/html (markdown/render (:body entry) (:wikilinks entry))))]]))
 
 (defn rss
-  "The 20 most recent entries as an RSS 2.0 XML string."
+  "The most recent entries (:feed-entries, default 20) as an RSS 2.0 XML
+  string."
   [config index]
-  (str "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-       (h/html {:mode :xml}
-               [:rss {:version "2.0"}
-                [:channel
-                 [:title (:site-title config)]
-                 [:link (:base-url config)]
-                 [:description (:site-description config)]
-                 (map #(item config %) (take 20 (:entries index)))]])))
+  (let [n (or (:feed-entries config) default-feed-entries)]
+    (str "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+         (h/html {:mode :xml}
+                 [:rss {:version "2.0"}
+                  [:channel
+                   [:title (:site-title config)]
+                   [:link (:base-url config)]
+                   [:description (:site-description config)]
+                   (map #(item config %) (take n (:entries index)))]]))))

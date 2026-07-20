@@ -213,6 +213,18 @@
       (is (str/includes? body "Older"))
       (is (str/includes? body "\"/2026/jun\"")))))
 
+(deftest feed-count-is-configurable
+  (testing ":feed-entries caps how many items the RSS feed carries"
+    (let [h (app/make-app (assoc config :feed-entries 1)
+                          (atom (content/build-index config)))
+          body (:body (h {:request-method :get :uri "/feed.xml"}))]
+      (is (= 1 (count (re-seq #"<item>" body))))))
+  (testing "without :feed-entries it falls back to the default"
+    (let [body (:body (GET "/feed.xml"))]
+      ;; example-content has more than one entry, so the default (20)
+      ;; lets several items through
+      (is (< 1 (count (re-seq #"<item>" body)))))))
+
 (deftest static-assets
   (let [{:keys [status headers]} (GET "/css/style.css")]
     (is (= 200 status))
