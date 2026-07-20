@@ -713,6 +713,29 @@
   [tags]
   (apply str "tags:\n" (map #(str "  - " % "\n") tags)))
 
+(defn- edit-frontmatter
+  "Apply `f` to the YAML frontmatter property block (the text between the
+  opening and closing `---`) and return the rebuilt file, or nil when `raw`
+  has no YAML frontmatter to edit. Only the header is touched; the body
+  passes through unchanged."
+  [raw f]
+  (when-let [open (re-find #"^---[ \t]*\r?\n" raw)]
+    (let [after-open (subs raw (count open))
+          m (re-matcher #"(?m)^---[ \t]*\r?\n" after-open)]
+      (when (.find m)
+        (let [props (subs after-open 0 (.start m))
+              closing (subs after-open (.start m) (.end m))
+              body (subs after-open (.end m))]
+          (str open (f props) closing body))))))
+
+(defn- append-property
+  "props with `line` appended (props' own trailing newline ensured first) —
+  how set-tags/set-slug add a property the frontmatter didn't already have."
+  [props line]
+  (str props
+       (when-not (or (str/blank? props) (str/ends-with? props "\n")) "\n")
+       line))
+
 (defn- set-tags
   "Return `raw` with its YAML frontmatter's `tags` property set to `tags`,
   replacing any existing tags block (inline `tags: []` or a block list) or
@@ -720,21 +743,26 @@
   passes through unchanged. Returns nil when `raw` has no YAML frontmatter
   to edit, so the caller can fall back to printing for a manual paste."
   [raw tags]
-  (when-let [open (re-find #"^---[ \t]*\r?\n" raw)]
-    (let [after-open (subs raw (count open))
-          m (re-matcher #"(?m)^---[ \t]*\r?\n" after-open)]
-      (when (.find m)
-        (let [props (subs after-open 0 (.start m))
-              closing (subs after-open (.start m) (.end m))
-              body (subs after-open (.end m))
-              block (render-tags-yaml tags)
-              tags-re #"(?m)^[ \t]*tags[ \t]*:[^\n]*(?:\r?\n[ \t]+-[^\n]*)*\r?\n?"
-              props' (if (re-find tags-re props)
-                       (str/replace-first props tags-re block)
-                       (str props
-                            (when-not (or (str/blank? props) (str/ends-with? props "\n")) "\n")
-                            block))]
-          (str open props' closing body))))))
+  (edit-frontmatter raw
+   (fn [props]
+     (let [block (render-tags-yaml tags)
+           tags-re #"(?m)^[ \t]*tags[ \t]*:[^\n]*(?:\r?\n[ \t]+-[^\n]*)*\r?\n?"]
+       (if (re-find tags-re props)
+         (str/replace-first props tags-re block)
+         (append-property props block))))))
+
+(defn- set-slug
+  "Return `raw` with its YAML frontmatter's `slug` property set to `slug`,
+  replacing an existing slug line or appending one. Returns nil when there
+  is no YAML frontmatter to edit."
+  [raw slug]
+  (edit-frontmatter raw
+   (fn [props]
+     (let [line (str "slug: " slug "\n")
+           slug-re #"(?m)^[ \t]*slug[ \t]*:[^\n]*\r?\n?"]
+       (if (re-find slug-re props)
+         (str/replace-first props slug-re line)
+         (append-property props line))))))
 
 (defn- suggest-tags-for!
   "Ask the configured LLM for tags for one entry, let the author pick which
@@ -825,3 +853,80 @@
                   (die "No such draft: " fname)))]
     (when src
       (suggest-tags-for! cfg src))))
+
+(defn- slug-prompt
+  "Prompt for the slug model — the URL tail for the entry. Same output
+  contract as the tag prompt, so the tag parser cleans the reply too."
+  [title body]
+  (str "You are choosing a URL slug for an entry on a personal blog.\n\n"
+       "Rules:\n"
+       "- Suggest 3 or 4 candidates, one per line.\n"
+       "- Each slug is lowercase kebab-case, short (2-4 words), and reads well "
+       "in a URL, e.g. repl-driven-development, why-clojure.\n"
+       "- Capture the core topic; concise and memorable beats a literal restatement.\n"
+       "- No preamble, no numbering, no bullets, no commentary — nothing but the slugs.\n\n"
+       "Title: " title "\n\n"
+       body))
+
+(defn- suggest-slug-for!
+  "Ask the configured LLM for slug candidates for one draft, let the author
+  pick one (or type their own with +), then write it to the draft's `slug`
+  property. Falls back to printing the line to paste by hand if the file has
+  no YAML frontmatter to edit."
+  [cfg src]
+  (let [base (str/replace (fs/file-name src) #"\.md$" "")
+        raw (slurp (str src))
+        {:keys [meta body]} (content/parse-frontmatter raw (str src))
+        current (or (:slug meta) (util/slugify base))
+        reply (tui/spin (str "Asking " (or (:llm-command cfg) "claude") " for slugs…")
+                        #(ask-llm cfg (slug-prompt base body)))
+        ;; Slugs clean up exactly like tags — kebab-case, one per line.
+        suggested (vec (remove #{current} (parse-tags reply)))
+        chosen (tui/choose suggested
+                           :label (str "Slug for \"" base "\" (now: " current "):")
+                           :render identity
+                           :add (fn [s] (not-empty (util/slugify s))))]
+    (cond
+      (nil? chosen) (println "Cancelled — slug unchanged.")
+      (= chosen current) (println "Slug unchanged.")
+      :else
+      (if-let [updated (set-slug raw chosen)]
+        (do (spit (str src) updated)
+            (println (str "Set slug of " base " to: " chosen)))
+        (do (warn "No YAML frontmatter to edit — add this to " base ":")
+            (println (str "slug: " chosen)))))))
+
+(defn- pick-slugless
+  "Interactive picker for `bb suggest-slug` with no name: every draft with
+  no `slug` property yet (published entries already have one), alphabetical,
+  rendered with its type. Returns the chosen file, or nil (nothing to slug,
+  or the author cancelled)."
+  [root]
+  (let [candidates (->> (draft-status root)
+                        (remove :error)
+                        (remove (comp :slug :meta))
+                        (map #(select-keys % [:file :base :type]))
+                        (sort-by :base))]
+    (if (empty? candidates)
+      (do (println "Every draft already has a slug.") nil)
+      (some-> (tui/choose candidates
+                          :label "Draft to slug (no slug yet):"
+                          :render (fn [{:keys [base type]}]
+                                    (format "%-7s %s" (name type) base)))
+              :file))))
+
+(defn suggest-slug
+  "bb suggest-slug [draft name] — has the configured LLM read a draft,
+  propose URL slugs, and (after you pick one, or type your own) write it to
+  the draft's `slug` property. With no name, pick from any draft that has no
+  slug yet — published entries already have one."
+  [& args]
+  (let [cfg (config/load-config :dev)
+        root (:content-path cfg)
+        fname (str/join " " args)
+        src (if (str/blank? fname)
+              (pick-slugless root)
+              (or (find-draft root fname)
+                  (die "No such draft: " fname)))]
+    (when src
+      (suggest-slug-for! cfg src))))

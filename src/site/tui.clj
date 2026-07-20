@@ -103,43 +103,60 @@
 
 ;; --- rendering ----------------------------------------------------------
 
-(defn- menu-lines [label render options idx]
-  (into [label]
-        (map-indexed
-         (fn [i o]
-           (if (= i idx)
-             (str reverse-video " ❯ " (render o) " " reset)
-             (str "   " (render o))))
-         options)))
+(defn- menu-lines [label render add? options idx]
+  (cond-> (into [label]
+                (map-indexed
+                 (fn [i o]
+                   (if (= i idx)
+                     (str reverse-video " ❯ " (render o) " " reset)
+                     (str "   " (render o))))
+                 options))
+    add? (conj "   + type your own · ↵ select · esc cancel")))
 
-(defn- render-menu!
-  "Draw (or redraw) the menu in place. After the first draw the cursor is
-  parked below the list, so redraws move it back up over the old lines and
-  clear each before reprinting — no flicker, no scrolling."
-  [label render options idx first?]
-  (let [lines (menu-lines label render options idx)]
-    (when-not first?
-      (print (cursor-up (count lines))))
-    (doseq [ln lines]
-      (print (str clear-line ln "\n")))
-    (flush)))
+(defn- draw-block!
+  "Redraw a block of `lines` in place, moving up over the `prev` lines drawn
+  last time and clearing each. Clears any surplus when the block shrank (a
+  prompt line that came to nothing), leaving the cursor just below the
+  block. Returns the new line count to pass back as `prev`."
+  [lines prev]
+  (when (pos? prev)
+    (print (cursor-up prev)))
+  (doseq [ln lines]
+    (print (str clear-line ln "\n")))
+  (let [extra (max 0 (- prev (count lines)))]
+    (dotimes [_ extra]
+      (print (str clear-line "\n")))
+    (when (pos? extra)
+      (print (cursor-up extra))))
+  (flush)
+  (count lines))
 
 ;; --- the two front-ends -------------------------------------------------
 
-(defn- choose-arrows [options label render]
+(defn- choose-arrows [options label render add]
   (with-open [in (io/input-stream "/dev/tty")]
     (with-cbreak
       (fn []
         (print hide-cursor)
         (flush)
-        (loop [idx 0 first? true]
-          (render-menu! label render options idx first?)
-          (case (read-key in)
-            :up (recur (mod (dec idx) (count options)) false)
-            :down (recur (mod (inc idx) (count options)) false)
-            :enter (nth options idx)
-            (:quit :esc :interrupt :eof) nil
-            (recur idx false)))))))
+        (loop [idx 0 prev 0]
+          (let [n (draw-block! (menu-lines label render add options idx) prev)]
+            (case (read-key in)
+              :up (recur (mod (dec idx) (max 1 (count options))) n)
+              :down (recur (mod (inc idx) (max 1 (count options))) n)
+              :add (if-not add
+                     (recur idx n)
+                     (do
+                       (print "  + type your own: ")
+                       (flush)
+                       ;; A non-blank entry is the choice — return it straight
+                       ;; away; a blank/cancel drops back to the list.
+                       (if-let [val (some-> (read-raw-line in) add)]
+                         val
+                         (recur idx (inc n)))))
+              :enter (when (seq options) (nth options idx))
+              (:quit :esc :interrupt :eof) nil
+              (recur idx n))))))))
 
 (defn- parse-choice
   "Parse a numbered-menu reply into a 0-based index in [0, n), or nil for
@@ -165,13 +182,16 @@
   cancels. Options map:
     :label   heading printed above the list (default \"Choose:\")
     :render  element → its display string (default `str`)
-  Draws an arrow-key menu on a real terminal and falls back to numbered
-  entry otherwise. An empty `options` returns nil without prompting."
-  [options & {:keys [label render] :or {label "Choose:" render str}}]
+    :add     optional (String -> element-or-nil) fn; when given, `+` prompts
+             for a line and the fn's non-nil result becomes the choice
+  Draws an arrow-key menu on a real terminal (+ types your own, Enter
+  selects, q/Esc cancels) and falls back to numbered entry otherwise. An
+  empty `options` with no `:add` returns nil without prompting."
+  [options & {:keys [label render add] :or {label "Choose:" render str}}]
   (let [options (vec options)]
     (cond
-      (empty? options) nil
-      (interactive?) (choose-arrows options label render)
+      (and (empty? options) (not (and add (interactive?)))) nil
+      (interactive?) (choose-arrows options label render add)
       :else (choose-numbered options label render))))
 
 (defn input
@@ -227,24 +247,6 @@
                    (str "   " text))))
              options))
       (conj (str "   ␣ toggle · " (when add? "+ add · ") "↵ confirm · a all · n none · esc cancel"))))
-
-(defn- draw-block!
-  "Redraw a block of `lines` in place, moving up over the `prev` lines drawn
-  last time and clearing each. Clears any surplus when the block shrank (an
-  added-tag prompt that came to nothing), leaving the cursor just below the
-  block. Returns the new line count to pass back as `prev`."
-  [lines prev]
-  (when (pos? prev)
-    (print (cursor-up prev)))
-  (doseq [ln lines]
-    (print (str clear-line ln "\n")))
-  (let [extra (max 0 (- prev (count lines)))]
-    (dotimes [_ extra]
-      (print (str clear-line "\n")))
-    (when (pos? extra)
-      (print (cursor-up extra))))
-  (flush)
-  (count lines))
 
 (defn- choose-many-arrows [options label render add preselected]
   (with-open [in (io/input-stream "/dev/tty")]

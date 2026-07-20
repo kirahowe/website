@@ -131,6 +131,15 @@
       (is (str/includes? (hint true) "+ add"))
       (is (not (str/includes? (hint false) "+ add"))))))
 
+(deftest menu-lines-hint
+  (let [menu-lines #'tui/menu-lines]
+    (testing "a footer with the + hint is present only when adding is enabled"
+      (let [with-add (menu-lines "L" identity true ["a"] 0)
+            no-add (menu-lines "L" identity false ["a"] 0)]
+        (is (str/includes? (last with-add) "type your own"))
+        (is (= (inc (count no-add)) (count with-add)))   ; the hint is the extra line
+        (is (not (some #(str/includes? % "type your own") no-add)))))))
+
 (deftest choose-many-numbered
   ;; Force the numbered path so it's deterministic without a tty.
   (with-redefs [tui/interactive? (constantly false)]

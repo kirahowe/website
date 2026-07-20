@@ -186,3 +186,21 @@
     (testing "a file with no YAML frontmatter to edit returns nil"
       (is (nil? (set-tags ";;;\n{:type :post :tags []}\n;;;\n\nBody\n" ["x"])))
       (is (nil? (set-tags "just a bare body\n" ["x"]))))))
+
+(deftest set-slug
+  (let [set-slug #'author/set-slug]
+    (testing "a draft with no slug gets one appended, body untouched"
+      (is (= "---\ndate: 2026-07-19\ntags: []\npublish: false\nslug: why-clojure\n---\n\nBody.\n"
+             (set-slug "---\ndate: 2026-07-19\ntags: []\npublish: false\n---\n\nBody.\n"
+                       "why-clojure"))))
+
+    (testing "an existing slug line is replaced; a slug: line in the body is left alone"
+      (let [out (set-slug "---\ntype: post\nslug: old-one\npublish: false\n---\n\nslug: not-frontmatter\n"
+                          "new-one")]
+        (is (re-find #"(?m)^slug: new-one$" out))
+        (is (not (re-find #"old-one" out)))
+        (is (re-find #"\nslug: not-frontmatter\n" out))))
+
+    (testing "a file with no YAML frontmatter to edit returns nil"
+      (is (nil? (set-slug ";;;\n{:type :post}\n;;;\n\nBody\n" "x")))
+      (is (nil? (set-slug "just a bare body\n" "x"))))))

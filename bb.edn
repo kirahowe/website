@@ -61,6 +61,10 @@
                 :requires ([site.author :as author])
                 :task (apply author/suggest-tags *command-line-args*)}
 
+  suggest-slug {:doc "Suggest URL slugs with the configured LLM, then write the one you pick (or type) into the draft: bb suggest-slug [<name>] — with no name, pick from any draft that has no slug yet"
+                :requires ([site.author :as author])
+                :task (apply author/suggest-slug *command-line-args*)}
+
   sync {:doc "Mirror the vault's published content into the publish repo and push (bb sync)"
         :requires ([site.author :as author])
         :task (apply author/sync-content *command-line-args*)}}}
