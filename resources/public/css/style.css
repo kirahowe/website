@@ -385,6 +385,17 @@ a:hover { text-decoration: underline; }
   align-items: center;
   gap: var(--sp2);
 }
+.permalink {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  color: var(--muted);
+}
+.permalink:hover { color: var(--accent); }
+.permalink svg {
+  height: .82em;
+  width: auto;
+}
 
 /* Quote entries — hanging Caveat marks in the quote colour, linked source */
 .entry blockquote,

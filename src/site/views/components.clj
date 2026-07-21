@@ -3,7 +3,9 @@
   {:type :title :path :date :tags :body :link-url :source :source-url}; the
   five page types compose from the functions here (entry-row, feed, sidebar
   sections, page-header, type-summary)."
-  (:require [clojure.set :as set]
+  (:require [clojure.java.io :as io]
+            [clojure.set :as set]
+            [hiccup2.core :as h]
             [site.markdown :as markdown]
             [site.search :as search]
             [site.util :as util]))
@@ -17,6 +19,21 @@
   Carries the type name as a tooltip for rows where it's the only type cue."
   [type]
   [:span.dot {:class (name type) :title (name type)}])
+
+;; The permalink chain-link glyph, inlined once so it inherits the theme
+;; colour via currentColor. Read once, not per request.
+(def ^:private link-icon
+  (delay (h/raw (slurp (io/resource "public/images/link.svg")))))
+
+(defn permalink
+  "A permalink to the entry's own page — the chain-link glyph shown in the
+  feed foot so short-form entries (whose title/source links outbound) are
+  still reachable at their canonical URL."
+  [entry]
+  [:a.permalink {:href (:path entry)
+                 :aria-label "Permalink to this entry"
+                 :title "Permalink"}
+   @link-icon])
 
 (defn- outbound
   "Links, releases and tools point at their source; everything else at its
@@ -91,11 +108,15 @@
     (markdown/excerpt (:body entry))))
 
 (defn- entry-foot
-  "The dense foot under a feed row: the type (with its colour dot) and the
-  entry's tags flowing together on a single wrapping line."
+  "The dense foot under a feed row: a permalink to the entry's own page
+  (for short-form types whose title/source points outbound), the type
+  (with its colour dot) and the entry's tags, flowing together on a single
+  wrapping line."
   [entry]
   [:div.entry-foot {:class (name (:type entry))}
    [:span.entry-kind (dot (:type entry)) (name (:type entry))]
+   (when-not (= :post (:type entry))
+     (list [:span.sep "/"] (permalink entry)))
    (when (seq (:tags entry))
      (cons [:span.sep "/"] (tag-links (:tags entry))))])
 
