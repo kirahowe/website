@@ -69,6 +69,38 @@
       (catch Exception e
         (die "Content error: " (ex-message e))))))
 
+(defn- foreign-redirect-rows
+  "[[old-url live-url] ...] for every previous URL on a foreign host —
+  the redirects that must be served at the old domains' edge, since this
+  site never sees those requests. Same-site previous URLs are excluded:
+  the app itself 301s them."
+  [base-url entries]
+  (for [e entries
+        url (:previous-urls e)
+        :when (nil? (content/local-previous-path base-url url))]
+    [url (str base-url (:path e))]))
+
+(defn redirects
+  "bb redirects — every previous URL of the published entries, split by
+  who serves the redirect. Same-site paths the app already 301s are
+  summarized on stderr; foreign-host URLs — the ones the old domains
+  must redirect themselves — come out on stdout as a Cloudflare
+  bulk-redirects CSV, ready for `bb redirects > redirects.csv`."
+  [& _]
+  (let [cfg (config/load-config :dev)
+        index (try (content/build-index cfg)
+                   (catch Exception e (die "Content error: " (ex-message e))))
+        rows (foreign-redirect-rows (:base-url cfg) (:entries index))]
+    (binding [*out* *err*]
+      (println (str (count (:redirects index))
+                    " same-site previous paths — the app serves these 301s itself."))
+      (println (str (count rows)
+                    " foreign-host previous URLs — set these up where the old domain lives:")))
+    (when (seq rows)
+      (println "source_url,target_url,status_code")
+      (doseq [[old live] rows]
+        (println (str old "," live ",301"))))))
+
 (defn new-draft
   "bb new [type] [title words...] — scaffolds drafts/<Title>.md in the
   content repo. The filename is the title, exactly as Obsidian would

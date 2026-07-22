@@ -6,8 +6,9 @@
 --   semantics, static pages, the URL scheme, archives, tag pages,
 --   search, and the RSS feed.
 -- Includes: visitor-facing surfaces over the shared Entry model,
---   the Page entity, canonical URLs, 404 semantics, feed shape,
---   search contract, caching posture.
+--   the Page entity, canonical URLs (including cross-posts whose
+--   canonical home is elsewhere, and previous-URL redirects),
+--   404 semantics, feed shape, search contract, caching posture.
 -- Excludes:
 --   - The publishing pipeline (publishing.allium)
 --   - Dev-only conveniences: live reload, per-request reindexing,
@@ -118,6 +119,11 @@ surface PublishedSite {
         -- pages are ignored; a stray Obsidian file cannot break the
         -- site. The server also refuses to index content whose entry
         -- URLs collide (the last good index keeps serving).
+    @guarantee EveryPageDeclaresItsUrl
+        -- Every public page declares its own absolute URL as canonical
+        -- in its markup; a facetted listing variant (?tag=) declares
+        -- the clean listing. The one exception: an entry with a
+        -- canonical_url declares that instead (see EntryPage).
     @guidance
         -- The home page shows at least config.home_entries recent
         -- entries, rounded up to whole days, then links onward to the
@@ -141,6 +147,7 @@ surface EntryPage {
         entry.via_url
         entry.attribution
         entry.attribution_url
+        entry.canonical_url
 
     @guarantee CanonicalUrl
         -- Exactly one canonical URL per entry:
@@ -148,6 +155,18 @@ surface EntryPage {
         -- same date (e.g. numeric month, zero-padded day) permanently
         -- redirect to it. A pinned_slug keeps a URL inherited from an
         -- old blog working forever.
+    @guarantee PreviousUrlsRedirect
+        -- Every previous_url on the site's own host permanently
+        -- redirects to the entry — consulted only where the site would
+        -- otherwise 404, so an old URL can never shadow live content.
+        -- Foreign-host previous_urls are the old domains' redirects to
+        -- serve; `bb redirects` exports them (Cloudflare bulk-redirect
+        -- CSV). A previous URL that is blank, already live, or claimed
+        -- by two entries fails indexing loudly.
+    @guarantee CrossPostsPointHome
+        -- An entry with a canonical_url declares that URL — not its
+        -- own — as the content's canonical location in its markup, and
+        -- credits the original visibly on the page.
     @guarantee WikilinksNeverDangle
         -- [[wikilinks]] resolve by filename to the target entry's URL;
         -- an unresolved link renders as plain text, never a dead link.

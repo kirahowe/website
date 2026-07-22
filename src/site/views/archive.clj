@@ -80,7 +80,8 @@
                 (keys (:by-year index)))
         year-href (fn [y] (str "/" y (when tag (str "?tag=" (name tag)))))
         tag-href (fn [t] (str "/" year "?tag=" (name t)))]
-    (layout/page config (cond-> (str year) tag (str " / #" (name tag)))
+    (layout/page config {:title (cond-> (str year) tag (str " / #" (name tag)))
+                         :path (str "/" year)}
                  (c/page-header heading (c/count-label (count entries)))
                  (c/cols (month-index year entries)
                          (c/sidebar (year-nav years year year-href)
@@ -130,7 +131,7 @@
         newer (when (pos? i) (nth months (dec i)))
         older (when (< (inc i) (count months)) (nth months (inc i)))
         title (str (util/month-name month) " " year)]
-    (layout/page config title
+    (layout/page config {:title title :path (util/month-url [year month])}
                  (c/page-header title (c/count-label (count entries)))
                  [:div.type-summary (c/type-summary entries true)]
                  (c/cols (c/feed entries)
@@ -138,7 +139,8 @@
                                     (nearby newer older))))))
 
 (defn day-page [config year month day entries]
-  (layout/page config (util/format-date {:year year :month month :day day})
+  (layout/page config {:title (util/format-date {:year year :month month :day day})
+                       :path (util/day-url {:year year :month month :day day})}
                (c/feed entries)))
 
 ;; --- type and tag listings ----------------------------------------------
@@ -162,7 +164,10 @@
         scope (cond->> (get (:by-type index) type)
                 tag (filter #(contains? (set (:tags %)) tag)))
         years (distinct (map #(-> % :date :year) scope))]
-    (layout/page config (cond-> label year (str " / " year) tag (str " / #" (name tag)))
+    (layout/page config {:title (cond-> label year (str " / " year) tag (str " / #" (name tag)))
+                         ;; the clean (query-free) listing is the canonical
+                         ;; form of every ?tag= facet variant
+                         :path (path year nil)}
                  (c/page-header heading (c/count-label (count entries)))
                  (c/cols (c/feed entries)
                          (c/sidebar (year-nav years year #(path % tag))
@@ -182,7 +187,8 @@
 (defn tag-page [config tag year entries]
   (let [heading (header-parts (list [:span.hash "#"] (name tag))
                               [(when year (filter-chip (str year) (str "/tags/" (name tag))))])]
-    (layout/page config (str "#" (name tag) (when year (str " / " year)))
+    (layout/page config {:title (str "#" (name tag) (when year (str " / " year)))
+                         :path (str "/tags/" (name tag) (when year (str "/" year)))}
                  (c/page-header heading (c/count-label (count entries)))
                  (c/cols (c/feed entries)
                          (c/sidebar (related-tags entries tag)
@@ -190,7 +196,7 @@
 
 (defn tags-page [config index]
   (let [tags (:tag-counts index)]
-    (layout/page config "Tags"
+    (layout/page config {:title "Tags" :path "/tags"}
                  (c/page-header "Tags" (str (count tags) " tags"))
                  (if (seq tags)
                    [:div.tag-index (c/tag-cloud tags)]

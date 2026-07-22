@@ -56,11 +56,19 @@
         [:a {:href url} label])]]))
 
 (defn page
-  "config, title (nil for the homepage), hiccup content → full HTML string."
-  [config title & content]
+  "config, opts, hiccup content → full HTML string. opts:
+    :title      the page title; nil for the homepage
+    :path       the page's own path (\"/2026/jul/4/x\") — absolutized into
+                its rel=canonical and og:url. Facetted views pass their
+                clean path, so ?tag= variants canonicalize to the plain
+                listing; pages with no stable URL (drafts, 404) pass none.
+    :canonical  an absolute URL that replaces the self rel=canonical — an
+                entry whose canonical home is elsewhere points there."
+  [config {:keys [title path canonical]} & content]
   (let [full-title (if title
                      (str title " — " (:site-title config))
                      (:site-title config))
+        self-url   (when path (str (:base-url config) path))
         og-image   (str (:base-url config) "/images/og.png")]
     (str
      (h/html {:mode :html}
@@ -77,12 +85,18 @@
                [:meta {:name "color-scheme" :content "dark light"}]
                [:title full-title]
                [:meta {:name "description" :content (:site-description config)}]
-               ;; Open Graph — how the site renders when shared (link previews)
+               ;; The page's one true URL: an external :canonical wins (the
+               ;; content's home is elsewhere), else the page's own address.
+               (when-let [href (or canonical self-url)]
+                 [:link {:rel "canonical" :href href}])
+               ;; Open Graph — how the site renders when shared (link previews).
+               ;; og:url stays this page's own URL even when rel=canonical
+               ;; points elsewhere: a share of this page is about this page.
                [:meta {:property "og:type" :content "website"}]
                [:meta {:property "og:site_name" :content (:site-title config)}]
                [:meta {:property "og:title" :content full-title}]
                [:meta {:property "og:description" :content (:site-description config)}]
-               [:meta {:property "og:url" :content (:base-url config)}]
+               [:meta {:property "og:url" :content (or self-url (:base-url config))}]
                [:meta {:property "og:image" :content og-image}]
                [:meta {:property "og:image:type" :content "image/png"}]
                [:meta {:property "og:image:width" :content "2400"}]
@@ -103,14 +117,14 @@
                (footer config)
                (when (:dev? config) [:script (h/raw livereload-script)])]]))))
 
-(defn static-page [config {:keys [title body]}]
-  (page config title
+(defn static-page [config {:keys [title body path]}]
+  (page config {:title title :path path}
         [:article.article
          [:h1 title]
          (markdown/render-article body nil)]))
 
 (defn not-found [config]
-  (page config "Not found"
+  (page config {:title "Not found"}
         [:article.article
          [:h1 "404"]
          [:p "Nothing lives at this address. Try "

@@ -30,7 +30,11 @@
       (:link-url entry)
       (list [:span.sep "/"] (util/host (:link-url entry)))
       (= :post (:type entry))
-      (list [:span.sep "/"] (str (markdown/read-time (:body entry)) " min read")))]))
+      (list [:span.sep "/"] (str (markdown/read-time (:body entry)) " min read")))
+    ;; A cross-post credits its canonical home visibly, not just in markup
+    (when-let [canonical (:canonical-url entry)]
+      (list [:span.sep "/"] "originally published at "
+            [:a {:href canonical} (util/host canonical)]))]))
 
 (defn- article-body [entry]
   (if (= :quote (:type entry))
@@ -54,14 +58,16 @@
       [:a.more {:href "/about"} (str "More about " (first-name config) " →")]]]))
 
 (defn entry-page [config index entry]
-  (layout/page config (or (:title entry) (util/format-date (:date entry)))
+  (layout/page config {:title (or (:title entry) (util/format-date (:date entry)))
+                       :path (:path entry)
+                       :canonical (:canonical-url entry)}
                [:article.article
                 (article-head entry)
                 (article-body entry)]
                (post-footer config index entry)))
 
 (defn draft-page [config entry]
-  (layout/page config (str "Draft: " (or (:title entry) (:draft-name entry)))
+  (layout/page config {:title (str "Draft: " (or (:title entry) (:draft-name entry)))}
                [:div.draft-banner "Draft — dev preview, not published."]
                [:article.article
                 (when (:title entry) [:h1 (:title entry)])

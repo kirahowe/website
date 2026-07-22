@@ -205,6 +205,18 @@
       (is (nil? (set-slug ";;;\n{:type :post}\n;;;\n\nBody\n" "x")))
       (is (nil? (set-slug "just a bare body\n" "x"))))))
 
+(deftest foreign-redirect-rows
+  (let [rows #'author/foreign-redirect-rows]
+    (testing "only foreign-host previous URLs become edge-redirect rows"
+      (is (= [["https://old.example.org/a" "https://example.com/2026/jul/4/x"]]
+             (rows "https://example.com"
+                   [{:path "/2026/jul/4/x"
+                     :previous-urls ["/old/a"
+                                     "https://example.com/old/b"
+                                     "https://old.example.org/a"]}]))))
+    (testing "entries with no previous URLs contribute nothing"
+      (is (empty? (rows "https://example.com" [{:path "/2026/jul/4/x"}]))))))
+
 (deftest parse-phrases
   (let [parse #'author/parse-phrases]
     (testing "keeps readable casing and strips list markers / quoting"

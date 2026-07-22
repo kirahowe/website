@@ -83,7 +83,7 @@
   [config index {:keys [q type tag]} matches]
   (let [terms (search/parse-query q)
         shown (search/apply-filters matches {:type type :tag tag})]
-    (layout/page config "Search"
+    (layout/page config {:title "Search" :path "/search"}
                  (prompt q)
                  (cond
                    (nil? q)

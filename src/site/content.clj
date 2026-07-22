@@ -14,7 +14,8 @@
   Frontmatter dialects, detected by the first line:
     ---   YAML — what Obsidian writes (the Properties panel). Natural
           property names map onto the entry model: link → :link-url,
-          via → :link-via, author → :source, source → :source-url.
+          via → :link-via, author → :source, source → :source-url,
+          canonical → :canonical-url, previously → :previous-urls.
     ;;;   EDN — the original format, still accepted.
     none  a bare entry publishes as a :post.
 
@@ -73,11 +74,14 @@
         (set/rename-keys {:link :link-url
                           :via :link-via
                           :author :source
-                          :source :source-url})
+                          :source :source-url
+                          :canonical :canonical-url
+                          :previously :previous-urls})
         (dissoc :date :publish)
         (cond->
          (:type present) (update :type keyword)
-         (:tags present) (update :tags #(if (coll? %) % [%]))))))
+         (:tags present) (update :tags #(if (coll? %) % [%]))
+         (:previously present) (update :previous-urls #(if (coll? %) (vec %) [%]))))))
 
 (defn- read-yaml-meta [s file]
   (normalize-yaml-meta
@@ -302,7 +306,53 @@
   "What the server serves when content is unavailable at boot — the sync
   loop replaces it as soon as a pull succeeds."
   {:entries [] :by-path {} :by-type {} :nav-types [] :by-year {} :by-month {}
-   :by-day {} :by-tag {} :tag-counts [] :months [] :drafts {} :pages {}})
+   :by-day {} :by-tag {} :tag-counts [] :months [] :drafts {} :pages {}
+   :redirects {}})
+
+(defn local-previous-path
+  "A previous URL reduced to a path on this site: a bare path passes
+  through, an absolute URL on the site's own host loses its scheme and
+  host, and a URL on any other host is nil — that redirect must be
+  served at the old host (see `bb redirects`). Trailing slashes drop so
+  redirect lookups can be exact."
+  [base-url url]
+  (let [path (cond
+               (str/starts-with? url "/") url
+               (and base-url (= (util/host base-url) (util/host url)))
+               (str/replace url #"^\w+://[^/]+" "")
+               :else nil)]
+    (some-> path (str/replace #"/+$" ""))))
+
+(defn- build-redirects
+  "The entries' :previous-urls as {old site-local path → live entry path}
+  — what the server 301s when a request would otherwise 404. Foreign-host
+  previous URLs are left out (they redirect at their own edge). Fails
+  loudly on a previous URL that is blank, is already a live entry URL,
+  or is claimed by two different entries."
+  [config entries]
+  (let [live (into #{} (map :path) entries)]
+    (reduce
+     (fn [acc {:keys [path previous-urls file]}]
+       (reduce
+        (fn [acc url]
+          (let [src (local-previous-path (:base-url config) url)]
+            (cond
+              (nil? src) acc
+              (str/blank? src)
+              (throw (ex-info (str "Previous URL has no path in " file ": " (pr-str url))
+                              {:file file :url url}))
+              (live src)
+              (throw (ex-info (str "Previous URL " src " in " file " is a live entry URL")
+                              {:file file :url src}))
+              (and (contains? acc src) (not= (get acc src) path))
+              (throw (ex-info (str "Previous URL " src " claimed by both "
+                                   (get acc src) " and " path)
+                              {:url src :paths [(get acc src) path]}))
+              :else (assoc acc src path))))
+        acc
+        previous-urls))
+     {}
+     entries)))
 
 (defn build-index
   "Content repo → the in-memory index every request reads from."
@@ -341,5 +391,8 @@
                       frequencies
                       (sort-by (fn [[t n]] [(- n) (name t)]))
                       vec)
+     ;; old site-local URLs (the entries' :previous-urls) → live paths;
+     ;; served as 301s where a request would otherwise 404
+     :redirects (build-redirects config entries)
      :drafts drafts
      :pages pages}))

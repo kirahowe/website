@@ -1,5 +1,6 @@
 (ns site.content-test
   (:require [clojure.java.io :as io]
+            [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
             [site.content :as content])
   (:import [java.nio.file Files]
@@ -77,7 +78,23 @@
     (let [{:keys [meta]} (content/parse-frontmatter
                           "---\ntags: solo\n---\nB"
                           "test.md")]
-      (is (= ["solo"] (vec (:tags meta)))))))
+      (is (= ["solo"] (vec (:tags meta))))))
+
+  (testing "canonical → :canonical-url, previously → :previous-urls"
+    (let [{:keys [meta]} (content/parse-frontmatter
+                          (str "---\n"
+                               "canonical: https://elsewhere.example/post\n"
+                               "previously:\n  - /old/path\n  - https://old.example.org/post\n"
+                               "---\nB")
+                          "test.md")]
+      (is (= "https://elsewhere.example/post" (:canonical-url meta)))
+      (is (= ["/old/path" "https://old.example.org/post"] (:previous-urls meta)))))
+
+  (testing "a single-string previously still becomes a collection"
+    (let [{:keys [meta]} (content/parse-frontmatter
+                          "---\npreviously: /old/path\n---\nB"
+                          "test.md")]
+      (is (= ["/old/path"] (:previous-urls meta))))))
 
 (deftest type-validation
   (testing "typo'd type cannot silently coin a new type"
@@ -152,6 +169,50 @@
       (testing "entries carry the wikilink target map"
         (is (= "/2026/jul/10/everything-fails"
                (get (:wikilinks post) "everything fails")))))))
+
+(deftest previous-url-redirects
+  (let [dir (str (Files/createTempDirectory "content-test" (into-array FileAttribute [])))
+        day (io/file dir "2026" "07" "10")]
+    (.mkdirs day)
+    (spit (io/file day "moved.md")
+          (str "---\n"
+               "previously:\n"
+               "  - /blog/moved\n"
+               "  - https://example.com/notes/moved/\n"
+               "  - https://elsewhere.example.org/moved\n"
+               "---\nBody"))
+    (let [index (content/build-index (assoc config
+                                            :content-path dir
+                                            :base-url "https://example.com"))]
+      (testing "bare paths and own-host absolutes redirect (trailing slash dropped)"
+        (is (= {"/blog/moved" "/2026/jul/10/moved"
+                "/notes/moved" "/2026/jul/10/moved"}
+               (:redirects index))))
+      (testing "a foreign-host previous URL is the old domain's redirect, not ours"
+        (is (not-any? #(str/includes? % "elsewhere") (keys (:redirects index))))))))
+
+(deftest previous-url-collisions
+  (let [make (fn [files]
+               (let [dir (str (Files/createTempDirectory "content-test" (into-array FileAttribute [])))
+                     day (io/file dir "2026" "07" "10")]
+                 (.mkdirs day)
+                 (doseq [[name content] files]
+                   (spit (io/file day name) content))
+                 (assoc config :content-path dir :base-url "https://example.com")))]
+    (testing "two entries claiming the same previous URL fail indexing"
+      (is (thrown-with-msg? Exception #"claimed by both"
+                            (content/build-index
+                             (make {"a.md" "---\npreviously: /old\n---\nA"
+                                    "b.md" "---\npreviously: /old\n---\nB"})))))
+    (testing "a previous URL that is a live entry URL fails indexing"
+      (is (thrown-with-msg? Exception #"live entry URL"
+                            (content/build-index
+                             (make {"a.md" "---\npreviously: /2026/jul/10/b\n---\nA"
+                                    "b.md" "just a body"})))))
+    (testing "a previous URL with no path fails indexing"
+      (is (thrown-with-msg? Exception #"no path"
+                            (content/build-index
+                             (make {"a.md" "---\npreviously: https://example.com\n---\nA"})))))))
 
 (deftest workflow-properties
   (testing "unquoted YAML date parses as the authored calendar date (UTC, not system zone)"

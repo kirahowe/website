@@ -86,6 +86,15 @@ One-time setup:
   image never requires a site deploy.
 - **Slugs are automatic**: `slugify(filename)`. A `slug:` property exists
   only to pin a URL (e.g. one inherited from an old blog).
+- **Content that lived (or lives) elsewhere.** Two properties keep the
+  web tidy. `canonical:` marks a cross-post whose canonical home is
+  elsewhere: the page emits a `rel=canonical` pointing there and credits
+  the original visibly ("originally published at …"). `previously:`
+  lists URLs the content used to live at: paths on this site's own
+  domain 301 to the entry automatically (consulted only where the site
+  would otherwise 404, so an old URL can never shadow live content),
+  and `bb redirects` exports the foreign-domain ones as a Cloudflare
+  bulk-redirects CSV to serve from wherever the old domain now points.
 
 ```sh
 bb new post My great idea      # scaffolds drafts/My great idea.md
@@ -190,6 +199,8 @@ Body in markdown, with [[Hello world|wikilinks]] and ![[screenshot.png]].
 - `type` defaults to `post`; a typo'd type fails indexing loudly
 - quotes use `author:` and `source:` (the URL), and stay untitled unless
   a `title:` property says otherwise
+- `canonical:` marks a cross-post whose canonical home is elsewhere;
+  `previously:` lists URLs the content used to live at (see "Writing")
 - the original EDN frontmatter (`;;;`-delimited) is still accepted
 
 ## Configuration

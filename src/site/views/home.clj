@@ -34,7 +34,7 @@
 (defn home [config index]
   (let [n (or (:home-entries config) default-home-entries)
         {:keys [shown next-entry]} (take-whole-days (:entries index) n)]
-    (layout/page config nil
+    (layout/page config {:path "/"}
                  (c/cols (list (c/feed shown)
                                (when next-entry (older-link next-entry)))
                          (c/sidebar

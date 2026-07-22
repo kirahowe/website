@@ -34,6 +34,12 @@ entity Entry {
     via_url: String?                -- `via`: credit for where a link was found
     attribution: String?            -- `author`: who a quote is from
     attribution_url: String?        -- `source`: the URL a quote's cite line links to
+    canonical_url: String?          -- `canonical`: the content's canonical home when that
+                                    -- is elsewhere (a cross-post); the entry page declares
+                                    -- it as canonical in place of its own URL
+    previous_urls: Set<String>      -- `previously`: URLs this content lived at before —
+                                    -- same-site paths 301 to the entry, foreign-host URLs
+                                    -- are exported for the old domains' edge (bb redirects)
     authored_date: Timestamp?       -- the workflow `date` property, day precision; set at
                                     -- creation, the author's to edit (e.g. backdating)
     content_valid: Boolean          -- the file parses with the server's own parser

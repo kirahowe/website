@@ -17,6 +17,10 @@
            :requires ([site.author :as author])
            :task (author/reindex)}
 
+  redirects {:doc "List every entry's previous URLs: same-site paths the app 301s itself (summary on stderr), and a Cloudflare bulk-redirects CSV on stdout for the old domains: bb redirects > redirects.csv"
+             :requires ([site.author :as author])
+             :task (apply author/redirects *command-line-args*)}
+
   test {:doc "Run the test suite"
         :requires ([clojure.test :as t]
                    [site.author-test]

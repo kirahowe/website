@@ -173,6 +173,50 @@
     (is (= 404 (:status (GET "/nope"))))
     (is (= 404 (:status (GET "/2026/jul/4/nope"))))))
 
+(deftest canonical-urls
+  (testing "every page declares its own absolute URL as canonical, and og:url matches"
+    (let [{:keys [body]} (GET "/2026/jul/4/hello-world")]
+      (is (str/includes? body "<link href=\"https://example.com/2026/jul/4/hello-world\" rel=\"canonical\">"))
+      (is (str/includes? body "content=\"https://example.com/2026/jul/4/hello-world\" property=\"og:url\"")))
+    (is (str/includes? (:body (GET "/"))
+                       "<link href=\"https://example.com/\" rel=\"canonical\">"))
+    (is (str/includes? (:body (GET "/2026/jul"))
+                       "<link href=\"https://example.com/2026/jul\" rel=\"canonical\">"))
+    (is (str/includes? (:body (GET "/tags/clojure"))
+                       "<link href=\"https://example.com/tags/clojure\" rel=\"canonical\">"))
+    (is (str/includes? (:body (GET "/about"))
+                       "<link href=\"https://example.com/about\" rel=\"canonical\">")))
+
+  (testing "a ?tag= facet variant canonicalizes to the clean listing"
+    (is (str/includes? (:body (GET "/posts" "tag=clojure"))
+                       "<link href=\"https://example.com/posts\" rel=\"canonical\">"))
+    (is (str/includes? (:body (GET "/2026" "tag=clojure"))
+                       "<link href=\"https://example.com/2026\" rel=\"canonical\">")))
+
+  (testing "a cross-post's canonical points at its home elsewhere and credits it visibly"
+    (let [{:keys [body]} (GET "/2026/may/2/caching-thought")]
+      (is (str/includes? body "<link href=\"https://oldblog.example.org/2026/caching\" rel=\"canonical\">"))
+      (is (str/includes? body "originally published at"))
+      (is (str/includes? body ">oldblog.example.org</a>"))
+      ;; og:url stays this page's own URL: a share of this page is about this page
+      (is (str/includes? body "content=\"https://example.com/2026/may/2/caching-thought\" property=\"og:url\"")))))
+
+(deftest previous-urls-redirect
+  (testing "an old same-site URL 301s to the entry, cacheably"
+    (let [{:keys [status headers]} (GET "/blog/repl-driven")]
+      (is (= 301 status))
+      (is (= "/2025/nov/12/repl-driven" (get headers "Location")))
+      (is (str/includes? (get headers "Cache-Control") "public")))
+    (testing "with a trailing slash too"
+      (is (= 301 (:status (GET "/blog/repl-driven/")))))
+    (testing "an own-host absolute previous URL redirects by its path"
+      (let [{:keys [status headers]} (GET "/notes/repl.html")]
+        (is (= 301 status))
+        (is (= "/2025/nov/12/repl-driven" (get headers "Location"))))))
+
+  (testing "a foreign-host previous URL never registers a redirect here"
+    (is (= 404 (:status (GET "/2025/repl-driven"))))))
+
 (deftest drafts-are-dev-only
   (testing "production server: drafts don't exist"
     (is (= 404 (:status (GET "/drafts/an-idea-brewing"))))

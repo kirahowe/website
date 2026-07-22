@@ -43,6 +43,18 @@
                    "Cache-Control" "public, max-age=86400"}
          :body (io/input-stream f)}))))
 
+(defn- previous-url-redirect
+  "301 for a URI some entry records as a previous URL (its :previous-urls).
+  Consulted only after normal routing 404s, so an old URL can never shadow
+  live content."
+  [index uri]
+  (let [trimmed (str/replace (str uri) #"/+$" "")
+        uri (if (str/blank? trimmed) uri trimmed)]
+    (when-let [target (get (:redirects index) uri)]
+      {:status 301
+       :headers {"Location" target
+                 "Cache-Control" handlers/public-cache}})))
+
 (defn make-app
   "→ Ring handler. In :dev? mode the content index is rebuilt on every
   request (edits show up on refresh) and drafts are viewable."
@@ -58,10 +70,13 @@
                   ;; The header renders from config alone, but which nav
                   ;; links exist depends on the content — hand it along.
                   config (assoc config :nav-types (:nav-types index))
-                  match (routes/match-route config (routes/path-segments uri))]
-              (if match
-                (handlers/handle config index match req)
-                (handlers/not-found config)))))
+                  match (routes/match-route config (routes/path-segments uri))
+                  resp (if match
+                         (handlers/handle config index match req)
+                         (handlers/not-found config))]
+              (if (= 404 (:status resp))
+                (or (previous-url-redirect index uri) resp)
+                resp))))
       (catch Exception e
         (binding [*out* *err*]
           (println "ERROR" (:uri req) "—" (ex-message e)))
