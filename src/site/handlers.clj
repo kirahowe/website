@@ -49,6 +49,17 @@
     (filterv #(= year (-> % :date :year)) entries)
     entries))
 
+(defn- filter-tag [entries tag]
+  (if tag
+    (filterv #(contains? (set (:tags %)) tag) entries)
+    entries))
+
+(defn- tag-param
+  "The ?tag= facet on a listing, as a keyword (or nil) — lets a sidebar tag
+  refine the current type/year view instead of leaving for its own page."
+  [req]
+  (some-> (get (query-params req) "tag") not-empty keyword))
+
 (defn handle
   "Dispatch a matched route against the index."
   [config index {:keys [handler params]} req]
@@ -57,9 +68,10 @@
     (html (v.home/home config index))
 
     :year
-    (let [{:keys [year]} params]
-      (some-entries config (get (:by-year index) year)
-                    #(v.archive/year-page config index year %)))
+    (let [{:keys [year]} params
+          tag (tag-param req)]
+      (some-entries config (filter-tag (get (:by-year index) year) tag)
+                    #(v.archive/year-page config index year tag %)))
 
     :month
     (let [{:keys [year month]} params]
@@ -87,9 +99,12 @@
       (html (v.home/home config index)))
 
     :type-list
-    (let [{:keys [type year]} params]
-      (some-entries config (filter-year (get (:by-type index) type) year)
-                    #(v.archive/type-page config type year %)))
+    (let [{:keys [type year]} params
+          tag (tag-param req)]
+      (some-entries config (-> (get (:by-type index) type)
+                               (filter-year year)
+                               (filter-tag tag))
+                    #(v.archive/type-page config index type year tag %)))
 
     :tag
     (let [{:keys [tag year]} params]

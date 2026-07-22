@@ -78,13 +78,15 @@
 
 (defn quote-blockquote
   "The quote body as a blockquote — the full rendered markdown, with the
-  closing Caveat mark tucked onto the end of the last block so it stays
-  inline with the text. Shared by the feed row and the entry page."
+  closing mark tucked onto the last block so it stays inline with the text.
+  The opening mark is a CSS ::before on the blockquote itself, so it hangs in
+  the gutter regardless of the first block. Shared by the feed row and entry
+  page."
   [entry]
-  (let [paras (vec (rest (markdown/render (:body entry) (:wikilinks entry))))
-        paras (cond-> paras
-                (seq paras) (update (dec (count paras)) conj [:span.quote-close "”"]))]
-    (into [:blockquote] paras)))
+  (let [blocks (vec (rest (markdown/render (:body entry) (:wikilinks entry))))
+        blocks (cond-> blocks
+                 (seq blocks) (update (dec (count blocks)) conj [:span.quote-close "”"]))]
+    (into [:blockquote.quote] blocks)))
 
 ;; --- feed row ------------------------------------------------------------
 
@@ -154,7 +156,7 @@
       (= :quote (:type entry))
       (list
        (if (seq terms)
-         [:blockquote (highlight (row-excerpt entry terms) terms) [:span.quote-close "”"]]
+         [:blockquote.quote (highlight (row-excerpt entry terms) terms) [:span.quote-close "”"]]
          (quote-blockquote entry))
        (quote-source entry))
 
@@ -191,10 +193,12 @@
 
 (defn page-header
   "Slim banner atop tag / year / month pages: a title (hiccup) and a plain
-  entry count."
+  entry count. The count is led by a slash in its own muted formatting, so
+  it reads as the last item of the slashed header row (listing views add the
+  matching slashes before any facet chips in the title)."
   [title count]
   [:header.page-header
-   [:h1 title (when count [:span.count count])]])
+   [:h1 title (when count (list [:span.sep.count "/"] [:span.count count]))]])
 
 (defn count-label [n]
   (str n " " (if (= 1 n) "entry" "entries")))
@@ -231,11 +235,14 @@
   [:a.side-link {:href path} (when type (dot type)) [:span.title title]])
 
 (defn tag-cloud
-  "Tag links with counts — the sidebar widget and the tags index share it."
-  [tag-counts]
-  [:div.tag-cloud
-   (for [[t n] tag-counts]
-     [:a.tag {:href (str "/tags/" (name t))} (str "#" (name t)) " " [:b n]])])
+  "Tag links with counts — the sidebar widget and the tags index share it.
+  `href` maps a tag to its URL (default: its global /tags page); listing
+  facets pass an href that keeps the tag scoped to the current view."
+  ([tag-counts] (tag-cloud tag-counts (fn [t] (str "/tags/" (name t)))))
+  ([tag-counts href]
+   [:div.tag-cloud
+    (for [[t n] tag-counts]
+      [:a.tag {:href (href t)} (str "#" (name t)) " " [:b n]])]))
 
 (defn top-tags [tag-counts n]
   (when (seq tag-counts)

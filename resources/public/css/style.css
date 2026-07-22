@@ -1,6 +1,6 @@
 /* ==========================================================================
    Kira Howe — a dense, programmer-flavored web log.
-   Warm charcoal + a single teal accent, IBM Plex Sans / Mono, Caveat wordmark.
+   Warm charcoal + a single teal accent, system sans / mono type.
    Dual theme: dark by default, light via prefers-color-scheme. No JS.
 
    The system, in five rules:
@@ -24,6 +24,11 @@
    -------------------------------------------------------------------------- */
 
 :root {
+  /* Dark canvas/scrollbars/controls by default; the light media query
+     below flips it. Paired with the color-scheme <meta> so navigation
+     never flashes a white backdrop before this stylesheet paints. */
+  color-scheme: dark;
+
   /* Dark theme (default) */
   --bg: #17171a;            /* page background — near-black, faintly warm */
   --panel: #212125;         /* code blocks, subtle raised areas */
@@ -58,10 +63,10 @@
   --r: 7px;
   --r-sm: 4px;
 
-  /* Type families */
-  --sans: "IBM Plex Sans", system-ui, sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  --script: "Caveat", cursive;
+  /* Type families — system stacks, no web fonts (no FOUT, no network) */
+  --sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --serif: Georgia, "Times New Roman", serif;   /* the big hanging quote marks */
 
   /* Type scale — one base reading size + a few steps. Every font-size
      references one of these; no bespoke px sizes live in the rules below. */
@@ -85,6 +90,7 @@
 
 @media (prefers-color-scheme: light) {
   :root {
+    color-scheme: light;
     --bg: #f9f9f9;          /* near-white paper */
     --panel: #ffffff;
     --fg: #33312b;
@@ -305,6 +311,11 @@ a:hover { text-decoration: underline; }
 }
 .page-header .hash { color: var(--muted); }
 .page-header .count { font: 400 var(--fs-sm) var(--mono); color: var(--muted); }
+/* Applied tag facet: smaller and muted next to the title, with an × that
+   clears it back to the un-filtered listing. */
+.page-header .filter { font: 400 var(--fs-md) var(--mono); color: var(--muted); }
+.page-header .filter-x { margin-left: var(--sp1); color: var(--muted); }
+.page-header .filter-x:hover { color: var(--accent); }
 
 /* Per-type count summary under a month header */
 .type-summary {
@@ -397,32 +408,50 @@ a:hover { text-decoration: underline; }
   width: auto;
 }
 
-/* Quote entries — hanging Caveat marks in the quote colour, linked source */
+/* Blockquotes default to a conventional left-ruled, indented quote — used by
+   post bodies, static pages, and the pull-quote in a link/release/tool row.
+   Only a Quote-type entry opts out, into the hanging marks below. */
 .entry blockquote,
 .article blockquote {
-  position: relative;
-  margin: 0;
-  padding-left: var(--sp6);
+  margin: var(--sp4) 0;
+  padding-left: var(--sp4);
+  border-left: 2px solid var(--quote);
   font: 400 italic var(--fs) var(--sans);
   line-height: var(--lh);
   color: var(--head);
 }
-.entry blockquote::before,
-.article blockquote::before {
-  content: "\201C";
-  position: absolute;
-  left: calc(var(--sp1) * -1);
-  top: .5em;
-  font: 700 50px/0 var(--script);
+/* A Quote-type entry drops the rule for the hanging serif marks that sign it:
+   the open one hangs in the left gutter (hence relative + the wider pad), the
+   close one tucks inline after the last word; margin:0 keeps it flush with
+   its cite line. */
+.entry blockquote.quote,
+.article blockquote.quote {
+  position: relative;
+  margin: 0;
+  padding-left: var(--sp6);
+  border-left: 0;
+}
+/* The open mark is a ::before on the blockquote itself, so it hangs in the
+   left gutter no matter what the first block is (paragraph, list, heading);
+   the close mark is a span tucked inline after the last word. Same
+   glyph/size/colour, only the placement differs. */
+.entry blockquote.quote::before,
+.article blockquote.quote::before,
+.quote-close {
+  font: 700 40px/0 var(--serif);
   font-style: normal;
   color: var(--quote);
 }
+.entry blockquote.quote::before,
+.article blockquote.quote::before {
+  content: "\201C";
+  position: absolute;
+  left: 0.18em;
+  top: 0.5em;
+}
 .quote-close {
   margin-left: var(--sp1);
-  font: 700 50px/0 var(--script);
-  font-style: normal;
-  vertical-align: -.5em;
-  color: var(--quote);
+  vertical-align: -0.45em;
 }
 .quote-cite {
   margin-top: var(--sp2);
@@ -437,19 +466,11 @@ a:hover { text-decoration: underline; }
 .entry blockquote ul,
 .entry blockquote ol { padding-left: var(--sp5); }
 .entry blockquote li::marker { color: var(--muted); }
-.entry blockquote > :last-child { margin-bottom: 0; }
-
-/* A link/release/tool pull-quote is a conventional blockquote — a left
-   rule and a modest indent, not the hanging Caveat mark that signs a quote
-   entry. It also restores symmetric vertical space: the shared rule above
-   zeroes the margin for quote rows, which otherwise left the quote flush
-   against the comment that follows it. */
-.entry-body blockquote {
-  margin: var(--sp4) 0;
-  padding-left: var(--sp4);
-  border-left: 2px solid var(--quote);
-}
-.entry-body blockquote::before { content: none; }
+/* Hug the border/cite: zero the outer child margins in any blockquote. */
+.entry blockquote > :first-child,
+.article blockquote > :first-child { margin-top: 0; }
+.entry blockquote > :last-child,
+.article blockquote > :last-child { margin-bottom: 0; }
 .feed-more {
   display: inline-block;
   margin: var(--sp5) var(--gutter) 0;

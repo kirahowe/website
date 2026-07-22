@@ -6,11 +6,6 @@
             [hiccup2.core :as h]
             [site.markdown :as markdown]))
 
-(def ^:private fonts
-  (str "https://fonts.googleapis.com/css2?family=Caveat:wght@700"
-       "&family=IBM+Plex+Mono:wght@400;500;600;700"
-       "&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap"))
-
 ;; The wordmark logotype, inlined once so it inherits the theme colour via
 ;; currentColor and inverts on hover. Read once, not per request.
 (def ^:private wordmark
@@ -74,6 +69,12 @@
               [:head
                [:meta {:charset "utf-8"}]
                [:meta {:name "viewport" :content "width=device-width, initial-scale=1"}]
+               ;; Read during HTML parse, before any stylesheet loads, so the
+               ;; browser paints a dark canvas on the first frame of every
+               ;; navigation — no white flash while style.css/fonts arrive.
+               ;; "dark light" = dark by default, light for OS-light users,
+               ;; matching the prefers-color-scheme switch in style.css.
+               [:meta {:name "color-scheme" :content "dark light"}]
                [:title full-title]
                [:meta {:name "description" :content (:site-description config)}]
                ;; Open Graph — how the site renders when shared (link previews)
@@ -92,8 +93,6 @@
                [:meta {:name "twitter:title" :content full-title}]
                [:meta {:name "twitter:description" :content (:site-description config)}]
                [:meta {:name "twitter:image" :content og-image}]
-               [:link {:rel "preconnect" :href "https://fonts.gstatic.com" :crossorigin true}]
-               [:link {:rel "stylesheet" :href fonts}]
                [:link {:rel "stylesheet" :href "/css/style.css"}]
                [:link {:rel "alternate" :type "application/rss+xml"
                        :title (:site-title config) :href "/feed.xml"}]

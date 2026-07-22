@@ -96,7 +96,9 @@
 
   (testing "quote renders with attribution, full body, and one via credit"
     (let [{:keys [body]} (GET "/2026/jun/21/rich-hickey-on-simplicity")]
-      (is (str/includes? body "<blockquote>"))
+      ;; a quote-type entry carries the .quote class (its hanging serif marks);
+      ;; other blockquotes get the plain left-border style
+      (is (str/includes? body "<blockquote class=\"quote\">"))
       (is (str/includes? body "Rich Hickey"))
       (is (str/includes? body "prerequisite for reliability"))
       ;; the via credit sits on the cite line — once, even on a titled quote
