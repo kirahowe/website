@@ -42,14 +42,10 @@
   (or (:link-url entry) (:path entry)))
 
 (defn entry-label
-  "A one-line label for an entry in a dense list: its title, a short quote
-  excerpt, or — for untitled entries — the date."
+  "A one-line label for an entry in a dense list: its title — every entry
+  has one now — falling back to the date only if one were ever missing."
   [entry]
-  (or (:title entry)
-      (when (= :quote (:type entry))
-        (let [ex (markdown/excerpt (:body entry))]
-          (str "“" (subs ex 0 (min 60 (count ex))) "”")))
-      (util/format-date (:date entry))))
+  (or (:title entry) (util/format-date (:date entry))))
 
 (defn tag-links
   "An entry's #tag links, sorted by name — the one tag atom, used by the
@@ -283,8 +279,8 @@
          (take n))))
 
 (defn recent-links
-  "The N most recent titled entries as an entry-list — the same ledger the
-  related list uses, sitting in the sidebar."
+  "The N most recent entries as an entry-list — the same ledger the related
+  list uses, sitting in the sidebar."
   [entries n]
   (side-section "Recent"
-                (entry-list (take n (filter :title entries)))))
+                (entry-list (take n entries))))

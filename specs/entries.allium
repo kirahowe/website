@@ -27,7 +27,7 @@ entity Entry {
     type: EntryType                 -- defaults to post when the file declares nothing
     body: String
     tags: Set<String>
-    explicit_title: String?         -- the `title` property; without it quotes stay untitled
+    explicit_title: String?         -- the `title` property: overrides the filename-derived title
     pinned_slug: String?            -- the `slug` property: pins a URL (e.g. one inherited
                                     -- from an old blog); otherwise the slug is derived
     link_url: String?               -- `link`: the outbound URL for link-ish types
@@ -53,6 +53,6 @@ entity Entry {
 
     -- Derived
     slug: pinned_slug ?? slugify(file_title)     -- slugify: black box, lowercase-kebab
-    is_untitled: type = quote and explicit_title = null
-    display_title: explicit_title ?? file_title  -- meaningful only when not is_untitled
+    display_title: explicit_title ?? file_title  -- every entry is titled; a quote's filename
+                                                 -- titles it just like any other type
 }

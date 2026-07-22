@@ -152,11 +152,11 @@ surface EntryPage {
         -- [[wikilinks]] resolve by filename to the target entry's URL;
         -- an unresolved link renders as plain text, never a dead link.
     @guidance
-        -- Display follows the type: quotes render untitled (unless
-        -- explicit_title is set) with an attribution cite line linking
-        -- to attribution_url; links point out to link_url and credit
-        -- via_url on the cite line. Each entry links its newer and
-        -- older neighbours in date order.
+        -- Display follows the type: quotes render as a large blockquote,
+        -- titled by their filename (or explicit_title) like any entry,
+        -- with an attribution cite line linking to attribution_url; links
+        -- point out to link_url and credit via_url on the cite line. Each
+        -- entry links its newer and older neighbours in date order.
 }
 
 -- Date, type and tag listings.
@@ -213,10 +213,6 @@ surface Feed {
         -- resolved — no truncation, no click-through teaser.
     @guarantee StableItemIdentity
         -- Each item's identity is the entry's absolute canonical URL.
-    @guarantee UntitledItemsGetFallbackTitles
-        -- An untitled entry (a quote without an explicit title) gets a
-        -- generated item title from its type and date, e.g.
-        -- "Quote, July 4, 2026".
     @guidance
         -- RSS 2.0; the config.feed_entries most recent entries,
         -- newest first.

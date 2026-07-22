@@ -205,6 +205,29 @@
       (is (nil? (set-slug ";;;\n{:type :post}\n;;;\n\nBody\n" "x")))
       (is (nil? (set-slug "just a bare body\n" "x"))))))
 
+(deftest parse-phrases
+  (let [parse #'author/parse-phrases]
+    (testing "keeps readable casing and strips list markers / quoting"
+      (is (= ["Simplicity is a choice" "A clear idea"]
+             (parse "- Simplicity is a choice\n2. \"A clear idea\""))))
+    (testing "drops prose (a colon line) and over-long lines"
+      (is (= ["Short and sweet"]
+             (parse "Here are some options:\nShort and sweet\nThis line is far too long to be a good title phrase"))))))
+
+(deftest sanitize-note-title
+  (let [f #'author/sanitize-note-title]
+    (testing "drops filesystem/Obsidian-forbidden characters and collapses whitespace"
+      (is (= "Simplicity a choice" (f "Simplicity: a choice")))
+      (is (= "AB testing" (f "A/B  testing")))
+      (is (= "Wildcard" (f "Wild*card?"))))))
+
+(deftest default-quote-name?
+  (let [f #'author/default-quote-name?]
+    (testing "the bb-new-quote scaffold name is a default; an authored name is not"
+      (is (true? (f "quote 2026-07-21")))
+      (is (false? (f "Simplicity is a choice")))
+      (is (false? (f "quote about something"))))))
+
 (deftest slug-collision-fn
   (let [slug-collision-fn #'author/slug-collision-fn
         jul19 (LocalDate/of 2026 7 19)]

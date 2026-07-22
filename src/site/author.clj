@@ -25,7 +25,7 @@
     (case type
       :post (str "---\ndate: " date "\ntags: []\npublish: false\n---\n\n")
       :link (str "---\ntype: link\ndate: " date "\nlink: \nvia: \ntags: []\npublish: false\n---\n\n")
-      :quote (str "---\ntype: quote\ndate: " date "\nauthor: \nsource: \ntags: []\npublish: false\n---\n\n")
+      :quote (str "---\ntype: quote\ndate: " date "\nauthor: \nsource: \nvia: \ntags: []\npublish: false\n---\n\n")
       (:release :tool) (str "---\ntype: " (name type) "\ndate: " date "\nlink: \ntags: []\npublish: false\n---\n\n")
       (str "---\ntype: " (name type) "\ndate: " date "\ntags: []\npublish: false\n---\n\n"))))
 
@@ -868,6 +868,59 @@
        "Title: " title "\n\n"
        body))
 
+(defn- title-prompt
+  "Prompt for the quote-title model: a short phrase that captures the
+  quote, used as both the entry's title and — slugified — its URL slug.
+  Same terse output contract as the slug and tag prompts."
+  [body]
+  (str "You are choosing a short title for a quote on a personal blog. "
+       "The title is shown as a heading and, lowercased and hyphenated, "
+       "becomes the entry's URL slug.\n\n"
+       "Rules:\n"
+       "- Suggest 3 or 4 candidates, one per line.\n"
+       "- Each is a short phrase, 2 to 5 words, that captures the heart of "
+       "the quote; concise and evocative beats a literal restatement, "
+       "e.g. Simplicity is a choice.\n"
+       "- Sentence case, no trailing punctuation, no quotation marks.\n"
+       "- No preamble, no numbering, no bullets, no commentary — nothing but "
+       "the phrases.\n\n"
+       body))
+
+(defn- phrase-line?
+  "Whether a cleaned line plausibly is a short title phrase rather than the
+  model's prose: 1-6 words containing a letter or digit, with no
+  sentence-ending punctuation."
+  [s]
+  (and (<= 1 (count (str/split (str/trim s) #"\s+")) 6)
+       (re-find #"[A-Za-z0-9]" s)
+       (not (re-find #"[.!?:]" s))))
+
+(defn- parse-phrases
+  "Turn the model's reply into clean, de-duplicated title phrases: strip
+  list markers and stray quoting, keep only lines that look like a short
+  phrase, and preserve their readable casing (unlike parse-tags, which
+  slugifies)."
+  [raw]
+  (->> (str/split-lines raw)
+       (map #(-> %
+                 str/trim
+                 (str/replace #"^(?:[-*#>]|\d+[.)])\s+" "")
+                 (str/replace #"[`\"']" "")
+                 str/trim))
+       (filter phrase-line?)
+       distinct
+       (take 6)))
+
+(defn- sanitize-note-title
+  "A model-suggested phrase reduced to a safe Obsidian note filename: drop
+  the characters Obsidian and the filesystem reject in a name, collapse runs
+  of whitespace, trim. The slug still derives from the result."
+  [s]
+  (-> (str s)
+      (str/replace #"[\\/:*?\"<>|]" "")
+      (str/replace #"\s+" " ")
+      str/trim))
+
 (defn- slug-collision-fn
   "A lookup: slug → the published entry it would collide with, or nil. The
   key is the draft's URL (its authored `date`, or today, + slug) — exactly
@@ -881,20 +934,14 @@
       (when by-path
         (get by-path (util/entry-url {:date {:year y :month m :day d} :slug slug}))))))
 
-(defn- suggest-slug-for!
-  "Ask the configured LLM for slug candidates for one draft, let the author
-  pick one (or type their own with +), then write it to the draft's `slug`
-  property. Never offers — and refuses a typed — slug that would collide
-  with an existing entry's URL. Falls back to printing the line to paste by
-  hand if the file has no YAML frontmatter to edit."
-  [cfg src]
-  (let [base (str/replace (fs/file-name src) #"\.md$" "")
-        raw (slurp (str src))
-        {:keys [meta body]} (content/parse-frontmatter raw (str src))
-        current (or (:slug meta) (util/slugify base))
-        date (or (try (:date (content/workflow-properties raw (str src)))
-                      (catch Exception _ nil))
-                 (LocalDate/now))
+(defn- suggest-plain-slug!
+  "Ask the configured LLM for slug candidates for a non-quote draft, let
+  the author pick one (or type their own with +), then write it to the
+  draft's `slug` property. Never offers — and refuses a typed — slug that
+  would collide with an existing entry's URL. Falls back to printing the
+  line to paste by hand if the file has no YAML frontmatter to edit."
+  [cfg src raw meta body base date]
+  (let [current (or (:slug meta) (util/slugify base))
         collides (slug-collision-fn cfg date)
         reply (tui/spin (str "Asking " (or (:llm-command cfg) "claude") " for slugs…")
                         #(ask-llm cfg (slug-prompt base body)))
@@ -917,30 +964,108 @@
         (do (warn "No YAML frontmatter to edit — add this to " base ":")
             (println (str "slug: " chosen)))))))
 
+(defn- suggest-quote-name!
+  "The quote branch: a quote has no meaningful title and only a
+  filename-derived slug, so suggest one short phrase and rename the draft
+  file to it. The filename is the note's title in the vault and, slugified,
+  its URL slug — no `title`/`slug` properties, the same single source every
+  other type uses. The phrase is slugified for the collision check, so a URL
+  that's already taken is refused; an existing draft of that name is never
+  clobbered."
+  [cfg src base body date]
+  (let [collides (slug-collision-fn cfg date)
+        current-slug (util/slugify base)
+        reply (tui/spin (str "Asking " (or (:llm-command cfg) "claude") " for a title…")
+                        #(ask-llm cfg (title-prompt body)))
+        suggested (vec (remove #(let [s (util/slugify (sanitize-note-title %))]
+                                  (or (str/blank? s) (= s current-slug) (collides s)))
+                               (parse-phrases reply)))
+        chosen (tui/choose suggested
+                           :label (str "Title for the quote (now: " base "):")
+                           :render identity
+                           :add (fn [s] (not-empty (sanitize-note-title s))))]
+    (if (nil? chosen)
+      (println "Cancelled — draft not renamed.")
+      (let [new-base (sanitize-note-title chosen)
+            slug (util/slugify new-base)
+            target (fs/path (fs/parent src) (str new-base ".md"))]
+        (cond
+          (str/blank? slug)
+          (die "\"" chosen "\" has no letters or digits to slugify — nothing renamed.")
+          (= new-base base)
+          (println "Name unchanged.")
+          (collides slug)
+          (die "Slug \"" slug "\" (from \"" new-base "\") would collide with "
+               (:path (collides slug)) " — nothing renamed.")
+          (fs/exists? target)
+          (die "A draft named \"" new-base "\" already exists — nothing renamed.")
+          :else
+          (do (fs/move src target)
+              (println (str "Renamed: " base " → " new-base))
+              (println (str "Slug:    " slug))))))))
+
+(defn- suggest-slug-for!
+  "Name one draft for its URL. A quote — untitled, addressed only by its
+  filename — is renamed to a short suggested phrase (the note's title in the
+  vault and, slugified, its URL); every other type gets a pinned `slug`
+  property. Either way the author picks a candidate (or types their own with
+  +), and a URL that would collide with an existing entry is refused."
+  [cfg src]
+  (let [base (str/replace (fs/file-name src) #"\.md$" "")
+        raw (slurp (str src))
+        {:keys [meta body]} (content/parse-frontmatter raw (str src))
+        date (or (try (:date (content/workflow-properties raw (str src)))
+                      (catch Exception _ nil))
+                 (LocalDate/now))]
+    (if (= :quote (:type meta))
+      (suggest-quote-name! cfg src base body date)
+      (suggest-plain-slug! cfg src raw meta body base date))))
+
+(defn- default-quote-name?
+  "A quote filename still in its scaffold form — `quote YYYY-MM-DD`, the
+  auto name `bb new quote` gives an unnamed quote. These are the quotes
+  `bb suggest-slug` offers to rename; a quote the author has already named
+  is left alone."
+  [base]
+  (boolean (re-matches #"quote \d{4}-\d{2}-\d{2}" base)))
+
+(defn- needs-slugging?
+  "Whether a draft is a candidate for a no-name `bb suggest-slug`: a quote
+  still under its auto-generated name (the flow renames it), or any other
+  type that has no pinned `slug` property yet."
+  [{:keys [type meta base]}]
+  (if (= :quote type)
+    (default-quote-name? base)
+    (not (:slug meta))))
+
 (defn- pick-slugless
-  "Interactive picker for `bb suggest-slug` with no name: every draft with
-  no `slug` property yet (published entries already have one), alphabetical,
-  rendered with its type. Returns the chosen file, or nil (nothing to slug,
+  "Interactive picker for `bb suggest-slug` with no name: drafts that still
+  want a URL — a quote under its auto-generated name (which the flow
+  renames), or another type with no `slug` property yet — alphabetical,
+  rendered with their type. Returns the chosen file, or nil (nothing to do,
   or the author cancelled)."
   [root]
   (let [candidates (->> (draft-status root)
                         (remove :error)
-                        (remove (comp :slug :meta))
+                        (filter needs-slugging?)
                         (map #(select-keys % [:file :base :type]))
                         (sort-by :base))]
     (if (empty? candidates)
-      (do (println "Every draft already has a slug.") nil)
+      (do (println "Every draft already has a slug or a name.") nil)
       (some-> (tui/choose candidates
-                          :label "Draft to slug (no slug yet):"
+                          :label "Draft to name or slug:"
                           :render (fn [{:keys [base type]}]
                                     (format "%-7s %s" (name type) base)))
               :file))))
 
 (defn suggest-slug
   "bb suggest-slug [draft name] — has the configured LLM read a draft,
-  propose URL slugs, and (after you pick one, or type your own) write it to
-  the draft's `slug` property. With no name, pick from any draft that has no
-  slug yet — published entries already have one."
+  propose URL slugs, and (after you pick one, or type your own) pin the
+  choice to the draft's `slug` property. For a quote — untitled and
+  addressed only by its filename — it proposes a short phrase and renames
+  the note to it instead, so the filename becomes both the note title and,
+  slugified, the URL. With no name, pick from any draft that still wants a
+  URL — an unnamed quote, or another type with no slug yet."
   [& args]
   (let [cfg (config/load-config :dev)
         root (:content-path cfg)

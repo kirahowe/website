@@ -18,9 +18,9 @@
     ;;;   EDN — the original format, still accepted.
     none  a bare entry publishes as a :post.
 
-  The filename is the human title (quotes stay untitled unless a title
-  property says otherwise); the slug is slugified from it unless a slug
-  property pins something else (e.g. to preserve an old URL)."
+  The filename is the human title (a `title` property overrides it); the
+  slug is slugified from it unless a slug property pins something else
+  (e.g. to preserve an old URL)."
   (:require [clj-yaml.core :as yaml]
             [clojure.edn :as edn]
             [clojure.java.io :as io]
@@ -185,11 +185,10 @@
   (into #{} (map keyword) tags))
 
 (defn- title-for
-  "The filename is the title, except for quotes, which stay untitled
-  unless a title property is set explicitly."
-  [meta type fname]
-  (or (:title meta)
-      (when-not (= type :quote) fname)))
+  "The title is the filename, for every type; a `title` property overrides
+  it (e.g. to title a quote by its point rather than its filename)."
+  [meta fname]
+  (or (:title meta) fname))
 
 (defn load-entry
   "file → entry map. The date comes from the file's path; the title from
@@ -207,7 +206,7 @@
         (throw (ex-info (str "Invalid date in path: " rp) {:file rp :date date})))
       (let [entry (merge (dissoc meta :slug)
                          {:type type
-                          :title (title-for meta type fname)
+                          :title (title-for meta fname)
                           :slug (or (:slug meta) (util/slugify fname))
                           :file-title fname
                           :date date
@@ -226,7 +225,7 @@
         type (check-type! config meta rp)]
     (merge (dissoc meta :slug)
            {:type type
-            :title (title-for meta type name)
+            :title (title-for meta name)
             :slug (or (:slug meta) (util/slugify name))
             :file-title name
             :draft-name name

@@ -146,8 +146,8 @@
       (testing "filename is the title; slug is slugified from it"
         (is (= "My Great Idea" (:title post)))
         (is (= :post (:type post)) "no type property means post"))
-      (testing "quotes stay untitled unless a title property is set"
-        (is (nil? (:title quote)))
+      (testing "a quote is titled by its filename, like any other type"
+        (is (= "Everything fails" (:title quote)))
         (is (= "W. Vogels" (:source quote))))
       (testing "entries carry the wikilink target map"
         (is (= "/2026/jul/10/everything-fails"

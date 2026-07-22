@@ -1,9 +1,7 @@
 (ns site.feed
   "RSS 2.0, rendered with hiccup in XML mode — no XML library needed."
-  (:require [clojure.string :as str]
-            [hiccup2.core :as h]
-            [site.markdown :as markdown]
-            [site.util :as util])
+  (:require [hiccup2.core :as h]
+            [site.markdown :as markdown])
   (:import [java.time ZonedDateTime ZoneOffset]
            [java.time.format DateTimeFormatter]))
 
@@ -13,15 +11,10 @@
   (.format DateTimeFormatter/RFC_1123_DATE_TIME
            (ZonedDateTime/of year month day 12 0 0 0 ZoneOffset/UTC)))
 
-(defn- item-title [entry]
-  (or (:title entry)
-      (str (str/capitalize (name (:type entry))) ", "
-           (util/format-date (:date entry)))))
-
 (defn- item [config entry]
   (let [url (str (:base-url config) (:path entry))]
     [:item
-     [:title (item-title entry)]
+     [:title (:title entry)]
      [:link url]
      [:guid url]
      [:pubDate (rfc-1123 (:date entry))]
