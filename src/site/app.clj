@@ -15,15 +15,21 @@
    "txt" "text/plain" "woff" "font/woff" "woff2" "font/woff2"})
 
 (defn- static-response
-  "Serves files under resources/public for asset paths."
-  [uri]
+  "Serves files under resources/public for asset paths. A request carrying
+  the ?v= content hash (how layout links every asset) is cacheable
+  forever — a changed asset arrives at a new URL — while a bare request
+  keeps a TTL, since nothing busts its cache when the file changes."
+  [uri query-string]
   (when (and (re-matches #"/(css|js|images|fonts)/.+" uri)
              (not (str/includes? uri "..")))
     (when-let [res (io/resource (str "public" uri))]
-      (let [ext (peek (str/split uri #"\."))]
+      (let [ext (peek (str/split uri #"\."))
+            versioned? (re-find #"(?:^|&)v=" (str query-string))]
         {:status 200
          :headers {"Content-Type" (get content-types ext "application/octet-stream")
-                   "Cache-Control" "public, max-age=86400"}
+                   "Cache-Control" (if versioned?
+                                     "public, max-age=31536000, immutable"
+                                     "public, max-age=86400")}
          :body (io/input-stream res)}))))
 
 (defn- attachment-response
@@ -62,7 +68,7 @@
   (fn [req]
     (try
       (let [uri (:uri req)]
-        (or (static-response uri)
+        (or (static-response uri (:query-string req))
             (attachment-response config uri)
             (let [index (if (:dev? config)
                           (content/build-index config)

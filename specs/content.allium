@@ -113,7 +113,9 @@ surface PublishedSite {
     @guarantee CdnFriendly
         -- Every public page carries CDN-friendly cache headers, so a
         -- CDN in front absorbs traffic spikes; search results and
-        -- draft previews are never cached.
+        -- draft previews are never cached. Pages link static assets by
+        -- content-hashed URLs (?v=), served immutable — a changed
+        -- asset is a new URL, so a cache can never serve it stale.
     @guarantee StrayFilesAreHarmless
         -- Markdown files that are neither dated entries, drafts nor
         -- pages are ignored; a stray Obsidian file cannot break the

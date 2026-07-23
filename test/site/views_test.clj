@@ -285,6 +285,15 @@
   (let [{:keys [status headers]} (GET "/css/style.css")]
     (is (= 200 status))
     (is (= "text/css" (get headers "Content-Type"))))
+  (testing "pages link assets by content-hashed URLs (cache busting)"
+    (let [body (:body (GET "/"))]
+      (is (re-find #"/css/style\.css\?v=[0-9a-f]{8}" body))
+      (is (re-find #"/images/og\.png\?v=[0-9a-f]{8}" body))))
+  (testing "a ?v= request is cacheable forever; a bare one keeps a TTL"
+    (is (str/includes? (get-in (GET "/css/style.css" "v=abc12345") [:headers "Cache-Control"])
+                       "immutable"))
+    (is (not (str/includes? (get-in (GET "/css/style.css") [:headers "Cache-Control"])
+                            "immutable"))))
   (testing "no path traversal"
     (is (not= 200 (:status (GET "/css/../../config/config.edn"))))))
 

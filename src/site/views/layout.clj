@@ -11,6 +11,23 @@
 (def ^:private wordmark
   (delay (slurp (io/resource "public/images/wordmark.svg"))))
 
+;; Cache-busting asset URLs: every asset a page links carries its content
+;; hash (?v=), so a changed file arrives at a brand-new URL and the old
+;; one can sit in browser and CDN caches forever without ever going
+;; stale. Hashed once per process in prod (assets ship inside the deploy
+;; image, so a change always means a fresh process); per render under
+;; `bb dev`, so an edited stylesheet busts through on the next reload.
+(defn- asset-hash [path]
+  (let [bytes (with-open [in (io/input-stream (io/resource (str "public" path)))]
+                (.readAllBytes in))]
+    (subs (format "%032x" (BigInteger. 1 (.digest (java.security.MessageDigest/getInstance "MD5") bytes)))
+          0 8)))
+
+(def ^:private asset-hash-cached (memoize asset-hash))
+
+(defn- asset-url [config path]
+  (str path "?v=" ((if (:dev? config) asset-hash asset-hash-cached) path)))
+
 ;; Injected only under `bb dev`: opens an SSE stream to site.livereload and
 ;; refreshes the page when a watched file changes. Reconnecting after the
 ;; server itself restarts also reloads, so code edits (which need a `bb dev`
@@ -69,7 +86,7 @@
                      (str title " — " (:site-title config))
                      (:site-title config))
         self-url   (when path (str (:base-url config) path))
-        og-image   (str (:base-url config) "/images/og.png")]
+        og-image   (str (:base-url config) (asset-url config "/images/og.png"))]
     (str
      (h/html {:mode :html}
              (h/raw "<!DOCTYPE html>\n")
@@ -107,7 +124,7 @@
                [:meta {:name "twitter:title" :content full-title}]
                [:meta {:name "twitter:description" :content (:site-description config)}]
                [:meta {:name "twitter:image" :content og-image}]
-               [:link {:rel "stylesheet" :href "/css/style.css"}]
+               [:link {:rel "stylesheet" :href (asset-url config "/css/style.css")}]
                [:link {:rel "alternate" :type "application/rss+xml"
                        :title (:site-title config) :href "/feed.xml"}]
                (when-not (:dev? config) analytics-script)]
