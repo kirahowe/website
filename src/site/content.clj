@@ -14,7 +14,8 @@
   Frontmatter dialects, detected by the first line:
     ---   YAML — what Obsidian writes (the Properties panel). Natural
           property names map onto the entry model: link → :link-url,
-          via → :link-via, author → :source, source → :source-url,
+          via → :link-via, author → :source, source → :source-url
+          (a quote's cite URL; a tool's source code),
           canonical → :canonical-url, previously → :previous-urls.
     ;;;   EDN — the original format, still accepted.
     none  a bare entry publishes as a :post.

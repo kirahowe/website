@@ -174,7 +174,9 @@ surface EntryPage {
         -- Display follows the type: quotes render as a large blockquote,
         -- titled by their filename (or explicit_title) like any entry,
         -- with an attribution cite line linking to attribution_url; links
-        -- point out to link_url and credit via_url on the cite line. Each
+        -- point out to link_url and credit via_url on the cite line. A
+        -- tool credits its source code (attribution_url) as a (source)
+        -- link after the title, styled like the via credit. Each
         -- entry links its newer and older neighbours in date order.
 }
 

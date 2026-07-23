@@ -116,7 +116,14 @@
 
   (testing "release and tool titles link out too"
     (is (str/includes? (:body (GET "/2026/apr/18/website-v1")) "releases/tag/v1.0"))
-    (is (str/includes? (:body (GET "/2026/mar/7/vault-publish")) "github.com/kirahowe/vault-publish")))
+    (is (str/includes? (:body (GET "/2026/mar/7/vault-publish")) "tools.example.com/vault-publish")))
+
+  (testing "a tool credits its source code after the title, styled like a via credit"
+    (let [{:keys [body]} (GET "/2026/mar/7/vault-publish")]
+      (is (str/includes? body "href=\"https://github.com/kirahowe/vault-publish\">source</a>"))
+      (is (= 1 (count (re-seq #"class=\"via\"" body)))))
+    ;; ...and the credit reaches the feed rows too
+    (is (str/includes? (:body (GET "/tools")) ">source</a>")))
 
   (testing "static page"
     (let [{:keys [status body]} (GET "/about")]

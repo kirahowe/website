@@ -1,7 +1,8 @@
 ;;;
 {:type :tool
  :title "vault-publish"
- :link-url "https://github.com/kirahowe/vault-publish"
+ :link-url "https://tools.example.com/vault-publish"
+ :source-url "https://github.com/kirahowe/vault-publish"
  :tags [:tools]}
 ;;;
 

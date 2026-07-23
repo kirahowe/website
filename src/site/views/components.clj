@@ -61,6 +61,14 @@
   (when-let [via (:link-via entry)]
     [:span.via " (" [:a {:href via} "via"] ")"]))
 
+(defn source-link
+  "The “(source)” link after a tool's title — where its source code lives,
+  when the entry records it. Wears the via styling: the same muted
+  parenthetical credit."
+  [entry]
+  (when-let [url (and (= :tool (:type entry)) (:source-url entry))]
+    [:span.via " (" [:a {:href url} "source"] ")"]))
+
 (defn quote-source
   "The \"— source\" line under a quote, linked when a URL is known and
   closing with the (via) credit when one is recorded. Shared by the feed
@@ -122,7 +130,8 @@
   (when (:title entry)
     [:h3.entry-title
      [:a {:href (outbound entry)} (highlight (:title entry) terms)]
-     (via-link entry)]))
+     (via-link entry)
+     (source-link entry)]))
 
 (def ^:private full-body-types
   "Short-form outbound entries whose whole body — a comment plus, often, a

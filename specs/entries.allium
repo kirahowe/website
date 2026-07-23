@@ -33,7 +33,8 @@ entity Entry {
     link_url: String?               -- `link`: the outbound URL for link-ish types
     via_url: String?                -- `via`: credit for where a link was found
     attribution: String?            -- `author`: who a quote is from
-    attribution_url: String?        -- `source`: the URL a quote's cite line links to
+    attribution_url: String?        -- `source`: the URL a quote's cite line links to;
+                                    -- on a tool, where its source code lives
     canonical_url: String?          -- `canonical`: the content's canonical home when that
                                     -- is elsewhere (a cross-post); the entry page declares
                                     -- it as canonical in place of its own URL

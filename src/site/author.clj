@@ -26,7 +26,8 @@
       :post (str "---\ndate: " date "\ntags: []\npublish: false\n---\n\n")
       :link (str "---\ntype: link\ndate: " date "\nlink: \nvia: \ntags: []\npublish: false\n---\n\n")
       :quote (str "---\ntype: quote\ndate: " date "\nauthor: \nsource: \nvia: \ntags: []\npublish: false\n---\n\n")
-      (:release :tool) (str "---\ntype: " (name type) "\ndate: " date "\nlink: \ntags: []\npublish: false\n---\n\n")
+      :release (str "---\ntype: release\ndate: " date "\nlink: \ntags: []\npublish: false\n---\n\n")
+      :tool (str "---\ntype: tool\ndate: " date "\nlink: \nsource: \ntags: []\npublish: false\n---\n\n")
       (str "---\ntype: " (name type) "\ndate: " date "\ntags: []\npublish: false\n---\n\n"))))
 
 (defn- die [& msg]

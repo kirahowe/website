@@ -23,7 +23,8 @@
             title)
       ;; a quote's via credit sits on its source line, not the title
       (when-not (= :quote (:type entry))
-        (c/via-link entry))])
+        (c/via-link entry))
+      (c/source-link entry)])
    [:div.article-meta
     (util/format-date (:date entry))
     (cond
