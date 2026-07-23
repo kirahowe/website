@@ -274,7 +274,10 @@ a:hover { text-decoration: underline; }
   display: grid;
   grid-template-columns: 1fr 300px;
 }
-.main { border-right: 1px solid var(--hair); }
+/* min-width: 0 on both grid children: a grid item's min-width defaults to
+   auto, so a wide image (its intrinsic size) would inflate the 1fr track
+   past the page instead of shrinking to fit. */
+.main { min-width: 0; border-right: 1px solid var(--hair); }
 .sidebar { min-width: 0; }
 
 .side { padding: var(--sp5); }
