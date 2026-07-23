@@ -588,6 +588,22 @@ a:hover { text-decoration: underline; }
   color: var(--muted);
 }
 
+/* Thematic break — five quiet em dashes in the mono voice, not a rule
+   line; hairlines are for page structure, not prose. */
+.article hr,
+.entry hr {
+  margin: var(--sp6) 0;
+  border: 0;
+  font: 400 var(--fs-sm) var(--mono);
+  text-align: center;
+  color: var(--muted);
+}
+.article hr::before,
+.entry hr::before {
+  content: "— — — — —";
+  word-spacing: var(--sp3);
+}
+
 /* --------------------------------------------------------------------------
    Post footer — tag chips, related ledger, bio
    -------------------------------------------------------------------------- */
