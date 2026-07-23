@@ -3,13 +3,18 @@
   concerns stay in one place. Obsidian's dialect is handled here:
   [[wikilinks]] resolve against the entry index at the AST level (so
   code blocks stay literal), and ![[image embeds]] become /attachments/
-  images."
+  images. Raw HTML passes through verbatim (per CommonMark), and $ is
+  never a formula delimiter — the site has no math rendering, so $
+  always means money."
   (:require [clojure.string :as str]
+            [hiccup2.core :as h]
             [nextjournal.markdown :as md]
             [nextjournal.markdown.utils :as md.utils]))
 
 (def ^:private parse-ctx
-  (update md.utils/empty-doc :text-tokenizers conj md.utils/internal-link-tokenizer))
+  (-> md.utils/empty-doc
+      (assoc :disable-inline-formulas true)
+      (update :text-tokenizers conj md.utils/internal-link-tokenizer)))
 
 (def ^:private image-extensions
   #{"png" "jpg" "jpeg" "gif" "webp" "svg"})
@@ -64,6 +69,24 @@
         [:a.internal {:href url} label]
         [:span.unresolved-link label]))))
 
+(defn- raw-html
+  "Raw HTML in the source passes through unescaped; the author's own
+  vault is the only input."
+  [_ctx node]
+  (h/raw (md/node->text node)))
+
+(defn- strip-tags [s]
+  (str/replace (str s) #"<[^>]*>" ""))
+
+(defn- clean-id-heading
+  "The default heading renderer, except raw HTML is stripped from the
+  generated anchor id — a <sup> in a heading otherwise leaks tags into
+  it."
+  [ctx {:as node :keys [attrs]}]
+  ((:heading md/default-hiccup-renderers)
+   ctx
+   (cond-> node (:id attrs) (update-in [:attrs :id] strip-tags))))
+
 (defn render
   "markdown string → hiccup. `wikilinks` is {lowercased filename → url}
   (built by the content index and carried on each entry); without it,
@@ -77,7 +100,10 @@
                                       str/trim)]
                             (get wikilinks (str/lower-case t))))
          renderers (assoc md/default-hiccup-renderers
-                          :internal-link (wikilink-renderer resolve-target))]
+                          :internal-link (wikilink-renderer resolve-target)
+                          :html-inline raw-html
+                          :html-block raw-html
+                          :heading clean-id-heading)]
      (md/->hiccup renderers (md/parse parse-ctx (preprocess s))))))
 
 ;; --- introspection for publish-time lints --------------------------------
