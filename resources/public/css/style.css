@@ -39,6 +39,7 @@
   --hair2: rgba(255, 255, 255, .14);       /* nav separator, input borders */
   --hair-faint: rgba(255, 255, 255, .022); /* intra-day whisper rule */
   --code-bg: rgba(255, 255, 255, .06);     /* inline code background */
+  --shadow: rgba(0, 0, 0, .5);             /* image-mount drop shadow */
   --accent: #64d1dd;        /* teal — every title, link, wordmark */
   --on-accent: #0b1416;     /* text/glyph on a filled accent */
   --hit: rgba(100, 209, 221, .18);  /* matched-term wash on search results */
@@ -100,6 +101,7 @@
     --hair2: rgba(0, 0, 0, .16);
     --hair-faint: rgba(0, 0, 0, .045);
     --code-bg: rgba(0, 0, 0, .05);
+    --shadow: rgba(0, 0, 0, .16);
     --accent: #00778c;      /* deep teal — clears AA on the paper */
     --on-accent: #ffffff;
     --hit: rgba(0, 119, 140, .14);
@@ -547,11 +549,44 @@ a:hover { text-decoration: underline; }
   background: none;
   color: var(--fg);
 }
-.article img { max-width: 100%; height: auto; }
 .article blockquote { margin: 0 0 var(--sp2); }
 .article .quote-cite { margin: 0 0 var(--sp4); }
 
 .unresolved-link { color: var(--muted); }
+
+/* --------------------------------------------------------------------------
+   Content images — post bodies and feed cards. A photo-print mount: the
+   panel surface as matte, a hairline edge, and a hard offset shadow — the
+   same raised-panel treatment code blocks get, in both themes.
+   -------------------------------------------------------------------------- */
+
+.article img,
+.entry img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: var(--sp5) auto;
+  padding: var(--sp3);
+  background: var(--panel);
+  border: 1px solid var(--hair);
+  border-radius: var(--r-sm);
+  box-shadow: 4px 4px 0 var(--shadow);
+}
+
+/* A (raw-HTML) <figure> owns the vertical rhythm; its caption is the mono
+   metadata voice, centred under the mount. */
+.article figure,
+.entry figure { margin: var(--sp5) 0; }
+.article figure img,
+.entry figure img { margin: 0 auto; }
+.article figcaption,
+.entry figcaption {
+  max-width: 80%;
+  margin: var(--sp3) auto 0;
+  font: 400 var(--fs-sm) var(--mono);
+  text-align: center;
+  color: var(--muted);
+}
 
 /* --------------------------------------------------------------------------
    Post footer — tag chips, related ledger, bio
@@ -758,4 +793,6 @@ a:hover { text-decoration: underline; }
      vertical divider doesn't survive the wrap, so drop it. */
   .site-nav { gap: var(--sp2) var(--sp3); }
   .nav-sep { display: none; }
+  /* Thinner matte where every pixel of width counts */
+  .article img, .entry img { padding: var(--sp2); }
 }
