@@ -12,7 +12,8 @@
   {"css" "text/css" "js" "text/javascript" "json" "application/json"
    "png" "image/png" "jpg" "image/jpeg" "jpeg" "image/jpeg" "gif" "image/gif"
    "svg" "image/svg+xml" "ico" "image/x-icon" "webp" "image/webp"
-   "txt" "text/plain" "woff" "font/woff" "woff2" "font/woff2"})
+   "txt" "text/plain" "csv" "text/csv"
+   "woff" "font/woff" "woff2" "font/woff2"})
 
 (defn- static-response
   "Serves files under resources/public for asset paths. A request carrying
