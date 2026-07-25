@@ -192,6 +192,12 @@
       (is (str/includes? body "href=\"/tags/clojure/feed.xml\""))
       (is (str/includes? body "rel=\"alternate\" title=\"RSS for #clojure\""))))
 
+  (testing "tags index carries the client-side filter, hidden until its JS runs"
+    (let [{:keys [body]} (GET "/tags")]
+      (is (str/includes? body "search-prompt tag-filter"))
+      (is (str/includes? body "aria-label=\"Filter tags\""))
+      (is (str/includes? body "tag-filter-empty"))))
+
   (testing "404"
     (is (= 404 (:status (GET "/nope"))))
     (is (= 404 (:status (GET "/2026/jul/4/nope"))))))

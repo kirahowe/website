@@ -679,6 +679,13 @@ a:hover { text-decoration: underline; }
 .tag-index { padding: var(--sp5) var(--gutter) var(--sp6); }
 .tag-index .tag-cloud { gap: var(--sp3) var(--sp4); }
 
+/* The tag index's client-side filter reuses the search prompt below. It
+   ships hidden and JS reveals it, so the [hidden] attr must beat the
+   prompt's display:flex; sits tighter than the search page's bar because
+   the page header above already carries the top of the page. */
+.search-prompt.tag-filter { margin-top: var(--sp5); }
+.search-prompt[hidden] { display: none; }
+
 /* Search — a command prompt over the whole site: a borderless query bar on
    an accent baseline, relevance-ranked results with highlighted hits, and
    facet rails (type, tag) that narrow without re-typing. */
@@ -740,6 +747,17 @@ a:hover { text-decoration: underline; }
 .search-prompt button span { line-height: 1; }
 .search-prompt button .key { letter-spacing: 0; transform: translateY(-1px); }
 .search-prompt button:hover { color: var(--accent); }
+/* On /tags the × is a button (it resets the client-side filter rather
+   than linking anywhere) — take back the ENTER button's caps styling so
+   it renders exactly like the search page's × link, and honour [hidden]
+   over the button's inline-flex. */
+.search-prompt button.prompt-clear {
+  font: 400 var(--fs-lg) var(--mono);
+  line-height: 1;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.search-prompt button.prompt-clear[hidden] { display: none; }
 
 .search-summary,
 .search-hint {

@@ -3,6 +3,7 @@
   calendar), day, plus type and tag listings and the tag index. The feed
   pages reuse the home-page shell; the year page is its own dense index."
   (:require [clojure.string :as str]
+            [hiccup2.core :as h]
             [site.util :as util]
             [site.views.components :as c]
             [site.views.layout :as layout])
@@ -198,10 +199,44 @@
                          (c/sidebar (related-tags entries tag)
                                     (tag-feeds tag))))))
 
+;; Live filtering for the tag index: hides tags whose name doesn't contain
+;; the query. Matching is against the link's own text node ("#clojure"), so
+;; a digit in the query can't match the counts. The bar and the × ship
+;; hidden and the script un-hides them — without JS they'd be dead
+;; controls, and everything else on the page works fine without it.
+(def ^:private tag-filter-script
+  (str "(function(){var bar=document.querySelector('.tag-filter');"
+       "var input=bar.querySelector('input');"
+       "var clear=bar.querySelector('.prompt-clear');"
+       "var tags=document.querySelectorAll('.tag-index .tag');"
+       "var empty=document.querySelector('.tag-filter-empty');"
+       "function apply(){var q=input.value.trim().toLowerCase();var shown=0;"
+       "tags.forEach(function(a){"
+       "var hide=q!==''&&a.firstChild.textContent.toLowerCase().indexOf(q)<0;"
+       "a.hidden=hide;if(!hide)shown++;});"
+       "clear.hidden=q==='';empty.hidden=shown>0;}"
+       "input.addEventListener('input',apply);"
+       "clear.addEventListener('click',function(){input.value='';apply();input.focus();});"
+       "bar.hidden=false;})();"))
+
+(defn- tag-filter
+  "The tag index's filter bar — the search page's prompt, reused. No form
+  and no submit: it never leaves the page, so the ENTER affordance is
+  dropped and the clear × is a button, not a link."
+  []
+  [:div.search-prompt.tag-filter {:hidden true}
+   [:span.prompt-mark {:aria-hidden "true"} ">"]
+   [:input {:type "search" :placeholder "type to filter…"
+            :autocomplete "off" :aria-label "Filter tags"}]
+   [:button.prompt-clear {:type "button" :hidden true :aria-label "Clear filter"} "×"]])
+
 (defn tags-page [config index]
   (let [tags (:tag-counts index)]
     (layout/page config {:title "Tags" :path "/tags"}
                  (c/page-header "Tags" (str (count tags) " tags"))
                  (if (seq tags)
-                   [:div.tag-index (c/tag-cloud tags)]
+                   (list (tag-filter)
+                         [:div.tag-index (c/tag-cloud tags)]
+                         [:p.empty.tag-filter-empty {:hidden true} "No tags match."]
+                         [:script (h/raw tag-filter-script)])
                    [:p.empty "No tags yet."]))))
