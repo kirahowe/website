@@ -706,7 +706,8 @@ a:hover { text-decoration: underline; }
   min-width: 0;
   padding: 0;
   border: 0;
-  font: 400 var(--fs-xl) var(--sans);
+  /* one tier under the h1 display size — the query is an input, not a title */
+  font: 400 var(--fs-lg) var(--sans);
   letter-spacing: var(--ls-tight);
   color: var(--head);
   background: transparent;
