@@ -34,7 +34,8 @@
 (deftest tag-routes
   (is (= {:handler :tags} (match "/tags")))
   (is (= {:handler :tag :params {:tag :clojure}} (match "/tags/clojure")))
-  (is (= {:handler :tag :params {:tag :clojure :year 2026}} (match "/tags/clojure/2026"))))
+  (is (= {:handler :tag :params {:tag :clojure :year 2026}} (match "/tags/clojure/2026")))
+  (is (= {:handler :tag-feed :params {:tag :clojure}} (match "/tags/clojure/feed.xml"))))
 
 (deftest other-routes
   (is (= {:handler :search} (match "/search")))

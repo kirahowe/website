@@ -176,6 +176,22 @@
       (is (str/includes? body "<rss"))
       (is (str/includes? body "Hello, world"))))
 
+  (testing "tag feed: the site channel scoped to one tag"
+    (let [{:keys [status body headers]} (GET "/tags/clojure/feed.xml")]
+      (is (= 200 status))
+      (is (str/includes? (get headers "Content-Type") "rss"))
+      (is (str/includes? body "Test Site / #clojure"))
+      (is (str/includes? body "https://example.com/tags/clojure"))
+      (is (str/includes? body "Hello, world"))
+      ;; only tagged entries make it in
+      (is (not (str/includes? body "vault-publish"))))
+    ;; a tag with no entries has no feed, like its listing
+    (is (= 404 (:status (GET "/tags/zebra/feed.xml"))))
+    ;; the tag page points at the scoped feed: sidebar link + head alternate
+    (let [{:keys [body]} (GET "/tags/clojure")]
+      (is (str/includes? body "href=\"/tags/clojure/feed.xml\""))
+      (is (str/includes? body "rel=\"alternate\" title=\"RSS for #clojure\""))))
+
   (testing "404"
     (is (= 404 (:status (GET "/nope"))))
     (is (= 404 (:status (GET "/2026/jul/4/nope"))))))

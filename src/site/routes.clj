@@ -12,6 +12,7 @@
   /tags                    tag index
   /tags/clojure            entries tagged clojure
   /tags/clojure/2026       ... filtered by year
+  /tags/clojure/feed.xml   RSS scoped to the tag
   /search?q=...            search
   /feed.xml                RSS
   /drafts/<name>?preview=  token-gated draft preview
@@ -69,6 +70,9 @@
           :else nil)
 
       3 (cond
+          (and (= a "tags") (= c "feed.xml"))
+          {:handler :tag-feed :params {:tag (keyword b)}}
+
           (and (= a "tags") (util/parse-year c))
           {:handler :tag :params {:tag (keyword b)
                                   :year (util/parse-year c)}}

@@ -26,6 +26,12 @@
 (defn not-found [config]
   (html (v.layout/not-found config) 404 "public, max-age=60"))
 
+(defn- rss-ok [body]
+  {:status 200
+   :headers {"Content-Type" "application/rss+xml; charset=utf-8"
+             "Cache-Control" public-cache}
+   :body body})
+
 (defn query-params
   "\"q=hello+world&x=1\" → {\"q\" \"hello world\", \"x\" \"1\"}"
   [req]
@@ -141,7 +147,11 @@
       (not-found config))
 
     :feed
-    {:status 200
-     :headers {"Content-Type" "application/rss+xml; charset=utf-8"
-               "Cache-Control" public-cache}
-     :body (feed/rss config index)}))
+    (rss-ok (feed/rss config index))
+
+    :tag-feed
+    ;; A feed for a tag that has no entries 404s, like its listing would.
+    (let [{:keys [tag]} params]
+      (if-let [entries (seq (get (:by-tag index) tag))]
+        (rss-ok (feed/tag-rss config tag entries))
+        (not-found config)))))

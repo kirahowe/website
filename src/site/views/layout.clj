@@ -80,8 +80,10 @@
                 clean path, so ?tag= variants canonicalize to the plain
                 listing; pages with no stable URL (drafts, 404) pass none.
     :canonical  an absolute URL that replaces the self rel=canonical — an
-                entry whose canonical home is elsewhere points there."
-  [config {:keys [title path canonical]} & content]
+                entry whose canonical home is elsewhere points there.
+    :feed       {:href :title} of a feed scoped to this page (a tag's
+                RSS), advertised for discovery alongside the site feed."
+  [config {:keys [title path canonical feed]} & content]
   (let [full-title (if title
                      (str title " — " (:site-title config))
                      (:site-title config))
@@ -127,6 +129,9 @@
                [:link {:rel "stylesheet" :href (asset-url config "/css/style.css")}]
                [:link {:rel "alternate" :type "application/rss+xml"
                        :title (:site-title config) :href "/feed.xml"}]
+               (when feed
+                 [:link {:rel "alternate" :type "application/rss+xml"
+                         :title (:title feed) :href (:href feed)}])
                (when-not (:dev? config) analytics-script)]
               [:body
                (header config (nil? title))
