@@ -38,5 +38,5 @@
                  (c/cols (list (c/feed shown)
                                (when next-entry (older-link next-entry)))
                          (c/sidebar
-                          (c/recent-links (:entries index) 5)
+                          (c/recent-links (:entries index) 10)
                           (c/top-tags (:tag-counts index) 5))))))
