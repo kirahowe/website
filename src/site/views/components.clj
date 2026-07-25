@@ -173,6 +173,11 @@
       :else
       (list
        (entry-title entry terms)
+       ;; a post that opens on an image carries a little version of it
+       ;; into the preview (search results stay compact prose)
+       (when-not (seq terms)
+         (when-let [{:keys [src alt]} (markdown/lede-image (:body entry))]
+           [:a.entry-thumb {:href (:path entry)} [:img {:src src :alt alt}]]))
        [:p.entry-excerpt (highlight (row-excerpt entry terms) terms)
         (when (= :post (:type entry))
           (list " " [:a.excerpt-more {:href (:path entry)}

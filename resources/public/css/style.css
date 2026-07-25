@@ -375,6 +375,11 @@ a:hover { text-decoration: underline; }
 }
 .excerpt-more { font: 400 var(--fs-sm) var(--mono); white-space: nowrap; }
 
+/* A post that opens on an image previews with a little version of it —
+   the same photo-mount as .entry img, height-capped, linking to the post */
+.entry-thumb { display: block; width: fit-content; margin: 0 auto; }
+.entry-thumb img { max-height: 240px; margin: var(--sp4) auto; }
+
 /* link / release / tool feed cards carry their full body — the comment
    prose (muted, like an excerpt) plus any pull-quote, which reads as a
    conventional left-rule blockquote (styled below) */

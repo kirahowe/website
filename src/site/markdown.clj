@@ -137,9 +137,21 @@
        (filter #(image-extensions (str/lower-case (or (peek (str/split % #"\.")) ""))))))
 
 (defn lede
-  "The first paragraph of a markdown string — what post previews show."
+  "The first paragraph of a markdown string."
   [s]
   (first (str/split (str s) #"\n\s*\n" 2)))
+
+(defn lede-image
+  "When a body opens on an image — its first block is a lone markdown
+  image or Obsidian embed — {:src ... :alt ...}, else nil. Feed rows use
+  it to carry a small version of the image into a post's preview."
+  [s]
+  (let [block (str/trim (or (lede s) ""))]
+    (or (when-let [[_ alt src] (re-matches #"!\[([^\]]*)\]\(([^)\s]+)\)" block)]
+          {:src src :alt alt})
+        (when-let [[_ target alt] (re-matches #"!\[\[([^\]|]+?)(?:\|([^\]]*))?\]\]" block)]
+          (when (image-extensions (str/lower-case (or (peek (str/split target #"\.")) "")))
+            {:src (attachment-url target) :alt (or alt "")})))))
 
 (defn word-count
   "Rough word count of a markdown string (whitespace-separated tokens)."
@@ -167,10 +179,14 @@
       str/trim))
 
 (defn excerpt
-  "The first paragraph as plain text — markdown syntax stripped — for the
-  one-line previews in feed rows and listings."
+  "The first paragraph that has any text, as plain text — a leading
+  image-only paragraph is skipped, so a post that opens on an image still
+  previews as prose."
   [s]
-  (plain (lede s)))
+  (->> (str/split (str s) #"\n\s*\n")
+       (map plain)
+       (remove str/blank?)
+       first))
 
 (defn- add-class [[tag & more] cls]
   (let [[attrs children] (if (map? (first more))

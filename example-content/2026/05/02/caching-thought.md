@@ -6,6 +6,8 @@
  :canonical-url "https://oldblog.example.org/2026/caching"}
 ;;;
 
+![A CDN caching diagram](/attachments/caching-diagram.png)
+
 Untitled entries are fine — the date is the identity. A thought worth writing
 down: if content only changes when you publish, then *every* page except
 search is cacheable, and a CDN makes a tiny dynamic site behave like a

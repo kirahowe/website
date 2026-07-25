@@ -180,6 +180,26 @@
     (is (= 404 (:status (GET "/nope"))))
     (is (= 404 (:status (GET "/2026/jul/4/nope"))))))
 
+(deftest image-lede-posts
+  (testing "a post that opens on an image previews with a small linked image plus prose"
+    (let [{:keys [body]} (GET "/")]
+      (is (str/includes? body "class=\"entry-thumb\""))
+      (is (str/includes? body "src=\"/attachments/caching-diagram.png\""))
+      ;; the excerpt skips the image paragraph and previews the first prose
+      (is (str/includes? body "Untitled entries are fine"))))
+
+  (testing "the thumb links to the post, not the image"
+    (is (str/includes? (:body (GET "/2026/may"))
+                       "<a class=\"entry-thumb\" href=\"/2026/may/2/caching-thought\">")))
+
+  (testing "search results stay compact prose — no thumbs"
+    (let [{:keys [body]} (GET "/search" "q=cacheable")]
+      (is (str/includes? body "Untitled entries are fine"))
+      (is (not (str/includes? body "entry-thumb")))))
+
+  (testing "the attachment itself serves"
+    (is (= 200 (:status (GET "/attachments/caching-diagram.png"))))))
+
 (deftest canonical-urls
   (testing "every page declares its own absolute URL as canonical, and og:url matches"
     (let [{:keys [body]} (GET "/2026/jul/4/hello-world")]
