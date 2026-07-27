@@ -46,6 +46,7 @@
 
   /* One colour per entry type (nav words, dots, syntax) */
   --post: #cd9ce9;
+  --note: #c9d367;
   --link: #e79f4e;
   --quote: #8fdf9a;
   --release: #ff7cb8;
@@ -107,6 +108,7 @@
     --hit: rgba(0, 119, 140, .14);
 
     --post: #aa20e8;
+    --note: #5f6b00;
     --link: #c1750a;
     --quote: #378911;
     --release: #d91671;
@@ -117,6 +119,7 @@
 /* One source of truth for type → colour: an element tagged with its type
    class exposes --type-color, which its dot and nav word both read. */
 .post    { --type-color: var(--post); }
+.note    { --type-color: var(--note); }
 .link    { --type-color: var(--link); }
 .quote   { --type-color: var(--quote); }
 .release { --type-color: var(--release); }

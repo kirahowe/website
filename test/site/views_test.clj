@@ -11,7 +11,7 @@
    :site-description "Testing"
    :base-url "https://example.com"
    :content-path "example-content"
-   :entry-types [:post :link :quote :release :tool]})
+   :entry-types [:post :note :link :quote :release :tool]})
 
 (def handler
   (app/make-app config (atom (content/build-index config))))
@@ -108,6 +108,30 @@
   (testing "a quote's via credit reaches the feed too"
     (let [{:keys [body]} (GET "/quotes")]
       (is (str/includes? body "news.ycombinator.com"))))
+
+  (testing "a note publishes whole: live markup, no continuation link"
+    (let [{:keys [body]} (GET "/notes")]
+      ;; the body renders, so its links and emphasis survive the feed —
+      ;; an excerpt would have flattened both to plain text
+      (is (str/includes? body "href=\"https://example.org/short-form\""))
+      (is (str/includes? body "<em>is</em>"))
+      ;; nothing more to read: no reading-time link, and the title already
+      ;; leads home, so the foot carries no second permalink
+      (is (not (str/includes? body "min read]")))
+      (is (not (str/includes? body "class=\"permalink\"")))
+      ;; its own page still exists, reached from that title
+      (is (str/includes? body "href=\"/2026/jul/4/a-note-is-one-thought\""))))
+
+  (testing "a note's entry page carries no reading-time either"
+    (let [{:keys [status body]} (GET "/2026/jul/4/a-note-is-one-thought")]
+      (is (= 200 status))
+      (is (str/includes? body "published whole"))
+      (is (not (str/includes? body "min read")))))
+
+  (testing "under search a note drops to a highlighted excerpt, like a link"
+    (let [{:keys [body]} (GET "/search" "q=thought")]
+      (is (str/includes? body "<mark class=\"hit\">thought</mark>"))
+      (is (str/includes? body "class=\"entry-excerpt\""))))
 
   (testing "link entry title points at the external URL"
     (let [{:keys [body]} (GET "/2025/aug/30/babashka")]

@@ -15,7 +15,7 @@
 -- Mirrors :entry-types in config/config.edn — the authoritative list,
 -- in nav order. An unknown type in a content file fails indexing
 -- loudly rather than silently coining a new type.
-enum EntryType { post | link | quote | release | tool }
+enum EntryType { post | note | link | quote | release | tool }
 
 ------------------------------------------------------------
 -- Entities and Variants

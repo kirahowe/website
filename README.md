@@ -60,7 +60,7 @@ One-time setup:
 
 ## Writing
 
-- **New note in `drafts/`.** The filename is the title. A bare note with
+- **New file in `drafts/`.** The filename is the title. A bare file with
   no frontmatter publishes as a post — frontmatter is entirely optional.
   `bb new` scaffolds it from the vault's `templates/` folder; on the
   phone, Obsidian's *Insert template* command does the same — pick the
@@ -68,8 +68,8 @@ One-time setup:
   prefilled.
 - **Properties, not metadata.** Frontmatter is YAML — Obsidian's
   Properties panel. `tags` autocomplete against the vault; other entry
-  types set `type: link` / `type: quote` plus their natural fields
-  (`link`, `via`, `author`, `source`).
+  types set `type: note` / `type: link` / `type: quote` plus their
+  natural fields (`link`, `via`, `author`, `source`).
 - **`date` and `publish` are workflow properties, not entry data** — the
   site itself ignores both (a published entry's date is its folder path).
   `date` is set to today when the draft is created, but it's yours to
@@ -116,8 +116,9 @@ queue at once. It's a tiny pure-babashka picker (`src/site/tui.clj`), no
 
 A file is a draft because it lives in `drafts/`; publishing is moving it
 into the date tree. No flags to forget. `bb publish` warns about
-unresolved wikilinks, missing attachments, missing or never-seen tags,
-and a link entry without a URL — but a warning never blocks a publish.
+unresolved wikilinks, missing attachments, missing or never-seen tags, a
+link entry without a URL, and a post short enough to be a note — but a
+warning never blocks a publish.
 Run it with no name at a terminal and it offers the picker above; with no
 name in a script (or the launchd agent) it publishes every queued draft
 instead (see "Publishing from your phone" below) — `bb drafts` shows what
@@ -197,6 +198,10 @@ Body in markdown, with [[Hello world|wikilinks]] and ![[screenshot.png]].
 ```
 
 - `type` defaults to `post`; a typo'd type fails indexing loudly
+- a `note` is one thought, short enough that the feed *is* the page: it
+  publishes whole there, links and emphasis live, with no "…n min read"
+  onward link (a post previews its first paragraph and offers the rest —
+  `bb publish` warns when a post is short enough to want `type: note`)
 - quotes use `author:` and `source:` (the URL), and stay untitled unless
   a `title:` property says otherwise
 - `canonical:` marks a cross-post whose canonical home is elsewhere;
@@ -229,7 +234,7 @@ content repo on a timer.
 |-----|-------|
 | `/2026` · `/2026/jul` · `/2026/jul/4` | date archives |
 | `/2026/jul/4/hello-world` | single entry |
-| `/posts` · `/links` · `/quotes` · `/releases` · `/tools` | by type (`/2026/posts` filters by year) |
+| `/posts` · `/notes` · `/links` · `/quotes` · `/releases` · `/tools` | by type (`/2026/posts` filters by year) |
 | `/tags` · `/tags/clojure` · `/tags/clojure/2026` | by tag |
 | `/search?q=...` | full-text search |
 | `/feed.xml` | RSS |

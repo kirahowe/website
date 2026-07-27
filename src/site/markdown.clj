@@ -141,6 +141,13 @@
   [s]
   (first (str/split (str s) #"\n\s*\n" 2)))
 
+(defn one-block?
+  "Whether a body is a single block — one paragraph, with nothing after
+  it. A post this short previews whole in the feed, so its continuation
+  link leads nowhere new; `bb publish` warns and suggests `type: note`."
+  [s]
+  (= 1 (count (remove str/blank? (str/split (str s) #"\n\s*\n")))))
+
 (defn lede-image
   "When a body opens on an image — its first block is a lone markdown
   image or Obsidian embed — {:src ... :alt ...}, else nil. Feed rows use

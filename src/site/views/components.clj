@@ -10,7 +10,7 @@
             [site.search :as search]
             [site.util :as util]))
 
-(def type-order [:post :link :quote :release :tool])
+(def type-order [:post :note :link :quote :release :tool])
 
 ;; --- small atoms ---------------------------------------------------------
 
@@ -113,15 +113,22 @@
                     terms)
     (markdown/excerpt (:body entry))))
 
+(def ^:private self-titled-types
+  "Types whose feed row shows a title linking to the entry's own page.
+  Every other row needs the foot's permalink to be reachable at all: a
+  quote shows no title, and an outbound type's title points at its
+  source."
+  #{:post :note})
+
 (defn- entry-foot
   "The dense foot under a feed row: a permalink to the entry's own page
-  (for short-form types whose title/source points outbound), the type
-  (with its colour dot) and the entry's tags, flowing together on a single
+  (for the rows whose title doesn't already lead there), the type (with
+  its colour dot) and the entry's tags, flowing together on a single
   wrapping line."
   [entry]
   [:div.entry-foot {:class (name (:type entry))}
    [:span.entry-kind (dot (:type entry)) (name (:type entry))]
-   (when-not (= :post (:type entry))
+   (when-not (self-titled-types (:type entry))
      (list [:span.sep "/"] (permalink entry)))
    (when (seq (:tags entry))
      (cons [:span.sep "/"] (tag-links (:tags entry))))])
@@ -133,55 +140,93 @@
      (via-link entry)
      (source-link entry)]))
 
-(def ^:private full-body-types
-  "Short-form outbound entries whose whole body — a comment plus, often, a
-  pulled blockquote — belongs in the feed. A one-line excerpt would keep
-  only the first paragraph and silently drop any pull-quote."
-  #{:link :release :tool})
-
 (defn- entry-body
-  "A short-form entry's full rendered body for a feed row: its block
-  children (the comment paragraph and any blockquote) lifted out of the
-  render wrapper, so quotes survive where `excerpt` would drop them."
+  "An entry's full rendered body for a feed row: its block children (the
+  comment paragraph and any blockquote) lifted out of the render wrapper,
+  so quotes survive where `excerpt` would drop them."
   [entry]
   (into [:div.entry-body] (rest (markdown/render (:body entry) (:wikilinks entry)))))
 
+(defn- read-more
+  "A post's continuation link, closing its excerpt: the ellipsis into a
+  reading-time estimate for the rest of the entry."
+  [entry]
+  (list " " [:a.excerpt-more {:href (:path entry)}
+             (str "[…" (markdown/read-time (:body entry)) " min read]")]))
+
+;; --- the two row shapes --------------------------------------------------
+
+(defn- preview-row
+  "The previewing shape: a title, the lede image when the body opens on
+  one, and the first paragraph as plain prose. `tail` closes the excerpt
+  (a post's read-more link). Under an active search the prose becomes a
+  snippet following the first hit, matches are marked, and the thumb
+  drops so results stay compact."
+  ([entry opts] (preview-row entry opts nil))
+  ([entry {:keys [terms]} tail]
+   (list
+    (entry-title entry terms)
+    ;; a post that opens on an image carries a little version of it
+    ;; into the preview (search results stay compact prose)
+    (when-not (seq terms)
+      (when-let [{:keys [src alt]} (markdown/lede-image (:body entry))]
+        [:a.entry-thumb {:href (:path entry)} [:img {:src src :alt alt}]]))
+    [:p.entry-excerpt (highlight (row-excerpt entry terms) terms) tail])))
+
+(defn- full-body-row
+  "The whole-body shape: a title plus the entry's fully rendered body —
+  the links, emphasis and any pull-quote an excerpt would flatten or drop.
+  Under an active search it falls back to the previewing shape, which
+  keeps the result compact and follows the terms into the body."
+  [entry {:keys [terms] :as opts}]
+  (if (seq terms)
+    (preview-row entry opts)
+    (list (entry-title entry terms) (entry-body entry))))
+
+;; --- one row per type ----------------------------------------------------
+
+(defmulti row-content
+  "One entry's feed row above the shared type/tags foot, dispatched on its
+  type. The default is the previewing shape, so a newly configured type
+  renders acceptably before it earns a method of its own. `opts` is
+  {:terms [...]} under an active search."
+  (fn [entry _opts] (:type entry)))
+
+(defmethod row-content :default [entry opts]
+  (preview-row entry opts))
+
+;; A post is long-form: the feed shows its opening and offers the rest.
+(defmethod row-content :post [entry opts]
+  (preview-row entry opts (read-more entry)))
+
+;; A note is short by construction — the feed is where it's read. It
+;; carries its whole body, and offers no continuation link to a page that
+;; would only repeat it.
+(defmethod row-content :note [entry opts]
+  (full-body-row entry opts))
+
+;; The outbound types comment on something elsewhere; the comment is the
+;; whole entry, so it publishes whole (pull-quote included).
+(defmethod row-content :link [entry opts] (full-body-row entry opts))
+(defmethod row-content :release [entry opts] (full-body-row entry opts))
+(defmethod row-content :tool [entry opts] (full-body-row entry opts))
+
+;; A quote is its blockquote and its attribution — no title of its own.
+(defmethod row-content :quote [entry {:keys [terms]}]
+  (list
+   (if (seq terms)
+     [:blockquote.quote (highlight (row-excerpt entry terms) terms) [:span.quote-close "”"]]
+     (quote-blockquote entry))
+   (quote-source entry)))
+
 (defn entry-row
-  "One entry in the feed. Short-form types carry their whole body: a quote
-  as a blockquote with a linked source; a link/release/tool as its comment
-  plus any pull-quote. A post renders as title + excerpt with a
-  reading-time link. Every row closes with the type/tags foot. With
-  {:terms [...]} (an active search), title and prose matches are marked and
-  the full-body types drop to an excerpt that follows the hit into the
-  body — keeping match highlighting and a compact result."
+  "One entry in the feed: its type's row content, closed by the type/tags
+  foot every row shares. With {:terms [...]} (an active search), title and
+  prose matches are marked."
   ([entry] (entry-row entry nil))
-  ([entry {:keys [terms]}]
+  ([entry opts]
    [:article.entry
-    (cond
-      (= :quote (:type entry))
-      (list
-       (if (seq terms)
-         [:blockquote.quote (highlight (row-excerpt entry terms) terms) [:span.quote-close "”"]]
-         (quote-blockquote entry))
-       (quote-source entry))
-
-      (and (full-body-types (:type entry)) (not (seq terms)))
-      (list
-       (entry-title entry terms)
-       (entry-body entry))
-
-      :else
-      (list
-       (entry-title entry terms)
-       ;; a post that opens on an image carries a little version of it
-       ;; into the preview (search results stay compact prose)
-       (when-not (seq terms)
-         (when-let [{:keys [src alt]} (markdown/lede-image (:body entry))]
-           [:a.entry-thumb {:href (:path entry)} [:img {:src src :alt alt}]]))
-       [:p.entry-excerpt (highlight (row-excerpt entry terms) terms)
-        (when (= :post (:type entry))
-          (list " " [:a.excerpt-more {:href (:path entry)}
-                     (str "[…" (markdown/read-time (:body entry)) " min read]")]))]))
+    (row-content entry opts)
     (entry-foot entry)]))
 
 (defn day-group

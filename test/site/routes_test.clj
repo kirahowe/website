@@ -2,7 +2,7 @@
   (:require [clojure.test :refer [deftest is testing]]
             [site.routes :as routes]))
 
-(def config {:entry-types [:post :link :quote :release :tool]})
+(def config {:entry-types [:post :note :link :quote :release :tool]})
 
 (defn- match [uri]
   (routes/match-route config (routes/path-segments uri)))
@@ -24,6 +24,7 @@
 
 (deftest type-routes
   (is (= {:handler :type-list :params {:type :post}} (match "/posts")))
+  (is (= {:handler :type-list :params {:type :note}} (match "/notes")))
   (is (= {:handler :type-list :params {:type :quote}} (match "/quotes")))
   (is (= {:handler :type-list :params {:type :link :year 2026}} (match "/2026/links")))
   (is (= {:handler :type-list :params {:type :release}} (match "/releases")))

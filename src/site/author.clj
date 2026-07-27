@@ -173,7 +173,10 @@
       (println (str "New tags (first use): " (str/join ", " (map name new-tags)))))
     (when (and (#{:link :release :tool} (:type draft))
                (not (:link-url draft)))
-      (warn "a " (name (:type draft)) " without a link property has no outbound URL"))))
+      (warn "a " (name (:type draft)) " without a link property has no outbound URL"))
+    (when (and (= :post (:type draft)) (markdown/one-block? body))
+      (warn "a one-paragraph post shows its whole body in the feed — "
+            "`type: note` fits it better (no continuation link)"))))
 
 (defn- fly-app-name []
   (when (fs/exists? "fly.toml")

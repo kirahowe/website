@@ -7,7 +7,7 @@
            [java.nio.file.attribute FileAttribute]))
 
 (def config
-  {:entry-types [:post :link :quote :release :tool]
+  {:entry-types [:post :note :link :quote :release :tool]
    :content-path "example-content"})
 
 (deftest frontmatter-parsing
@@ -108,7 +108,7 @@
 (deftest index-building
   (let [index (content/build-index config)]
     (testing "all example entries load, newest first"
-      (is (= 8 (count (:entries index))))
+      (is (= 9 (count (:entries index))))
       (is (= "/2026/jul/4/nextjournal-markdown" (:path (first (:entries index)))))
       (is (apply >= (map #(-> % :date :year) (:entries index)))))
 
@@ -121,11 +121,12 @@
       (is (some? (get (:by-path index) "/2025/nov/12/repl-driven")))
       (is (nil? (get (:by-path index) "/2025/nov/12/repl-driven-development"))))
 
-    (testing "same-day entries both load"
-      (is (= 2 (count (get (:by-day index) [2026 7 4])))))
+    (testing "same-day entries all load"
+      (is (= 3 (count (get (:by-day index) [2026 7 4])))))
 
     (testing "type and tag groupings"
       (is (= 3 (count (get (:by-type index) :post))))
+      (is (= 1 (count (get (:by-type index) :note))))
       (is (= 2 (count (get (:by-type index) :link))))
       (is (= 1 (count (get (:by-type index) :quote))))
       (is (= 1 (count (get (:by-type index) :release))))
