@@ -180,19 +180,17 @@
     (when (seq counts)
       (c/side-section "Related tags" (c/tag-cloud (take 6 counts))))))
 
-(defn- tag-feed-url [tag] (str "/tags/" (name tag) "/feed.xml"))
-
 (defn- tag-feeds [tag]
   (c/side-section "Feeds"
-                  (c/side-link {:path (tag-feed-url tag) :title (str "RSS for #" (name tag))})
+                  (c/side-link {:path (util/tag-feed-url tag) :title (str "RSS for #" (name tag))})
                   (c/side-link {:path "/tags" :title "All tags"})))
 
 (defn tag-page [config tag year entries]
   (let [heading (header-parts (list [:span.hash "#"] (name tag))
                               [(when year (filter-chip (str year) (str "/tags/" (name tag))))])]
     (layout/page config {:title (str "#" (name tag) (when year (str " / " year)))
-                         :path (str "/tags/" (name tag) (when year (str "/" year)))
-                         :feed {:href (tag-feed-url tag)
+                         :path (str (util/tag-url tag) (when year (str "/" year)))
+                         :feed {:href (util/tag-feed-url tag)
                                 :title (str "RSS for #" (name tag))}}
                  (c/page-header heading (c/count-label (count entries)))
                  (c/cols (c/feed entries)

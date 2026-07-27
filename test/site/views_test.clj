@@ -174,7 +174,10 @@
       (is (= 200 status))
       (is (str/includes? (get headers "Content-Type") "rss"))
       (is (str/includes? body "<rss"))
-      (is (str/includes? body "Hello, world"))))
+      (is (str/includes? body "Hello, world"))
+      ;; the channel names its own address, so a reader never has to
+      ;; re-derive it from the channel link
+      (is (str/includes? body "href=\"https://example.com/feed.xml\" rel=\"self\""))))
 
   (testing "tag feed: the site channel scoped to one tag"
     (let [{:keys [status body headers]} (GET "/tags/clojure/feed.xml")]
@@ -184,13 +187,20 @@
       (is (str/includes? body "https://example.com/tags/clojure"))
       (is (str/includes? body "Hello, world"))
       ;; only tagged entries make it in
-      (is (not (str/includes? body "vault-publish"))))
+      (is (not (str/includes? body "vault-publish")))
+      ;; rel=self is the tag's own feed, not the site feed — a reader that
+      ;; re-resolves this feed must land back on the scoped one
+      (is (str/includes? body "href=\"https://example.com/tags/clojure/feed.xml\" rel=\"self\"")))
     ;; a tag with no entries has no feed, like its listing
     (is (= 404 (:status (GET "/tags/zebra/feed.xml"))))
     ;; the tag page points at the scoped feed: sidebar link + head alternate
     (let [{:keys [body]} (GET "/tags/clojure")]
       (is (str/includes? body "href=\"/tags/clojure/feed.xml\""))
-      (is (str/includes? body "rel=\"alternate\" title=\"RSS for #clojure\""))))
+      (is (str/includes? body "rel=\"alternate\" title=\"RSS for #clojure\""))
+      ;; ...and it comes FIRST, ahead of the site-wide feed: autodiscovery
+      ;; takes the first alternate, so the order is the subscription
+      (is (< (str/index-of body "href=\"/tags/clojure/feed.xml\" rel=\"alternate\"")
+             (str/index-of body "href=\"/feed.xml\" rel=\"alternate\"")))))
 
   (testing "tags index carries the client-side filter, hidden until its JS runs"
     (let [{:keys [body]} (GET "/tags")]

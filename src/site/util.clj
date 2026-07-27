@@ -58,6 +58,15 @@
 (defn month-label [[year month]]
   (str (month-name month) " " year))
 
+(defn tag-url [tag]
+  (str "/tags/" (name tag)))
+
+(defn tag-feed-url
+  "A tag's scoped RSS. Built here so the page that advertises the feed and
+  the feed that names itself can't drift apart."
+  [tag]
+  (str (tag-url tag) "/feed.xml"))
+
 (defn format-date
   "{:year 2026 :month 7 :day 4} → \"July 4, 2026\""
   [{:keys [year month day]}]

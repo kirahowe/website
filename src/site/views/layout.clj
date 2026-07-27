@@ -82,7 +82,7 @@
     :canonical  an absolute URL that replaces the self rel=canonical — an
                 entry whose canonical home is elsewhere points there.
     :feed       {:href :title} of a feed scoped to this page (a tag's
-                RSS), advertised for discovery alongside the site feed."
+                RSS), advertised for discovery ahead of the site feed."
   [config {:keys [title path canonical feed]} & content]
   (let [full-title (if title
                      (str title " — " (:site-title config))
@@ -127,11 +127,16 @@
                [:meta {:name "twitter:description" :content (:site-description config)}]
                [:meta {:name "twitter:image" :content og-image}]
                [:link {:rel "stylesheet" :href (asset-url config "/css/style.css")}]
-               [:link {:rel "alternate" :type "application/rss+xml"
-                       :title (:site-title config) :href "/feed.xml"}]
+               ;; Feed autodiscovery. A page with a scoped feed (a tag's)
+               ;; advertises it FIRST: a reader handed the page URL takes
+               ;; the first alternate it finds, so listing the site feed
+               ;; ahead of it is what quietly turns "subscribe to #clojure"
+               ;; into "subscribe to everything".
                (when feed
                  [:link {:rel "alternate" :type "application/rss+xml"
                          :title (:title feed) :href (:href feed)}])
+               [:link {:rel "alternate" :type "application/rss+xml"
+                       :title (:site-title config) :href "/feed.xml"}]
                (when-not (:dev? config) analytics-script)]
               [:body
                (header config (nil? title))
