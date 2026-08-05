@@ -9,8 +9,7 @@
             [site.views.layout :as layout]))
 
 (def ^:private default-bio
-  "Kira Howe is a software engineer writing about Clojure, data, and the
-  craft of building small, durable software.")
+  "Kira Howe is a software engineer writing about building with care in the age of AI.")
 
 (defn- first-name [config]
   (first (str/split (:site-title config) #"\s+")))

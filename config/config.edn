@@ -21,7 +21,7 @@
  :entry-types [:post :note :link :quote :release :tool]
 
  ;; Short bio shown in the footer of every entry page.
- :bio "Kira Howe is a software engineer writing about Clojure, data, and the craft of building small, durable software."
+ :bio "Kira Howe is a software engineer writing about building with care in the age of AI."
 
  ;; Footer social links, [label url]. RSS is always included first.
  :social [["GitHub" "https://github.com/kirahowe"]]
