@@ -1,7 +1,8 @@
 /* ==========================================================================
    Kira Howe — a dense, programmer-flavored web log.
    Warm charcoal + a single teal accent, system sans / mono type.
-   Dual theme: dark by default, light via prefers-color-scheme. No JS.
+   Dual theme: OS preference decides by default; a footer control can
+   override it — the site's only JavaScript.
 
    The system, in five rules:
    1. Two voices. Sans carries content (titles, prose, excerpts); mono
@@ -24,33 +25,36 @@
    -------------------------------------------------------------------------- */
 
 :root {
-  /* Dark canvas/scrollbars/controls by default; the light media query
-     below flips it. Paired with the color-scheme <meta> so navigation
-     never flashes a white backdrop before this stylesheet paints. */
-  color-scheme: dark;
+  /* Both schemes ship; dark first, so a visitor with no OS preference and
+     no stored override (see :root[data-theme] below) still gets the dark
+     canvas — matching the color-scheme <meta> and the pre-paint script in
+     <head>, so the first frame of every navigation agrees with this. */
+  color-scheme: dark light;
 
-  /* Dark theme (default) */
-  --bg: #17171a;            /* page background — near-black, faintly warm */
-  --panel: #212125;         /* code blocks, subtle raised areas */
-  --fg: #d6d4cc;            /* body text */
-  --head: #f1efe8;          /* headings, strong text */
-  --muted: #908d83;         /* metadata, dates, labels */
-  --hair: rgba(255, 255, 255, .08);        /* standard hairline rule */
-  --hair2: rgba(255, 255, 255, .14);       /* nav separator, input borders */
-  --hair-faint: rgba(255, 255, 255, .022); /* intra-day whisper rule */
-  --code-bg: rgba(255, 255, 255, .06);     /* inline code background */
-  --shadow: rgba(0, 0, 0, .5);             /* image-mount drop shadow */
-  --accent: #64d1dd;        /* teal — every title, link, wordmark */
-  --on-accent: #0b1416;     /* text/glyph on a filled accent */
-  --hit: rgba(100, 209, 221, .18);  /* matched-term wash on search results */
+  /* Palette — each token declared once via light-dark(light, dark) instead
+     of twice, so a manual override (below) only has to flip color-scheme,
+     never redeclare a colour. */
+  --bg: light-dark(#fcfcfc, #17171a);       /* page background — near-white paper in light, near-black and faintly warm in dark */
+  --panel: light-dark(#ffffff, #212125);    /* code blocks, subtle raised areas */
+  --fg: light-dark(#33312b, #d6d4cc);       /* body text */
+  --head: light-dark(#17150f, #f1efe8);     /* headings, strong text */
+  --muted: light-dark(#6d6a60, #908d83);    /* metadata, dates, labels — light value darkened to clear 4.5:1 on the paper */
+  --hair: light-dark(rgba(0, 0, 0, .1), rgba(255, 255, 255, .08));         /* standard hairline rule */
+  --hair2: light-dark(rgba(0, 0, 0, .16), rgba(255, 255, 255, .14));      /* nav separator, input borders */
+  --hair-faint: light-dark(rgba(0, 0, 0, .045), rgba(255, 255, 255, .022)); /* intra-day whisper rule */
+  --code-bg: light-dark(rgba(0, 0, 0, .05), rgba(255, 255, 255, .06));    /* inline code background */
+  --shadow: light-dark(rgba(0, 0, 0, .16), rgba(0, 0, 0, .5));            /* image-mount drop shadow */
+  --accent: light-dark(#00778c, #64d1dd);   /* teal — every title, link, wordmark; light value deepened to clear AA on the paper */
+  --on-accent: light-dark(#ffffff, #0b1416); /* text/glyph on a filled accent */
+  --hit: light-dark(rgba(0, 119, 140, .14), rgba(100, 209, 221, .18));    /* matched-term wash on search results */
 
   /* One colour per entry type (nav words, dots, syntax) */
-  --post: #cd9ce9;
-  --note: #c9d367;
-  --link: #e79f4e;
-  --quote: #8fdf9a;
-  --release: #ff7cb8;
-  --tool: #a5a8f5;
+  --post: light-dark(#8e22c2, #cd9ce9);
+  --note: light-dark(#5f6b00, #c9d367);
+  --link: light-dark(#c25522, #e79f4e);
+  --quote: light-dark(#378911, #8fdf9a);
+  --release: light-dark(#da2b6e, #ff7cb8);
+  --tool: light-dark(#6d6dea, #a5a8f5);
 
   /* Spacing scale — every gap/pad/margin references one of these */
   --sp1: 4px;
@@ -90,31 +94,13 @@
   --ls-caps: .12em;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color-scheme: light;
-    --bg: #f9f9f9;          /* near-white paper */
-    --panel: #ffffff;
-    --fg: #33312b;
-    --head: #17150f;
-    --muted: #6d6a60;       /* darkened to clear 4.5:1 on the paper */
-    --hair: rgba(0, 0, 0, .1);
-    --hair2: rgba(0, 0, 0, .16);
-    --hair-faint: rgba(0, 0, 0, .045);
-    --code-bg: rgba(0, 0, 0, .05);
-    --shadow: rgba(0, 0, 0, .16);
-    --accent: #00778c;      /* deep teal — clears AA on the paper */
-    --on-accent: #ffffff;
-    --hit: rgba(0, 119, 140, .14);
-
-    --post: #aa20e8;
-    --note: #5f6b00;
-    --link: #c1750a;
-    --quote: #378911;
-    --release: #d91671;
-    --tool: #6d6dea;
-  }
-}
+/* Manual override: an attribute selector outranks a bare :root, and every
+   token above resolves off color-scheme — so flipping this one property
+   repaints the whole palette, no token redeclared. Set by the pre-paint
+   script in <head> and kept in sync by the footer toggle; absent, "system"
+   is in effect and the dark-light default above decides. */
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"]  { color-scheme: dark; }
 
 /* One source of truth for type → colour: an element tagged with its type
    class exposes --type-color, which its dot and nav word both read. */
@@ -825,6 +811,33 @@ a:hover { text-decoration: underline; }
   color: var(--muted);
 }
 .site-footer .social { display: flex; flex-wrap: wrap; gap: var(--sp1) var(--sp4); }
+
+/* .site-footer is space-between with exactly two children; the social
+   links and the theme toggle share this wrapper so they land together at
+   the right edge instead of the toggle pushing .social to the centre. */
+.footer-end { display: flex; align-items: center; gap: var(--sp4); }
+
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  padding: var(--sp1);
+  background: none;
+  border: 0;
+  border-radius: var(--r-sm);
+  color: var(--muted);
+  cursor: pointer;
+}
+.theme-toggle:hover { color: var(--accent); }  /* muted chrome warms to accent — rule 2 */
+/* Ships hidden until theme-toggle-script confirms JS can drive it (see
+   layout.clj); [hidden] alone loses to the display: flex above without this. */
+.theme-toggle[hidden] { display: none; }
+
+/* All three icons live in the DOM; data-mode (the button's own current
+   mode) picks the one that shows — no separate state to fall out of sync. */
+.theme-toggle svg { display: none; width: 15px; height: 15px; }
+.theme-toggle[data-mode="light"]  .i-light,
+.theme-toggle[data-mode="dark"]   .i-dark,
+.theme-toggle[data-mode="system"] .i-system { display: block; }
 
 /* --------------------------------------------------------------------------
    Narrow screens — a tighter gutter, and the columns stack

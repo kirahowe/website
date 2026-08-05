@@ -1,7 +1,8 @@
 (ns site.views-test
   "End-to-end: exercises the whole Ring app as a plain function against
   example-content — routing, content loading, markdown rendering, views."
-  (:require [clojure.string :as str]
+  (:require [clojure.data.xml :as xml]
+            [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
             [site.app :as app]
             [site.content :as content]))
@@ -361,17 +362,74 @@
   (let [{:keys [status headers]} (GET "/css/style.css")]
     (is (= 200 status))
     (is (= "text/css" (get headers "Content-Type"))))
+  (testing "the favicon trio resolves at the bare root, not just under /images"
+    (let [{:keys [status headers body]} (GET "/favicon.svg")]
+      (is (= 200 status))
+      (is (= "image/svg+xml" (get headers "Content-Type")))
+      ;; Served as XML, parsed strictly by browsers — malformed markup
+      ;; (say, a "--" inside a comment) is a blank tab icon, not a nit.
+      ;; parse-str is lazy; walking the whole tree is what makes bad
+      ;; markup actually throw here.
+      (is (pos? (count (xml-seq (xml/parse-str (slurp body)))))))
+    (let [{:keys [status headers]} (GET "/favicon.ico")]
+      (is (= 200 status))
+      (is (= "image/x-icon" (get headers "Content-Type"))))
+    (let [{:keys [status headers]} (GET "/apple-touch-icon.png")]
+      (is (= 200 status))
+      (is (= "image/png" (get headers "Content-Type")))))
   (testing "pages link assets by content-hashed URLs (cache busting)"
     (let [body (:body (GET "/"))]
       (is (re-find #"/css/style\.css\?v=[0-9a-f]{8}" body))
-      (is (re-find #"/images/og\.png\?v=[0-9a-f]{8}" body))))
+      (is (re-find #"/images/og\.png\?v=[0-9a-f]{8}" body))
+      (is (re-find #"/favicon\.svg\?v=[0-9a-f]{8}" body))))
   (testing "a ?v= request is cacheable forever; a bare one keeps a TTL"
     (is (str/includes? (get-in (GET "/css/style.css" "v=abc12345") [:headers "Cache-Control"])
                        "immutable"))
     (is (not (str/includes? (get-in (GET "/css/style.css") [:headers "Cache-Control"])
                             "immutable"))))
   (testing "no path traversal"
-    (is (not= 200 (:status (GET "/css/../../config/config.edn"))))))
+    (is (not= 200 (:status (GET "/css/../../config/config.edn")))))
+  (testing "the root carve-out serves three named files, not the root itself"
+    ;; re-matches anchors, so a near-miss on either side of a carved-out
+    ;; name is not a path the pattern can reach.
+    (is (not= 200 (:status (GET "/xfavicon.ico"))))
+    (is (not= 200 (:status (GET "/favicon.ico.bak"))))
+    (is (not= 200 (:status (GET "/config.edn"))))))
+
+(deftest theme-toggle
+  (testing "every page's head runs the pre-paint script before first paint"
+    (is (str/includes? (:body (GET "/")) "localStorage.getItem('theme')"))
+    (is (str/includes? (:body (GET "/2026/jul/4/hello-world")) "localStorage.getItem('theme')")))
+
+  (testing "the footer carries the toggle, hidden until its own script un-hides it"
+    (let [{:keys [body]} (GET "/")]
+      (is (str/includes? body "id=\"theme-toggle\""))
+      (is (str/includes? body "class=\"theme-toggle\""))
+      (is (re-find #"<button[^>]*class=\"theme-toggle\"[^>]*hidden" body))))
+
+  (testing "all three icons ship in the DOM"
+    (let [{:keys [body]} (GET "/")]
+      (is (str/includes? body "class=\"i-light\""))
+      (is (str/includes? body "class=\"i-dark\""))
+      (is (str/includes? body "class=\"i-system\""))
+      ;; decorative: the button's aria-label is the accessible name, so an
+      ;; icon announcing itself as well would read the control out twice
+      (doseq [icon ["i-light" "i-dark" "i-system"]]
+        (is (str/includes? body (str "aria-hidden=\"true\" class=\"" icon "\""))))))
+
+  (testing "the accessible name states the mode AND what pressing does"
+    (let [{:keys [body]} (GET "/")]
+      (is (str/includes? body "aria-label=\"Theme: system (follows your device). Click to switch to light.\""))
+      ;; the handler relabels from the same map the markup rendered from,
+      ;; so every mode it can reach has a name shipped with the page
+      (doseq [label ["Click to switch to light" "Click to switch to dark"
+                     "Click to switch to system"]]
+        (is (str/includes? body label)))))
+
+  (testing "an inner page carries the toggle too, not just the homepage"
+    (let [{:keys [body]} (GET "/2026/jul/4/hello-world")]
+      (is (str/includes? body "id=\"theme-toggle\""))
+      (is (str/includes? body "class=\"i-light\"")))))
 
 (deftest no-admin-http-surface
   (testing "there is no reindex endpoint — the server has no admin routes"

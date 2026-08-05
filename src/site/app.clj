@@ -19,9 +19,16 @@
   "Serves files under resources/public for asset paths. A request carrying
   the ?v= content hash (how layout links every asset) is cacheable
   forever — a changed asset arrives at a new URL — while a bare request
-  keeps a TTL, since nothing busts its cache when the file changes."
+  keeps a TTL, since nothing busts its cache when the file changes.
+
+  The favicon files are named exceptions at the root: browsers, feed
+  readers and bookmarking services request /favicon.ico directly, never
+  by way of a linked, hashed URL, so it (and its SVG/apple-touch-icon
+  siblings) must resolve at that bare path or they're never found. Each
+  is spelled out rather than opening the root to `.+`, so nothing else
+  up there becomes accidentally servable."
   [uri query-string]
-  (when (and (re-matches #"/(css|js|images|fonts)/.+" uri)
+  (when (and (re-matches #"/(?:(?:css|js|images|fonts)/.+|favicon\.(?:svg|ico)|apple-touch-icon\.png)" uri)
              (not (str/includes? uri "..")))
     (when-let [res (io/resource (str "public" uri))]
       (let [ext (peek (str/split uri #"\."))
