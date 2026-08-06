@@ -1,7 +1,7 @@
 # website
 
-My personal weblog of posts, links, quotes, and more, rendered from an Obsidian vault by a small Clojure program using [babashka](https://babashka.org).
-I wanted authoring content to be as easy as adding to my personal wiki (in Obsidian), with the tooling handling the complexity of transforming all those files into a website. The build process handles parsing frontmatter, `[[wikilinks]]`, pasted images, and organizing the content.
+My personal weblog of posts, links, quotes, and more — markdown files in a git repo, rendered by a small Clojure program using [babashka](https://babashka.org).
+Writing and publishing happen in a companion admin app (`website-admin`, its own repo); the tooling here turns the published files into a website — parsing frontmatter, `[[wikilinks]]`, pasted images, and organizing the content. The format is Obsidian's, where the site began, and dev mode still serves an Obsidian vault directly.
 
 This project was written almost entirely by Claude (Opus 4.8 and Fable 5). See [PLAN.md](PLAN.md) for the original AI-generated architecture and its rationale. More details about how it works are below, and instructions in case you ever want to clone this and up a similar website.
 
@@ -15,75 +15,71 @@ bb test       # run the test suite
 
 (To see the website with some realistic-looking fake data point `:content-path` in `config/dev.edn` at `example-content`.)
 
-## How content reaches the site: iCloud vault + a separate git repo
+## How content reaches the site
 
-Two directories, and **git never lives inside iCloud** so that iCloud can't corrupt it.
+Content lives in its own public git repo (the *content repo*), separate from
+this code repo. The admin app writes it: drafts live in a private drafts
+repo, and publishing commits the finished entry straight into the content
+repo's date tree through the GitHub API — from any device, no Mac involved.
 
 ```
-iCloud vault (source of truth)            Publish repo (transport, disposable)
-~/…/Obsidian/Documents/Blog/              ~/code/projects/kirahowe-content/
-├── drafts/       ← you write here         ├── .git/     ← OUTSIDE iCloud
-├── 2026/07/…     ← published              ├── 2026/07/…
-├── attachments/  ← pasted images          ├── attachments/
-├── pages/                                 └── pages/
-├── templates/, dev.md  (never published)      │
-└── .obsidian/          (never published)      │
-        │                                      │
-        │  iCloud ⇄ phone                      │  git push ⇄ GitHub ⇄ server
-        └──────────► bb publish / bb sync ─────┘
+admin app (PWA)                    Content repo (public, on GitHub)
+drafts → publish button ─────────► ├── 2026/07/…      the path IS the date
+                                   ├── pages/
+                                   └── attachments/
+                                        │
+                                        │  push webhook: POST /refresh
+                                        ▼
+                                   Server: git pull + reindex, in seconds
 ```
 
-- The **vault** is a plain Obsidian vault in iCloud (so my phone can see it). It contains no `.git` so that nothing git-related ever syncs to the phone or gets mangled by iCloud.
-- The **publish repo** is a normal git checkout *outside* iCloud. It's a mirror of the vault's publishable content and is disposable: if it ever wedges, delete it and re-clone. `bb publish` / `bb sync` mirror the vault into it and push, the server pulls from GitHub as usual.
-- My mac is the only bridge between the two sync systems, and only when I run `bb publish` / `bb sync`.
+The server clones the content repo at boot and refreshes two ways:
+
+- **The push webhook.** The content repo POSTs `/refresh` on every push;
+  the server pulls and reindexes within seconds of a publish. The payload's
+  sha lets it skip even the pull when it already serves that revision, and
+  a debounce coalesces a burst of pushes (one publish is several commits)
+  into at most one sync per window — trailing pushes are caught by one
+  scheduled sync, never dropped.
+- **A fallback pull** every `:content-sync-seconds` (30 minutes in prod)
+  heals a webhook delivery GitHub failed to make — it doesn't retry them.
+
+Publishing never deploys anything: content changes flow through git, code
+changes through `fly deploy`, and neither triggers the other.
 
 One-time setup:
 
-1. In Obsidian, create a dedicated vault in iCloud (everything that gets
-   published ends up on the server). Its `.obsidian/` and top-level
-   `dev.md`/`templates/` stay private — only the date tree, `pages/`, and
-   `attachments/` are mirrored out.
-2. Make a git checkout **outside** iCloud and push it once (public — the
-   server pulls it anonymously):
-   ```sh
-   mkdir -p ~/code/projects/kirahowe-content && cd $_
-   git init -b main
-   printf '.DS_Store\n' > .gitignore && git add -A && git commit -m "init"
-   gh repo create kirahowe-content --public --source . --push
-   ```
-3. In `config/dev.edn`, point `:content-path` at the vault and `:publish-repo` at
-   that checkout. In `config/prod.edn`, point `:content-git-url` at the repo.
-   Then `bb dev`, and `bb publish` / `bb sync` to push content live.
-
-> iCloud tip: right-click the vault folder → "Keep Downloaded" so iCloud
-> keeps a real local copy instead of evicting files to placeholders.
+1. Create the content repo (public — the server pulls it anonymously) with
+   the layout under "Content layout" below, and point `:content-git-url`
+   in `config/prod.edn` at it.
+2. In the content repo's settings, add a webhook: payload URL
+   `https://<your-site>/refresh`, content type `application/json`, just
+   the push event. No secret needed — the endpoint is unauthenticated by
+   design, because all it can do is trigger a debounced pull of a public
+   repo (and the site keeps its no-secrets property).
+3. For local writing, point `:content-path` in `config/dev.edn` at an
+   Obsidian vault (or any folder with the same layout) and `bb dev`.
 
 ## Writing
 
-- **New file in `drafts/`.** The filename is the title. A bare file with
-  no frontmatter publishes as a post — frontmatter is entirely optional.
-  `bb new` scaffolds it from the vault's `templates/` folder; on the
-  phone, Obsidian's *Insert template* command does the same — pick the
-  type and its properties (including `date` and `publish`, below) are
-  prefilled.
+- **A file is an entry.** The filename is the title. A bare file with no
+  frontmatter publishes as a post — frontmatter is entirely optional.
+  Drafts belong to the admin app; locally, `bb new` scaffolds one under
+  the dev vault's `drafts/` for previewing with `bb dev`.
 - **Properties, not metadata.** Frontmatter is YAML — Obsidian's
   Properties panel. `tags` autocomplete against the vault; other entry
   types set `type: note` / `type: link` / `type: quote` plus their
   natural fields (`link`, `via`, `author`, `source`).
 - **`date` and `publish` are workflow properties, not entry data** — the
   site itself ignores both (a published entry's date is its folder path).
-  `date` is set to today when the draft is created, but it's yours to
-  edit (e.g. to backdate something written over several days); `bb
-  publish` files the entry under it, falling back to today if it's
-  missing. `publish` starts `false`; see "Publishing from your phone"
-  below for what flipping it does.
+  `date` is what publishing files the entry under, falling back to today;
+  `publish` is a legacy queue toggle older vault drafts still carry.
 - **Link with `[[wikilinks]]`.** They resolve by filename to the entry's
   URL at render time. An unresolved link (e.g. to a still-unpublished
-  draft) degrades to plain text — never a dead link — and `bb publish`
-  warns about it.
-- **Paste images.** Obsidian files them under `attachments/` (the vault
-  is preconfigured); the server serves them at `/attachments/...`. An
-  image never requires a site deploy.
+  draft) degrades to plain text — never a dead link.
+- **Paste images.** Obsidian files them under `attachments/`; the admin
+  app stages and promotes them the same way. The server serves them at
+  `/attachments/...` — an image never requires a site deploy.
 - **Slugs are automatic**: `slugify(filename)`. A `slug:` property exists
   only to pin a URL (e.g. one inherited from an old blog).
 - **Content that lived (or lives) elsewhere.** Two properties keep the
@@ -97,74 +93,27 @@ One-time setup:
   bulk-redirects CSV to serve from wherever the old domain now points.
 
 ```sh
-bb new post My great idea      # scaffolds drafts/My great idea.md
+bb new post My great idea      # scaffolds drafts/My great idea.md in the dev vault
 # ...write — with `bb dev` running, preview at localhost:8100/drafts/My great idea
-bb suggest-tags my-great-idea  # LLM-suggested tags, printed ready to paste
-bb reindex                     # optional: validate that everything parses
-bb drafts                      # see every draft, and which are queued (publish: true)
-bb publish my-great-idea       # lints, moves it into its date folder, mirrors + pushes
+bb suggest-tags my-great-idea  # LLM-suggested tags, written into the draft
+bb suggest-slug my-great-idea  # LLM-suggested URL slugs, pinned to the draft
+bb reindex                     # validate that everything parses
+bb drafts                      # list every draft in the dev vault
 ```
 
 Don't feel like typing a name? Run these with no argument and they hand
 you a menu instead (↑/↓ or j/k, Enter to pick, q/Esc to cancel):
-`bb new` picks an entry type (and then asks for an optional title),
-`bb suggest-tags` lists every draft or published entry that still has no
-tags (a post can go out untagged and want tags after the fact), and `bb
-publish` lists every draft — with a shortcut at the top to flush the whole
-queue at once. It's a tiny pure-babashka picker (`src/site/tui.clj`), no
-`gum`/`fzf` to install.
+`bb new` picks an entry type (and then asks for an optional title), and
+`bb suggest-tags` / `bb suggest-slug` list every draft or entry that
+still wants tags or a slug. It's a tiny pure-babashka picker
+(`src/site/tui.clj`), no `gum`/`fzf` to install.
 
-A file is a draft because it lives in `drafts/`; publishing is moving it
-into the date tree. No flags to forget. `bb publish` warns about
-unresolved wikilinks, missing attachments, missing or never-seen tags, a
-link entry without a URL, and a post short enough to be a note — but a
-warning never blocks a publish.
-Run it with no name at a terminal and it offers the picker above; with no
-name in a script (or the launchd agent) it publishes every queued draft
-instead (see "Publishing from your phone" below) — `bb drafts` shows what
-that would do.
-
-**Editing or deleting something already published?** Change it in Obsidian,
-then `bb sync` — it re-mirrors the vault into the publish repo and pushes,
-deletions included. `bb publish` does this automatically for the draft it
-publishes; `bb sync` is for everything else.
-
-`bb publish` **is** the manual publish. The live site picks the push up
-on its next timed pull (≤ `:content-sync-seconds`); to go live right
-now, `fly apps restart <app>` — `bb publish` prints this command for you.
-
-## Publishing from your phone
-
-Writing happens anywhere the vault syncs to — including the phone — but
-publishing still needs a git push, which only the Mac can do. The bridge
-is the `publish` property: flip it to `true` in Obsidian on your phone to
-queue a draft, and a launchd agent on the Mac notices and publishes it.
-The agent is optional, though — a bare `bb publish` at the Mac's terminal
-lets you pick a draft (or the flush-the-queue shortcut) by hand, any time.
-
-```sh
-bb autopublish install     # once, on the Mac, from the project root
-```
-
-That installs a user launchd agent that runs `bb publish-queued` every
-5 minutes: it publishes every queued draft under its authored `date`
-(oldest first), mirrors, and pushes — the same as running `bb publish`
-by hand, just unattended. A draft with a broken date property is warned
-about and skipped rather than blocking the rest of the queue, and the
-agent refuses to publish anything at all if the content tree doesn't
-index cleanly (the same stance `bb sync` takes).
-
-A few things follow from that being a Mac-local agent, not a server:
-
-- **The Mac has to be awake and signed into iCloud** for the vault to
-  have synced down the flipped `publish` property in the first place.
-- **Pushes use your normal git credentials** — an SSH key loaded into
-  Keychain works fine under launchd.
-- Once pushed, it's live within the usual content-sync window
-  (≤ `:content-sync-seconds`), same as any other publish.
-- Logs land at `~/Library/Logs/website-autopublish.log`.
-- `bb autopublish status` shows whether it's installed and running, plus
-  the tail of the log; `bb autopublish uninstall` removes it.
+**Publishing** is the admin app's job: it refuses a blank or unconfirmed
+slug, refuses URL collisions, files the entry into the content repo's
+`YYYY/MM/DD/` folder, and promotes its images — then the push webhook has
+it live in seconds. Editing or deleting something already published is a
+commit to the content repo, through the admin app or by hand; any push
+refreshes the site the same way.
 
 ## Content layout
 
@@ -172,7 +121,7 @@ Whatever `:content-path` points at:
 
 ```
 my-vault/
-├── drafts/                      # all writing starts here (flat — phone-friendly)
+├── drafts/                      # dev-vault drafts (never published from here)
 │   └── An idea brewing.md
 ├── pages/                       # static pages → /about, etc.
 │   └── about.md
@@ -200,8 +149,7 @@ Body in markdown, with [[Hello world|wikilinks]] and ![[screenshot.png]].
 - `type` defaults to `post`; a typo'd type fails indexing loudly
 - a `note` is one thought, short enough that the feed *is* the page: it
   publishes whole there, links and emphasis live, with no "…n min read"
-  onward link (a post previews its first paragraph and offers the rest —
-  `bb publish` warns when a post is short enough to want `type: note`)
+  onward link (a post previews its first paragraph and offers the rest)
 - quotes use `author:` and `source:` (the URL), and stay untitled unless
   a `title:` property says otherwise
 - `canonical:` marks a cross-post whose canonical home is elsewhere;
@@ -219,14 +167,17 @@ Three committed files under `config/`, no environment variables, no secrets:
   your vault path, `:content-git-url nil` (no git syncing locally),
   personal `:llm-command` override, `:port 8100`.
 - **`config/prod.edn`** — merged in by `bb prod`: the clone target, the
-  content repo URL, the sync interval, `:port 8080` (what Fly routes to).
+  content repo URL, the fallback sync interval, `:port 8080` (what Fly
+  routes to).
 
 The port is environment-specific, so dev and prod never collide on one.
 
 Dev-only behavior (draft previews at `/drafts/<name>`, per-request
 reindexing) follows the environment, so dev and prod can't drift apart.
-The production server exposes no admin surface at all: it just pulls the
-content repo on a timer.
+The production server exposes no admin surface: its one non-page endpoint
+is `POST /refresh`, which can do nothing but trigger a debounced pull of
+the public content repo — and it only exists when content comes from git,
+so dev doesn't even have that.
 
 ## URLs
 
@@ -238,7 +189,7 @@ content repo on a timer.
 | `/tags` · `/tags/clojure` · `/tags/clojure/2026` | by tag |
 | `/search?q=...` | full-text search |
 | `/feed.xml` | RSS |
-| `/attachments/...` | images from the vault |
+| `/attachments/...` | images from the content repo |
 
 ## Deploying to Fly.io
 
@@ -250,9 +201,10 @@ repo settings:
  :content-git-url "https://github.com/<you>/<content-repo>"}
 ```
 
-The machine clones the content repo at boot and pulls every
-`:content-sync-seconds` (default 300), reindexing when anything changed —
-so publishing is just a git push; content changes never require a deploy.
+The machine clones the content repo at boot; the repo's push webhook
+POSTs `/refresh` and the pull + reindex happens within seconds, with the
+timed pull every `:content-sync-seconds` as the fallback — so publishing
+is just a git push; content changes never require a deploy.
 
 ```sh
 # once:
@@ -264,8 +216,9 @@ fly deploy
 
 - Every public page gets CDN-friendly cache headers; put Cloudflare (or any
   CDN) in front and traffic spikes never reach the server.
-- Publishes go live within `:content-sync-seconds` (default 5 minutes) of
-  the git push — no deploy, no webhook, no admin endpoint.
+- Publishes go live within seconds of the git push (the webhook), or at
+  worst within `:content-sync-seconds` (the fallback) — no deploy, no
+  admin surface beyond the pull-only `/refresh`.
 - A failed sync can never take the site down: bad network or a broken
   content push is logged, the last good index keeps serving, and the
   server retries every tick until the content is fixed. Even a broken

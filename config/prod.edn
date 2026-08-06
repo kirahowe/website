@@ -1,8 +1,10 @@
-{;; Production: clone the public content repo at boot, pull on a timer,
- ;; reindex when anything changed.
+{;; Production: clone the public content repo at boot; the repo's push
+ ;; webhook POSTs /refresh, so a publish is pulled and reindexed within
+ ;; seconds. The timed pull is only the fallback that heals a webhook
+ ;; delivery GitHub failed to make (it doesn't retry them).
  :content-path "content"
  :content-git-url "https://github.com/kirahowe/kirahowe-content"
- :content-sync-seconds 300
+ :content-sync-seconds 1800
 
  ;; Fly routes to internal_port 8080 (fly.toml) and the Dockerfile
  ;; EXPOSEs 8080 — the server must listen there.

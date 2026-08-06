@@ -101,3 +101,80 @@
         (git! checkout "remote" "set-url" "origin" (str origin "-gone"))
         (is (= :error (sync/sync-once! config index-atom)))
         (is (= 2 (count (:entries @index-atom))))))))
+
+(deftest refresh-sha-matches-served-index-skips-pull
+  (let [origin (temp-dir)
+        checkout (str (temp-dir) "/content")
+        config (assoc config-base
+                      :content-path checkout
+                      :content-git-url origin
+                      :refresh-debounce-seconds 0)]
+    (sh! "git" "init" "-q" "-b" "main" origin)
+    (entry! origin "2026/01/05/first.md" ";;;\n{:type :post}\n;;;\nfirst")
+    (git! origin "add" "-A")
+    (git! origin "commit" "-q" "-m" "first")
+    (sync/ensure-content! config)
+    (let [index-atom (atom (sync/build-indexed config))
+          rev (:git-rev (meta @index-atom))
+          state (sync/make-refresh-state)]
+      ;; Break the remote so any pull attempt would surface as :error —
+      ;; proving the sha match answered without touching git at all.
+      (git! checkout "remote" "set-url" "origin" (str origin "-gone"))
+      (is (= :current (sync/refresh! config index-atom state rev))))))
+
+(deftest refresh-with-differing-sha-syncs-immediately
+  (let [origin (temp-dir)
+        checkout (str (temp-dir) "/content")
+        config (assoc config-base
+                      :content-path checkout
+                      :content-git-url origin
+                      :refresh-debounce-seconds 0)]
+    (sh! "git" "init" "-q" "-b" "main" origin)
+    (entry! origin "2026/01/05/first.md" ";;;\n{:type :post}\n;;;\nfirst")
+    (git! origin "add" "-A")
+    (git! origin "commit" "-q" "-m" "first")
+    (sync/ensure-content! config)
+    (let [index-atom (atom (sync/build-indexed config))
+          state (sync/make-refresh-state)]
+      (entry! origin "2026/02/10/second.md" ";;;\n{:type :post :title \"Second\"}\n;;;\nmore")
+      (git! origin "add" "-A")
+      (git! origin "commit" "-q" "-m" "second")
+
+      (testing "a sha the index doesn't recognize syncs right now, in-request"
+        (is (= :updated (sync/refresh! config index-atom state
+                                       "0000000000000000000000000000000000000000")))
+        (is (some? (get (:by-path @index-atom) "/2026/feb/10/second"))))
+
+      (testing "nothing new — a nil sha still syncs, and finds nothing changed"
+        (is (= :unchanged (sync/refresh! config index-atom state nil)))))))
+
+(deftest refresh-debounce-coalesces-into-one-trailing-sync
+  (let [origin (temp-dir)
+        checkout (str (temp-dir) "/content")
+        config (assoc config-base
+                      :content-path checkout
+                      :content-git-url origin
+                      :refresh-debounce-seconds 1)]
+    (sh! "git" "init" "-q" "-b" "main" origin)
+    (entry! origin "2026/01/05/first.md" ";;;\n{:type :post}\n;;;\nfirst")
+    (git! origin "add" "-A")
+    (git! origin "commit" "-q" "-m" "first")
+    (sync/ensure-content! config)
+    (let [index-atom (atom (sync/build-indexed config))
+          state (sync/make-refresh-state)]
+      (testing "the first request in a window claims it and runs in-request"
+        (is (= :unchanged (sync/refresh! config index-atom state nil))))
+
+      (entry! origin "2026/03/20/third.md" ";;;\n{:type :post :title \"Third\"}\n;;;\nnewer")
+      (git! origin "add" "-A")
+      (git! origin "commit" "-q" "-m" "third")
+
+      (testing "a request landing inside the window schedules a trailing sync"
+        (is (= :scheduled (sync/refresh! config index-atom state nil))))
+
+      (testing "another request inside the window coalesces onto that same trailing sync"
+        (is (= :scheduled (sync/refresh! config index-atom state nil))))
+
+      (Thread/sleep 1600)
+      (testing "the trailing sync ran on its own — no further request needed"
+        (is (some? (get (:by-path @index-atom) "/2026/mar/20/third")))))))

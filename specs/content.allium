@@ -10,7 +10,9 @@
 --   canonical home is elsewhere, and previous-URL redirects),
 --   404 semantics, feed shape, search contract, caching posture.
 -- Excludes:
---   - The publishing pipeline (publishing.allium)
+--   - Authoring and publishing: since 2026-08-06 those live in the
+--     admin app (repo website-admin, specs/authoring.allium there)
+--   - Keeping the served content fresh (publishing.allium)
 --   - Dev-only conveniences: live reload, per-request reindexing,
 --     /drafts previews
 --   - Frontmatter dialect details (YAML vs legacy EDN both parse to
@@ -39,7 +41,7 @@ external entity Visitor {}
 
 -- A static page: pages/<slug>.md, served at /<slug> (e.g. /about).
 -- Pages have no draft stage and no date; they reach the site through
--- the same mirror-and-push as entries.
+-- the same public content repo as entries.
 entity Page {
     slug: String                    -- the filename (minus .md)
     explicit_title: String?         -- the `title` property
@@ -104,9 +106,11 @@ surface PublishedSite {
         -- crash-looping. (Backed by the Server rules in
         -- publishing.allium.)
     @guarantee EventualFreshness
-        -- A pushed change is live within publishing's
-        -- content_sync_interval of the push — no deploy, no webhook,
-        -- no manual step.
+        -- A pushed change is live within seconds: the content repo's
+        -- push webhook pokes the server, which refreshes at once (see
+        -- publishing's ContentRefreshEndpoint). No deploy, no manual
+        -- step. Should a webhook delivery never arrive, publishing's
+        -- content_sync_interval is the outside bound.
     @guarantee NavHidesEmptyTypes
         -- The navigation lists only entry types with at least one
         -- published entry, in the configured nav order.

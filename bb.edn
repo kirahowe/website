@@ -45,21 +45,9 @@
        :requires ([site.author :as author])
        :task (apply author/new-draft *command-line-args*)}
 
-  drafts {:doc "List every draft, marking which are queued to publish: bb drafts"
+  drafts {:doc "List every draft, marking which carry the legacy publish: true flag: bb drafts"
           :requires ([site.author :as author])
           :task (apply author/list-drafts *command-line-args*)}
-
-  publish {:doc "Publish a draft: bb publish [<name>] [--no-git] — lints it, moves it into its date folder, commits, pushes; with no name at a terminal, pick a draft (or flush the queue); with no name in a script, publishes every draft marked publish: true"
-           :requires ([site.author :as author])
-           :task (apply author/publish *command-line-args*)}
-
-  publish-queued {:doc "Same as bare `bb publish`: publishes every draft marked publish: true, then pushes: bb publish-queued [--no-git] (the stable name the autopublish agent invokes)"
-                  :requires ([site.author :as author])
-                  :task (apply author/publish-queued *command-line-args*)}
-
-  autopublish {:doc "Manage the launchd agent that runs publish-queued every 5 min: bb autopublish install|uninstall|status"
-               :requires ([site.author :as author])
-               :task (apply author/autopublish *command-line-args*)}
 
   suggest-tags {:doc "Suggest tags with the configured LLM, then write the ones you pick into the entry: bb suggest-tags [<name>] — with no name, pick from any draft or published entry that has no tags yet"
                 :requires ([site.author :as author])
@@ -67,8 +55,4 @@
 
   suggest-slug {:doc "Suggest URL slugs with the configured LLM, then write the one you pick (or type) into the draft (for a quote, renames the note instead — its filename becomes the title and slug): bb suggest-slug [<name>] — with no name, pick from any draft that has no slug yet"
                 :requires ([site.author :as author])
-                :task (apply author/suggest-slug *command-line-args*)}
-
-  sync {:doc "Mirror the vault's published content into the publish repo and push (bb sync)"
-        :requires ([site.author :as author])
-        :task (apply author/sync-content *command-line-args*)}}}
+                :task (apply author/suggest-slug *command-line-args*)}}}

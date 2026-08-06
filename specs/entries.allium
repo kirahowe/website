@@ -1,11 +1,17 @@
 -- allium: 3
 -- entries.allium
 --
--- Scope: The core Entry model shared by the publishing pipeline
---   (publishing.allium) and the content & serving model
---   (content.allium). This module declares what an entry IS; the
---   importing modules say how it moves (publishing) and how it is
---   served (content).
+-- Scope: The core Entry model. This module declares what an entry IS;
+--   other modules say how it is served (content.allium) and how it
+--   moves through its lifecycle.
+-- Note: since 2026-08-06 the lifecycle below is driven entirely from
+--   the admin app (repo website-admin, specs/authoring.allium there),
+--   which authors entries and commits them into the public content
+--   repo. No rule in THIS repo witnesses the transitions any more —
+--   publishing.allium now covers only the server's content freshness —
+--   so a check of this file reports the statuses as unreachable and the
+--   graph as deadlocked. That is expected: authoring.allium is
+--   authoritative for these edges.
 -- Dependencies: none. Imported via `use "./entries.allium"`.
 
 ------------------------------------------------------------
@@ -51,10 +57,10 @@ entity Entry {
                                     -- path, the site's authoritative date for the entry
 
     transitions status {
-        draft -> queued             -- the author flips the `publish` property to true
-        queued -> draft             -- ...or back to false
-        draft -> published          -- manual `bb publish <name>`
-        queued -> published         -- a queue flush (bare `bb publish` or the agent)
+        draft -> queued             -- the author marks the draft as ready to publish
+        queued -> draft             -- ...or unmarks it
+        draft -> published          -- published straight from the draft
+        queued -> published         -- published off the queue
         terminal: published         -- un-publishing is deleting, not a transition
     }
 
