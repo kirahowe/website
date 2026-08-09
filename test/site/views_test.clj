@@ -246,8 +246,14 @@
       (is (str/includes? body "Untitled entries are fine"))))
 
   (testing "the thumb links to the post, not the image"
+    ;; class and href adjacent, rather than the whole opening tag: the anchor
+    ;; also carries an aria-label, and hiccup sorts that ahead of both.
     (is (str/includes? (:body (GET "/2026/may"))
-                       "<a class=\"entry-thumb\" href=\"/2026/may/2/caching-thought\">")))
+                       "class=\"entry-thumb\" href=\"/2026/may/2/caching-thought\"")))
+
+  (testing "the thumb is named — its image may carry no alt, and an unnamed link is a dead end"
+    (is (re-find #"<a aria-label=\"[^\"]+\" class=\"entry-thumb\""
+                 (:body (GET "/2026/may")))))
 
   (testing "search results stay compact prose — no thumbs"
     (let [{:keys [body]} (GET "/search" "q=cacheable")]

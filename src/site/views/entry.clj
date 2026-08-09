@@ -41,7 +41,7 @@
     (list
      (c/quote-blockquote entry)
      (c/quote-source entry))
-    (markdown/render-article (:body entry) (:wikilinks entry))))
+    (rest (markdown/render (:body entry) (:wikilinks entry)))))
 
 (defn- post-footer [config index entry]
   (let [rel (c/related (:entries index) entry 8)]

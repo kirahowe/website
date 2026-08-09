@@ -59,7 +59,7 @@
   quote's source line — when the entry records where it was found."
   [entry]
   (when-let [via (:link-via entry)]
-    [:span.via " (" [:a {:href via} "via"] ")"]))
+    [:span.via " (" [:a {:href via :aria-label (str "via " (util/host via))} "via"] ")"]))
 
 (defn source-link
   "The “(source)” link after a tool's title — where its source code lives,
@@ -67,7 +67,7 @@
   parenthetical credit."
   [entry]
   (when-let [url (and (= :tool (:type entry)) (:source-url entry))]
-    [:span.via " (" [:a {:href url} "source"] ")"]))
+    [:span.via " (" [:a {:href url :aria-label (str "Source code at " (util/host url))} "source"] ")"]))
 
 (defn quote-source
   "The \"— source\" line under a quote, linked when a URL is known and
@@ -89,7 +89,7 @@
   [entry]
   (let [blocks (vec (rest (markdown/render (:body entry) (:wikilinks entry))))
         blocks (cond-> blocks
-                 (seq blocks) (update (dec (count blocks)) conj [:span.quote-close "”"]))]
+                 (seq blocks) (update (dec (count blocks)) conj [:span.quote-close {:aria-hidden "true"} "”"]))]
     (into [:blockquote.quote] blocks)))
 
 ;; --- feed row ------------------------------------------------------------
@@ -129,9 +129,9 @@
   [:div.entry-foot {:class (name (:type entry))}
    [:span.entry-kind (dot (:type entry)) (name (:type entry))]
    (when-not (self-titled-types (:type entry))
-     (list [:span.sep "/"] (permalink entry)))
+     (list [:span.sep {:aria-hidden "true"} "/"] (permalink entry)))
    (when (seq (:tags entry))
-     (cons [:span.sep "/"] (tag-links (:tags entry))))])
+     (cons [:span.sep {:aria-hidden "true"} "/"] (tag-links (:tags entry))))])
 
 (defn- entry-title [entry terms]
   (when (:title entry)
@@ -151,7 +151,8 @@
   "A post's continuation link, closing its excerpt: the ellipsis into a
   reading-time estimate for the rest of the entry."
   [entry]
-  (list " " [:a.excerpt-more {:href (:path entry)}
+  (list " " [:a.excerpt-more {:href (:path entry)
+                              :aria-label (str "Continue reading: " (entry-label entry))}
              (str "[…" (markdown/read-time (:body entry)) " min read]")]))
 
 ;; --- the two row shapes --------------------------------------------------
@@ -170,7 +171,9 @@
     ;; into the preview (search results stay compact prose)
     (when-not (seq terms)
       (when-let [{:keys [src alt]} (markdown/lede-image (:body entry))]
-        [:a.entry-thumb {:href (:path entry)} [:img {:src src :alt alt}]]))
+        [:a.entry-thumb {:href (:path entry)
+                         :aria-label (str (entry-label entry) " — cover image")}
+         [:img {:src src :alt alt}]]))
     [:p.entry-excerpt (highlight (row-excerpt entry terms) terms) tail])))
 
 (defn- full-body-row
@@ -215,7 +218,7 @@
 (defmethod row-content :quote [entry {:keys [terms]}]
   (list
    (if (seq terms)
-     [:blockquote.quote (highlight (row-excerpt entry terms) terms) [:span.quote-close "”"]]
+     [:blockquote.quote (highlight (row-excerpt entry terms) terms) [:span.quote-close {:aria-hidden "true"} "”"]]
      (quote-blockquote entry))
    (quote-source entry)))
 
@@ -253,7 +256,7 @@
   matching slashes before any facet chips in the title)."
   [title count]
   [:header.page-header
-   [:h1 title (when count (list [:span.sep.count "/"] [:span.count count]))]])
+   [:h1 title (when count (list [:span.sep.count {:aria-hidden "true"} "/"] [:span.count count]))]])
 
 (defn count-label [n]
   (str n " " (if (= 1 n) "entry" "entries")))

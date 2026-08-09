@@ -107,7 +107,9 @@
                       (repeat (mod (- 7 (mod total 7)) 7) nil))]
     [:section.side
      [:div.calendar-head
-      [:a {:href (str "/" year)} year] [:span "»"] [:span (util/month-name month)]]
+      [:a {:href (str "/" year) :aria-label (str "All of " year)} year]
+      [:span {:aria-hidden "true"} "»"]
+      [:span (util/month-name month)]]
      [:table.calendar
       [:thead [:tr (for [d ["M" "T" "W" "T" "F" "S" "S"]] [:th d])]]
       [:tbody
@@ -116,7 +118,8 @@
           (for [d week]
             (cond
               (nil? d) [:td]
-              (active d) [:td.on [:a {:href (str "/" year "/" slug "/" d)} d]]
+              (active d) [:td.on [:a {:href (str "/" year "/" slug "/" d)
+                                      :aria-label (str (util/month-name month) " " d ", " year)} d]]
               :else [:td d]))])]]]))
 
 (defn- nearby [newer older]

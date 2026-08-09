@@ -194,21 +194,3 @@
        (map plain)
        (remove str/blank?)
        first))
-
-(defn- add-class [[tag & more] cls]
-  (let [[attrs children] (if (map? (first more))
-                           [(first more) (rest more)]
-                           [{} more])]
-    (into [tag (update attrs :class #(if % (str % " " cls) cls))] children)))
-
-(defn render-article
-  "Like `render`, but returns the body's block children as a sequence with
-  the first paragraph tagged `.lead` — the opening-paragraph emphasis on
-  post and page bodies."
-  [s wikilinks]
-  (let [[_div & children] (render s wikilinks)
-        [before [lead & after]] (split-with #(not (and (vector? %) (= :p (first %))))
-                                            children)]
-    (concat before
-            (when lead [(add-class lead "lead")])
-            after)))

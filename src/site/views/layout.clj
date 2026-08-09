@@ -125,7 +125,7 @@
 
 (defn- header [config home?]
   [:header.site-header
-   [:a {:class (if home? "brand" "brand brand-sm") :href "/"} (h/raw @wordmark)]
+   [:a {:class (if home? "brand" "brand brand-sm") :href "/" :aria-label "Kira Howe — home"} (h/raw @wordmark)]
    [:nav.site-nav
     ;; :nav-types, not :entry-types — only types with at least one
     ;; published entry get a link, so an unused type is never a
@@ -133,7 +133,7 @@
     (for [t (:nav-types config)]
       [:a {:class (str "type " (name t)) :href (str "/" (name t) "s")}
        (str/capitalize (str (name t) "s"))])
-    [:span.nav-sep]
+    [:span.nav-sep {:aria-hidden "true"}]
     [:a {:href "/tags"} "Tags"]
     [:a {:href "/archive"} "Archive"]
     [:a {:href "/search"} "Search"]
@@ -242,7 +242,7 @@
   (page config {:title title :path path}
         [:article.article
          [:h1 title]
-         (markdown/render-article body nil)]))
+         (rest (markdown/render body nil))]))
 
 (defn not-found [config]
   (page config {:title "Not found"}

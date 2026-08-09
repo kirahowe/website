@@ -4,20 +4,26 @@
    Dual theme: OS preference decides by default; a footer control can
    override it — the site's only JavaScript.
 
-   The system, in five rules:
+   The system, in six rules:
    1. Two voices. Sans carries content (titles, prose, excerpts); mono
       carries the metadata layer (dates, counts, types, tags, nav, labels),
       always at --fs-sm.
-   2. One link behaviour. Links are accent and underline on hover, at one
-      shared offset — declared once on `a`. Muted chrome links (tags, day
-      headings, "more") additionally warm to accent. Composite rows underline
-      only their title. The two filled controls (brand, search button)
-      invert to accent instead.
+   2. One link behaviour, two resting states. A link inside a run of text
+      rests underlined — in prose, colour alone isn't a cue. A link that
+      stands alone (nav, titles, ledger rows, tags, feet) rests bare, since
+      position already marks it. Both land on the same hover: a 2px accent
+      rule at one shared offset. Muted chrome links (tags, day headings,
+      "more") additionally warm to accent. Composite rows underline only
+      their title. The two filled controls (brand, search button) invert to
+      accent instead.
    3. One ledger row. Every dense entry list — year archive, related list,
       sidebar recents — is the same row: mono date, type dot, accent title.
    4. One gutter. Every full-width container shares --gutter, so the page
       edge never moves between pages.
    5. Everything is a token: spacing, type, radii, tracking, line height.
+   6. Two units. Anything meant to scale with reading text — type, spacing,
+      measure — is expressed in rem off the browser default. Graphic details
+      that shouldn't scale — hairlines, radii, shadows — stay in px.
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
@@ -57,12 +63,12 @@
   --tool: light-dark(#6d6dea, #a5a8f5);
 
   /* Spacing scale — every gap/pad/margin references one of these */
-  --sp1: 4px;
-  --sp2: 8px;
-  --sp3: 12px;
-  --sp4: 16px;
-  --sp5: 24px;
-  --sp6: 32px;
+  --sp1: .25rem;   /* 4px */
+  --sp2: .5rem;    /* 8px */
+  --sp3: .75rem;   /* 12px */
+  --sp4: 1rem;     /* 16px */
+  --sp5: 1.5rem;   /* 24px */
+  --sp6: 2rem;     /* 32px */
   --gutter: var(--sp6);     /* the one horizontal page edge, sitewide */
 
   /* Radii — boxes get --r; inline code gets the smaller step */
@@ -74,13 +80,15 @@
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   --serif: Georgia, "Times New Roman", serif;   /* the big hanging quote marks */
 
-  /* Type scale — one base reading size + a few steps. Every font-size
-     references one of these; no bespoke px sizes live in the rules below. */
-  --fs-sm: 13px;    /* the mono metadata layer: nav, feet, meta, tags, code */
-  --fs: 16px;       /* base reading text: body, articles, excerpts, quotes */
-  --fs-md: 18px;    /* entry titles, article h3, lead paragraph */
-  --fs-lg: 22px;    /* article h2, month name */
-  --fs-xl: 32px;    /* display: page-header h1, article h1 */
+  /* Type scale — one base reading size + a few steps, in rem off the root
+     (browser default, so 1rem = 16px), so the whole scale honours the
+     reader's browser font-size setting. Every font-size references one of
+     these; no bespoke sizes live in the rules below. */
+  --fs-sm: .875rem;   /* 14px — the mono metadata layer: nav, feet, meta, tags, code */
+  --fs:    1.125rem;  /* 18px — base reading text: body, articles, excerpts, quotes */
+  --fs-md: 1.25rem;   /* 20px — article h3, applied-facet chip */
+  --fs-lg: 1.5rem;    /* 24px — feed entry titles, article h2, month name */
+  --fs-xl: 2.25rem;   /* 36px — display: page-header h1, article h1 */
 
   /* Line heights — two predictable steps. Reading prose gets the roomy one;
      headings, titles and dense rows get the tight one. Single-line chrome
@@ -118,7 +126,7 @@
 *, *::before, *::after { box-sizing: border-box; }
 
 body {
-  max-width: 860px;
+  max-width: 53.75rem;
   margin: 0 auto;
   font-family: var(--sans);
   font-size: var(--fs);
@@ -128,13 +136,42 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* The one link behaviour: accent, hover underlines at one shared offset */
-a { color: var(--accent); text-decoration: none; text-underline-offset: 2px; }
-a:hover { text-decoration: underline; }
+/* The one link behaviour: accent, with two resting states (rule 2) that
+   land on the same hover — a 2px accent rule at one shared offset. */
+a {
+  color: var(--accent);
+  text-decoration-line: none;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+a:hover { text-decoration-line: underline; text-decoration-thickness: 2px; }
+
+/* Prose links rest underlined: inside a run of text, colour is the only
+   cue a reader gets, and colour alone doesn't carry (WCAG 1.4.1). The
+   thinner resting rule keeps a linked paragraph from turning into a fence;
+   hover thickens it to 2px, same as everywhere else.
+
+   Longhand, never the `text-decoration` shorthand: the shorthand resets
+   thickness to auto, and at equal specificity these rules sit *after*
+   a:hover — so a shorthand here silently erases the hover's 2px and a
+   prose link ends up with no hover state at all. */
+.article a,
+.article-meta a,
+.entry-body a,
+.entry-excerpt a,
+.entry blockquote a,
+.quote-cite a { text-decoration-line: underline; }
+
+/* Headings are titles, not prose — a rule under 36px display type reads as
+   damage. They keep the bare resting state. */
+.article h1 a, .article h2 a, .article h3 a { text-decoration-line: none; }
 
 /* Composite row links underline only their title, never the whole row */
-.brand:hover, .index-row:hover, .side-link:hover, .facet:hover { text-decoration: none; }
-.index-row:hover .title, .side-link:hover .title, .facet:hover .title { text-decoration: underline; }
+.brand:hover, .index-row:hover, .side-link:hover, .facet:hover { text-decoration-line: none; }
+.index-row:hover .title, .side-link:hover .title, .facet:hover .title {
+  text-decoration-line: underline;
+  text-decoration-thickness: 2px;
+}
 
 /* Muted chrome links warm to accent on hover */
 .tag, .day-heading a, .excerpt-more { color: var(--muted); }
@@ -147,8 +184,8 @@ a:hover { text-decoration: underline; }
 .dot {
   display: inline-block;
   flex: none;
-  width: 7px;
-  height: 7px;
+  width: .5rem;
+  height: .5rem;
   border-radius: 50%;
   background: var(--type-color, var(--muted));
 }
@@ -175,7 +212,7 @@ a:hover { text-decoration: underline; }
 /* Ledger row: every dense entry list is `mono date | dot | title` */
 .index-row {
   display: grid;
-  grid-template-columns: 52px auto 1fr;
+  grid-template-columns: 3.5rem auto 1fr;
   gap: var(--sp3);
   align-items: baseline;
   padding: var(--sp1) 0;
@@ -197,8 +234,9 @@ a:hover { text-decoration: underline; }
 
 /* The related list and the sidebar recents are both entry-lists: the ledger
    row, but the date now carries its year, so the date column widens to fit
-   "Dec 30, 2026". */
-.entry-list .index-row { grid-template-columns: 6.5em auto 1fr; }
+   "Dec 30, 2026". Sized in rem rather than em: the column has to clear the
+   date's own --fs-sm mono, not the reading size the row inherits. */
+.entry-list .index-row { grid-template-columns: 7rem auto 1fr; }
 
 /* In the sidebar the row flows as one line of inline content — date, dot,
    title — so a long title wraps the full width, its later lines running back
@@ -235,8 +273,8 @@ a:hover { text-decoration: underline; }
 .brand:hover { background: var(--accent); }
 .brand:hover .brandmark { color: var(--on-accent); }
 
-.brandmark { display: block; width: auto; height: 46px; color: var(--accent); }
-.brand-sm .brandmark { height: 32px; }   /* inner pages */
+.brandmark { display: block; width: auto; height: 2.875rem; color: var(--accent); }
+.brand-sm .brandmark { height: 2rem; }   /* inner pages */
 
 .site-nav {
   display: flex;
@@ -261,7 +299,7 @@ a:hover { text-decoration: underline; }
 
 .cols {
   display: grid;
-  grid-template-columns: 1fr 300px;
+  grid-template-columns: 1fr 18.75rem;
 }
 /* min-width: 0 on both grid children: a grid item's min-width defaults to
    auto, so a wide image (its intrinsic size) would inflate the 1fr track
@@ -345,14 +383,14 @@ a:hover { text-decoration: underline; }
 
 .entry-title {
   margin: 0 0 var(--sp2);
-  font: 600 var(--fs-md) var(--sans);
+  font: 600 var(--fs-lg) var(--sans);
   line-height: var(--lh-tight);
   letter-spacing: var(--ls-tight);
 }
 
 /* Simon-style "(via)" credit after an outbound entry's title */
 .via { font-weight: 400; color: var(--muted); }
-.entry-title .via { font-size: .75em; }
+.entry-title .via { font-size: .6em; }
 .article h1 .via { font-size: .5em; letter-spacing: 0; }
 
 .entry-excerpt {
@@ -367,7 +405,7 @@ a:hover { text-decoration: underline; }
 /* A post that opens on an image previews with a little version of it —
    the same photo-mount as .entry img, height-capped, linking to the post */
 .entry-thumb { display: block; width: fit-content; margin: 0 auto; }
-.entry-thumb img { max-height: 240px; margin: var(--sp4) auto; }
+.entry-thumb img { max-height: 15rem; margin: var(--sp4) auto; }
 
 /* link / release / tool feed cards carry their full body — the comment
    prose (muted, like an excerpt) plus any pull-quote, which reads as a
@@ -437,7 +475,7 @@ a:hover { text-decoration: underline; }
 .entry blockquote.quote::before,
 .article blockquote.quote::before,
 .quote-close {
-  font: 700 40px/0 var(--serif);
+  font: 700 2.5rem/0 var(--serif);
   font-style: normal;
   color: var(--quote);
 }
@@ -504,7 +542,6 @@ a:hover { text-decoration: underline; }
   line-height: var(--lh);
   color: var(--fg);
 }
-.article .lead { font-size: var(--fs-md); color: var(--head); }
 .article h2 {
   margin: var(--sp6) 0 var(--sp3);
   font: 600 var(--fs-lg) var(--sans);
@@ -708,7 +745,7 @@ a:hover { text-decoration: underline; }
 .search-prompt input::-webkit-search-decoration { -webkit-appearance: none; }
 .search-prompt input:focus { outline: none; }  /* the accent baseline is the focus cue */
 .search-prompt input::placeholder { color: var(--muted); }
-/* Clearing is a plain link back to the blank prompt — no JS. At 20px on
+/* Clearing is a plain link back to the blank prompt — no JS. At --fs-lg on
    the shared baseline its ink rides above the ENTER caps; a 2px settle
    centers the two. */
 .prompt-clear {
@@ -717,7 +754,7 @@ a:hover { text-decoration: underline; }
   color: var(--muted);
   transform: translateY(2px);
 }
-.prompt-clear:hover { color: var(--accent); text-decoration: none; }
+.prompt-clear:hover { color: var(--accent); text-decoration-line: none; }
 .search-prompt button {
   display: inline-flex;
   align-items: center;
@@ -834,7 +871,7 @@ a:hover { text-decoration: underline; }
 
 /* All three icons live in the DOM; data-mode (the button's own current
    mode) picks the one that shows — no separate state to fall out of sync. */
-.theme-toggle svg { display: none; width: 15px; height: 15px; }
+.theme-toggle svg { display: none; width: .875rem; height: .875rem; }
 .theme-toggle[data-mode="light"]  .i-light,
 .theme-toggle[data-mode="dark"]   .i-dark,
 .theme-toggle[data-mode="system"] .i-system { display: block; }
@@ -843,7 +880,7 @@ a:hover { text-decoration: underline; }
    Narrow screens — a tighter gutter, and the columns stack
    -------------------------------------------------------------------------- */
 
-@media (max-width: 640px) {
+@media (max-width: 40rem) {
   :root { --gutter: var(--sp5); }
   .cols { grid-template-columns: 1fr; }
   .main { border-right: 0; }
