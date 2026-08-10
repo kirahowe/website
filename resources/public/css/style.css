@@ -947,7 +947,7 @@ a:hover { text-decoration-line: underline; text-decoration-thickness: 2px; }
 /* The /follow page instance sits under the prose at reading width. */
 .follow-form.full { margin-top: var(--sp5); }
 
-/* Compact instances (footer band, sidebar widget): one type tier down so the
+/* Compact instances (sidebar widget, post footer): one type tier down so the
    bar sits inside its container instead of dominating it. */
 .follow-form.compact { gap: var(--sp2); padding-bottom: var(--sp2); }
 .follow-form.compact .prompt-mark { font-size: var(--fs); }
@@ -956,3 +956,27 @@ a:hover { text-decoration-line: underline; text-decoration-thickness: 2px; }
 /* In the post footer, the follow section sits in the Tags / Related rhythm;
    cap the field so it doesn't stretch the full reading measure. */
 .post-footer .follow-form { max-width: 26rem; }
+
+/* Sidebar follow form: the ~300px rail is too tight for a text submit, so the
+   field and a real filled button stack — the mark + field on the first line,
+   a full-width Subscribe button on its own line below. */
+.side .follow-form {
+  flex-wrap: wrap;
+  gap: var(--sp3) var(--sp2);
+  padding-bottom: 0;
+  border-bottom: 0;   /* the accent baseline moves onto the field itself */
+}
+.side .follow-form input {
+  padding-bottom: var(--sp2);
+  border-bottom: 2px solid var(--accent);
+}
+.side .follow-form button {
+  flex: 0 0 100%;
+  justify-content: center;
+  padding: var(--sp2);
+  border-radius: var(--r-sm);
+  color: var(--on-accent);
+  background: var(--accent);
+}
+.side .follow-form button .key { display: none; }   /* a real button needs no ↵ hint */
+.side .follow-form button:hover { color: var(--on-accent); filter: brightness(1.08); }

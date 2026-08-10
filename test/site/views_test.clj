@@ -263,7 +263,17 @@
   (testing "every archive/index sidebar carries the Follow widget"
     (doseq [uri ["/" "/2026" "/2026/jul" "/tags/clojure" "/posts"]]
       (is (str/includes? (:body (GET uri)) ">Follow</h2>")
-          (str uri " sidebar should carry the Follow widget")))))
+          (str uri " sidebar should carry the Follow widget"))))
+
+  (testing "on the home page the Follow widget sits above Top tags"
+    (let [body (:body (GET "/"))]
+      (is (< (str/index-of body ">Follow</h2>")
+             (str/index-of body ">Top tags</h2>")))))
+
+  (testing "elsewhere the Follow widget stays last in the sidebar"
+    (let [body (:body (GET "/tags/clojure"))]
+      (is (< (str/index-of body ">Feeds</h2>")
+             (str/index-of body ">Follow</h2>"))))))
 
 (deftest image-lede-posts
   (testing "a post that opens on an image previews with a small linked image plus prose"

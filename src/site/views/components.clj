@@ -307,7 +307,7 @@
               :required true}]
      ;; Buttondown's embed marker
      [:input {:type "hidden" :name "embed" :value "1"}]
-     [:button {:type "submit"} [:span "Follow"] [:span.key "↵"]]]))
+     [:button {:type "submit"} [:span "Subscribe"] [:span.key "↵"]]]))
 
 (defn follow-pitch
   "The one-line 'follow by email or RSS' offer, shared by the sidebar widget
@@ -328,13 +328,21 @@
 
 (defn sidebar
   "The right rail. Composes the page's own widgets (recents, tag cloud, year
-  nav, calendar, facets…) and always ends with the Follow widget, so the email
-  offer reaches every archive/index page. `config` feeds the baked-in form;
-  `sections` are the page's widgets, in order, above it."
+  nav, calendar, facets…) and, by default, appends the Follow widget last, so
+  every archive/index page carries it for free.
+
+  An options map may lead the sections: {:follow :inline} suppresses the
+  append and lets the caller position (follow-widget config) among the
+  sections itself — the home page uses this to sit Follow above Top tags."
   [config & sections]
-  (into [:aside.sidebar]
-        (conj (vec (remove nil? sections))
-              (follow-widget config))))
+  (let [[opts sections] (if (map? (first sections))
+                          [(first sections) (rest sections)]
+                          [nil sections])
+        sections (remove nil? sections)]
+    (into [:aside.sidebar]
+          (if (= :inline (:follow opts))
+            sections
+            (concat sections [(follow-widget config)])))))
 
 (defn cols
   "The two-column shell: main feed on the left, sidebar on the right, with a
