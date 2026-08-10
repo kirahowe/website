@@ -285,29 +285,44 @@
 ;; Buttondown) plus the "follow by email or RSS" pitch; the sidebar
 ;; counterpart to the Follow section in the post footer on entry pages.
 
+(defn field-form
+  "The one input+button pair — search, the tag filter, and the follow form all
+  render through this, so the look can't drift between them: a bordered field
+  and, when :submit is given, a filled button sized to its label.
+    :attrs   extra wrapper attributes (action, method, role, an extra :class…)
+    :field   the <input> attribute map
+    :aside   hiccup between the field and the button — a hidden input (follow's
+             Buttondown marker) or a clear × (search)
+    :submit  the button's label, or nil for no button (the live tag filter)
+    :tag     the wrapper element, default :form (:div for the JS-only tag
+             filter, which submits nothing)."
+  [{:keys [attrs field aside submit tag]}]
+  (into [(or tag :form) (update attrs :class #(if % (str "field-form " %) "field-form"))]
+        (remove nil?
+                [[:input.field field]
+                 aside
+                 (when submit [:button.btn {:type "submit"} submit])])))
+
 (defn follow-form
-  "The email follow form — the search prompt's command-bar shape reused: a
-  leading mark, a borderless email field on the accent baseline, and a mono
-  Follow button. POSTs to the configured Buttondown account; until one is set
-  the action is a no-op placeholder (#). `size` is :full (the /follow page) or
-  :compact (post footer, sidebar). `id` keeps each instance's input unique."
-  [config {:keys [size id] :or {size :full id "follow-email"}}]
+  "The email follow form — the shared field+button pair, POSTing to the
+  configured Buttondown account; until one is set the action is a no-op
+  placeholder (#). `id` keeps each instance's input unique."
+  [config {:keys [id] :or {id "follow-email"}}]
   (let [user (:buttondown-username config)
         action (if user
                  (str "https://buttondown.com/api/emails/embed-subscribe/" user)
                  "#")]
-    [:form.follow-form (cond-> {:class (name size) :action action :method "post"}
-                         user (assoc :target "popupwindow"
-                                     :onsubmit (str "window.open('https://buttondown.com/"
-                                                    user "','popupwindow')")))
-     [:span.prompt-mark {:aria-hidden "true"} ">"]
-     [:input {:type "email" :name "email" :id id
+    (field-form
+     {:attrs (cond-> {:class "follow-form" :action action :method "post"}
+               user (assoc :target "popupwindow"
+                           :onsubmit (str "window.open('https://buttondown.com/"
+                                          user "','popupwindow')")))
+      :field {:type "email" :name "email" :id id
               :placeholder "you@example.com"
               :autocomplete "email" :aria-label "Your email address"
-              :required true}]
-     ;; Buttondown's embed marker
-     [:input {:type "hidden" :name "embed" :value "1"}]
-     [:button {:type "submit"} [:span "Subscribe"] [:span.key "↵"]]]))
+              :required true}
+      :aside [:input {:type "hidden" :name "embed" :value "1"}]
+      :submit "Subscribe"})))
 
 (defn follow-pitch
   "The one-line 'follow by email or RSS' offer, shared by the sidebar widget
@@ -324,7 +339,7 @@
   [config]
   (side-section "Follow"
                 (follow-pitch)
-                (follow-form config {:size :compact :id "follow-side"})))
+                (follow-form config {:id "follow-side"})))
 
 (defn sidebar
   "The right rail. Composes the page's own widgets (recents, tag cloud, year

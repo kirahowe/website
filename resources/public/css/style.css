@@ -705,86 +705,89 @@ a:hover { text-decoration-line: underline; text-decoration-thickness: 2px; }
 .tag-index { padding: var(--sp5) var(--gutter) var(--sp6); }
 .tag-index .tag-cloud { gap: var(--sp3) var(--sp4); }
 
-/* The tag index's client-side filter reuses the search prompt below. It
-   ships hidden and JS reveals it, so the [hidden] attr must beat the
-   prompt's display:flex; sits tighter than the search page's bar because
-   the page header above already carries the top of the page. */
-.search-prompt.tag-filter { margin-top: var(--sp5); }
-.search-prompt[hidden] { display: none; }
-
-/* Search — a command prompt over the whole site: a borderless query bar on
-   an accent baseline, relevance-ranked results with highlighted hits, and
-   facet rails (type, tag) that narrow without re-typing. */
-
-/* Everything in the bar sits on the query text's baseline — the > mark,
-   the clear ×, and the ENTER hint all read as one line of type. */
-.search-prompt {
+/* --------------------------------------------------------------------------
+   Field + button — the one input/button pair, shared by search, the tag
+   filter, and the follow form, so the look can't drift between them: a
+   bordered field and a filled button sized to its label.
+   -------------------------------------------------------------------------- */
+/* One raised control, not two boxes: the site's panel surface with the same
+   hard offset shadow the image mounts wear, a borderless field, and the button
+   fused onto the end. overflow:hidden clips the button to the rounded corners. */
+.field-form {
   display: flex;
-  align-items: baseline;
-  gap: var(--sp3);
-  margin: var(--sp6) var(--gutter) 0;
-  padding-bottom: var(--sp3);
-  border-bottom: 2px solid var(--accent);
+  align-items: stretch;
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--hair2);
+  border-radius: var(--r);
+  box-shadow: 3px 3px 0 var(--shadow);
+  transition: border-color .12s ease;
 }
-.prompt-mark { font: 600 var(--fs-lg) var(--mono); color: var(--accent); }
-.search-prompt input {
+.field-form:focus-within { border-color: var(--accent); }
+.field-form[hidden] { display: none; }
+
+.field {
   flex: 1;
   min-width: 0;
-  padding: 0;
-  border: 0;
-  /* one tier under the h1 display size — the query is an input, not a title */
-  font: 400 var(--fs-lg) var(--sans);
-  letter-spacing: var(--ls-tight);
+  padding: var(--sp3);
+  font: 400 var(--fs) var(--sans);
   color: var(--head);
-  background: transparent;
+  background: transparent;       /* the control carries the surface */
+  border: 0;
   -webkit-appearance: none;
   appearance: none;
 }
-/* No native clear button — the prompt styling is the whole affordance */
-.search-prompt input::-webkit-search-cancel-button,
-.search-prompt input::-webkit-search-decoration { -webkit-appearance: none; }
-.search-prompt input:focus { outline: none; }  /* the accent baseline is the focus cue */
-.search-prompt input::placeholder { color: var(--muted); }
-/* Clearing is a plain link back to the blank prompt — no JS. At --fs-lg on
-   the shared baseline its ink rides above the ENTER caps; a 2px settle
-   centers the two. */
-.prompt-clear {
-  font: 400 var(--fs-lg) var(--mono);
-  line-height: 1;
-  color: var(--muted);
-  transform: translateY(2px);
-}
-.prompt-clear:hover { color: var(--accent); text-decoration-line: none; }
-.search-prompt button {
+.field:focus { outline: none; }  /* focus shows on the whole control (:focus-within) */
+.field::placeholder { color: var(--muted); }
+/* The clear × is our own control, so drop the native search-cancel button */
+.field::-webkit-search-cancel-button,
+.field::-webkit-search-decoration { -webkit-appearance: none; }
+
+/* The button is fused onto the field's end — no gap, no radius of its own
+   (the control's overflow clip rounds it). */
+.btn {
+  flex: none;
   display: inline-flex;
   align-items: center;
   gap: var(--sp2);
-  padding: 0;
-  border: 0;
+  padding: var(--sp2) var(--sp4);
   font: 600 var(--fs-sm) var(--mono);
   text-transform: uppercase;
   letter-spacing: var(--ls-caps);
-  color: var(--muted);
-  background: none;
+  color: var(--on-accent);
+  background: var(--accent);
+  border: 0;
   cursor: pointer;
+  transition: filter .12s ease;
 }
-/* The ↵ keeps caps tracking off and hugs its glyph so flex centering
-   lines it up with the word; a 1px lift centers it on the caps' optical
-   middle (its glyph mass hangs low on the baseline) */
-.search-prompt button span { line-height: 1; }
-.search-prompt button .key { letter-spacing: 0; transform: translateY(-1px); }
-.search-prompt button:hover { color: var(--accent); }
-/* On /tags the × is a button (it resets the client-side filter rather
-   than linking anywhere) — take back the ENTER button's caps styling so
-   it renders exactly like the search page's × link, and honour [hidden]
-   over the button's inline-flex. */
-.search-prompt button.prompt-clear {
+.btn:hover { filter: brightness(1.07); }
+
+/* The clear × — search's link, the tag filter's button: a muted ghost tucked
+   inside the control before the button, warming to accent. */
+.field-clear {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--sp3);
   font: 400 var(--fs-lg) var(--mono);
   line-height: 1;
-  text-transform: none;
-  letter-spacing: normal;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  cursor: pointer;
 }
-.search-prompt button.prompt-clear[hidden] { display: none; }
+.field-clear:hover { color: var(--accent); text-decoration-line: none; }
+.field-clear[hidden] { display: none; }
+
+/* Context — only the surrounding rhythm differs; the control above is shared.
+   The offset shadow needs a little right/bottom room so it isn't clipped. */
+.field-form.search { margin: var(--sp6) var(--gutter) var(--sp1); }
+.field-form.tag-filter { margin: var(--sp5) var(--gutter) var(--sp1); }
+
+/* In the ~300px sidebar the field has no room beside the button, so the
+   control stacks — field on top, the button as its full-width base. */
+.side .field-form { flex-direction: column; }
+.side .field-form .btn { justify-content: center; }
 
 .search-summary,
 .search-hint {
@@ -894,8 +897,8 @@ a:hover { text-decoration-line: underline; text-decoration-thickness: 2px; }
 }
 
 /* --------------------------------------------------------------------------
-   Follow — the email signup, wearing the search prompt's command-bar clothes.
-   Shared by the /follow page (.full) and the post footer + sidebar (.compact).
+   Follow — the email signup. The form itself is the shared field/button pair
+   above; only the pitch line and a little context spacing are follow-specific.
    -------------------------------------------------------------------------- */
 
 .follow-pitch {
@@ -906,77 +909,8 @@ a:hover { text-decoration-line: underline; text-decoration-thickness: 2px; }
 .follow-pitch a { color: var(--muted); }
 .follow-pitch a:hover { color: var(--accent); }
 
-.follow-form {
-  display: flex;
-  align-items: baseline;
-  gap: var(--sp3);
-  padding-bottom: var(--sp3);
-  border-bottom: 2px solid var(--accent);
-}
-.follow-form .prompt-mark { font: 600 var(--fs-lg) var(--mono); color: var(--accent); }
-.follow-form input {
-  flex: 1;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  font: 400 var(--fs-lg) var(--sans);
-  letter-spacing: var(--ls-tight);
-  color: var(--head);
-  background: transparent;
-  -webkit-appearance: none;
-  appearance: none;
-}
-.follow-form input:focus { outline: none; }  /* the accent baseline is the focus cue */
-.follow-form input::placeholder { color: var(--muted); }
-.follow-form button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp2);
-  padding: 0;
-  border: 0;
-  font: 600 var(--fs-sm) var(--mono);
-  text-transform: uppercase;
-  letter-spacing: var(--ls-caps);
-  color: var(--muted);
-  background: none;
-  cursor: pointer;
-}
-.follow-form button .key { letter-spacing: 0; transform: translateY(-1px); }
-.follow-form button:hover { color: var(--accent); }
-
-/* The /follow page instance sits under the prose at reading width. */
-.follow-form.full { margin-top: var(--sp5); }
-
-/* Compact instances (sidebar widget, post footer): one type tier down so the
-   bar sits inside its container instead of dominating it. */
-.follow-form.compact { gap: var(--sp2); padding-bottom: var(--sp2); }
-.follow-form.compact .prompt-mark { font-size: var(--fs); }
-.follow-form.compact input { font-size: var(--fs); }
-
-/* In the post footer, the follow section sits in the Tags / Related rhythm;
-   cap the field so it doesn't stretch the full reading measure. */
+/* On the /follow page the form sits under the prose; in the post footer it
+   sits in the Tags / Related rhythm, capped so it doesn't run the full
+   reading measure. */
+.article .follow-form { margin-top: var(--sp5); }
 .post-footer .follow-form { max-width: 26rem; }
-
-/* Sidebar follow form: the ~300px rail is too tight for a text submit, so the
-   field and a real filled button stack — the mark + field on the first line,
-   a full-width Subscribe button on its own line below. */
-.side .follow-form {
-  flex-wrap: wrap;
-  gap: var(--sp3) var(--sp2);
-  padding-bottom: 0;
-  border-bottom: 0;   /* the accent baseline moves onto the field itself */
-}
-.side .follow-form input {
-  padding-bottom: var(--sp2);
-  border-bottom: 2px solid var(--accent);
-}
-.side .follow-form button {
-  flex: 0 0 100%;
-  justify-content: center;
-  padding: var(--sp2);
-  border-radius: var(--r-sm);
-  color: var(--on-accent);
-  background: var(--accent);
-}
-.side .follow-form button .key { display: none; }   /* a real button needs no ↵ hint */
-.side .follow-form button:hover { color: var(--on-accent); filter: brightness(1.08); }

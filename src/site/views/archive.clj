@@ -212,7 +212,7 @@
 (def ^:private tag-filter-script
   (str "(function(){var bar=document.querySelector('.tag-filter');"
        "var input=bar.querySelector('input');"
-       "var clear=bar.querySelector('.prompt-clear');"
+       "var clear=bar.querySelector('.field-clear');"
        "var tags=document.querySelectorAll('.tag-index .tag');"
        "var empty=document.querySelector('.tag-filter-empty');"
        "function apply(){var q=input.value.trim().toLowerCase();var shown=0;"
@@ -225,15 +225,16 @@
        "bar.hidden=false;})();"))
 
 (defn- tag-filter
-  "The tag index's filter bar — the search page's prompt, reused. No form
-  and no submit: it never leaves the page, so the ENTER affordance is
-  dropped and the clear × is a button, not a link."
+  "The tag index's filter bar — the shared field+button pair, as a div: it
+  filters live and never leaves the page, so it submits nothing and shows no
+  button. The clear × is a button the JS resets, not a link."
   []
-  [:div.search-prompt.tag-filter {:hidden true}
-   [:span.prompt-mark {:aria-hidden "true"} ">"]
-   [:input {:type "search" :placeholder "type to filter…"
-            :autocomplete "off" :aria-label "Filter tags"}]
-   [:button.prompt-clear {:type "button" :hidden true :aria-label "Clear filter"} "×"]])
+  (c/field-form
+   {:tag :div
+    :attrs {:class "tag-filter" :hidden true}
+    :field {:type "search" :placeholder "Filter tags…"
+            :autocomplete "off" :aria-label "Filter tags"}
+    :aside [:button.field-clear {:type "button" :hidden true :aria-label "Clear filter"} "×"]}))
 
 (defn tags-page [config index]
   (let [tags (:tag-counts index)]

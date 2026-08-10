@@ -14,4 +14,4 @@
                  [:article.article
                   [:h1 title]
                   (when (:body page) (rest (markdown/render (:body page) nil)))
-                  (c/follow-form config {:size :full :id "follow-page-email"})])))
+                  (c/follow-form config {:id "follow-page-email"})])))

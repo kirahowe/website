@@ -16,17 +16,17 @@
        (when tag (str "&tag=" (URLEncoder/encode (name tag) "UTF-8")))))
 
 (defn- prompt
-  "The query bar. A fresh query drops any active filters — narrowing
-  belongs to the facet rails; the × (shown once a query is active) is a
-  plain link back to the blank prompt, so clearing needs no JS."
+  "The query bar — the shared field+button pair. A fresh query drops any active
+  filters (narrowing belongs to the facet rails); the × (shown once a query is
+  active) is a plain link back to the blank prompt, so clearing needs no JS."
   [q]
-  [:form.search-prompt {:action "/search" :method "get" :role "search"}
-   [:span.prompt-mark {:aria-hidden "true"} ">"]
-   [:input {:type "search" :name "q" :value (or q "")
-            :placeholder "type to search…"
-            :autofocus true :autocomplete "off" :aria-label "Search"}]
-   (when q [:a.prompt-clear {:href "/search" :aria-label "Clear search"} "×"])
-   [:button {:type "submit"} [:span "enter"] [:span.key "↵"]]])
+  (c/field-form
+   {:attrs {:class "search" :action "/search" :method "get" :role "search"}
+    :field {:type "search" :name "q" :value (or q "")
+            :placeholder "Search…"
+            :autofocus true :autocomplete "off" :aria-label "Search"}
+    :aside (when q [:a.field-clear {:href "/search" :aria-label "Clear search"} "×"])
+    :submit "Search"}))
 
 ;; --- facet rails -----------------------------------------------------------
 

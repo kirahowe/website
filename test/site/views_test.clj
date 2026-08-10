@@ -159,6 +159,9 @@
     (let [{:keys [status body headers]} (GET "/search" "q=babashka")]
       (is (= 200 status))
       (is (= "no-store" (get headers "Cache-Control")))
+      ;; the query bar is the shared field/button pair
+      (is (str/includes? body "field-form search"))
+      (is (str/includes? body ">Search</button>"))
       (is (str/includes? body "sorted by relevance"))
       ;; matched terms are marked, in titles and snippets
       (is (str/includes? body "<mark class=\"hit\">Babashka</mark>"))
@@ -229,7 +232,7 @@
 
   (testing "tags index carries the client-side filter, hidden until its JS runs"
     (let [{:keys [body]} (GET "/tags")]
-      (is (str/includes? body "search-prompt tag-filter"))
+      (is (str/includes? body "field-form tag-filter"))
       (is (str/includes? body "aria-label=\"Filter tags\""))
       (is (str/includes? body "tag-filter-empty"))))
 
@@ -241,7 +244,7 @@
   (testing "the /follow page: static prose from the markdown + the email form"
     (let [{:keys [status body]} (GET "/follow")]
       (is (= 200 status))
-      (is (str/includes? body "follow-form full"))
+      (is (str/includes? body "field-form follow-form"))
       (is (str/includes? body "name=\"email\""))
       (is (str/includes? body "name=\"embed\""))
       ;; no Buttondown account in the test config → placeholder action
@@ -251,7 +254,7 @@
 
   (testing "an entry's page footer carries the follow section"
     (let [{:keys [body]} (GET "/2026/jul/4/hello-world")]
-      (is (str/includes? body "follow-form compact"))
+      (is (str/includes? body "field-form follow-form"))
       (is (str/includes? body "Follow by "))))
 
   (testing "the site footer no longer carries a follow band"
