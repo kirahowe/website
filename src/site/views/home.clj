@@ -39,4 +39,5 @@
                                (when next-entry (older-link next-entry)))
                          (c/sidebar
                           (c/recent-links (:entries index) 10)
+                          (c/follow-widget config)
                           (c/top-tags (:tag-counts index) 5))))))
