@@ -9,6 +9,8 @@
   /2026/jul/4/my-post      single entry
   /posts /links ... type listings (derived from config :entry-types)
   /2026/posts              type listing filtered by year
+  /posts/page/2            older entries of a type
+  /2026/posts/page/2       ... filtered by year
   /tags                    tag index
   /tags/clojure            entries tagged clojure
   /tags/clojure/2026       ... filtered by year
@@ -35,6 +37,15 @@
   "{\"posts\" :post, \"links\" :link, ...} from config."
   [config]
   (into {} (map (fn [t] [(str (name t) "s") t])) (:entry-types config)))
+
+(defn- parse-page
+  "Canonical listing page number: 2, 3, ... . Page 1 keeps the listing's
+  existing URL, and leading-zero spellings are rejected rather than creating
+  duplicate URLs."
+  [s]
+  (when (and s (re-matches #"[1-9]\d*" s))
+    (let [n (parse-long s)]
+      (when (and n (< 1 n)) n))))
 
 (defn match-route
   "segments → {:handler <kw> :params {...}} or nil (→ 404)."
@@ -72,6 +83,10 @@
           :else nil)
 
       3 (cond
+          (and (plural->type a) (= b "page") (parse-page c))
+          {:handler :type-list :params {:type (plural->type a)
+                                        :page (parse-page c)}}
+
           (and (= a "tags") (= c "feed.xml"))
           {:handler :tag-feed :params {:tag (keyword b)}}
 
@@ -86,10 +101,18 @@
 
           :else nil)
 
-      4 (when (and (util/parse-year a) (util/parse-month b) (util/parse-day c))
+      4 (cond
+          (and (util/parse-year a) (plural->type b) (= c "page") (parse-page d))
+          {:handler :type-list :params {:type (plural->type b)
+                                        :year (util/parse-year a)
+                                        :page (parse-page d)}}
+
+          (and (util/parse-year a) (util/parse-month b) (util/parse-day c))
           {:handler :entry :params {:year (util/parse-year a)
                                     :month (util/parse-month b)
                                     :day (util/parse-day c)
-                                    :slug d}})
+                                    :slug d}}
+
+          :else nil)
 
       nil)))

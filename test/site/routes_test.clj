@@ -29,6 +29,13 @@
   (is (= {:handler :type-list :params {:type :link :year 2026}} (match "/2026/links")))
   (is (= {:handler :type-list :params {:type :release}} (match "/releases")))
   (is (= {:handler :type-list :params {:type :tool}} (match "/tools")))
+  (is (= {:handler :type-list :params {:type :post :page 2}}
+         (match "/posts/page/2")))
+  (is (= {:handler :type-list :params {:type :post :year 2026 :page 3}}
+         (match "/2026/posts/page/3")))
+  (testing "page 1 and non-canonical page numbers do not duplicate the index"
+    (is (nil? (match "/posts/page/1")))
+    (is (nil? (match "/posts/page/02"))))
   (testing "unknown plural falls through to page lookup"
     (is (= {:handler :page :params {:slug "essays"}} (match "/essays")))))
 

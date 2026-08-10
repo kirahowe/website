@@ -186,7 +186,7 @@ so dev doesn't even have that.
 |-----|-------|
 | `/2026` · `/2026/jul` · `/2026/jul/4` | date archives |
 | `/2026/jul/4/hello-world` | single entry |
-| `/posts` · `/notes` · `/links` · `/quotes` · `/releases` · `/tools` | by type (`/2026/posts` filters by year) |
+| `/posts` · `/notes` · `/links` · `/quotes` · `/releases` · `/tools` | paginated by type (`/posts/page/2`; `/2026/posts` filters by year) |
 | `/tags` · `/tags/clojure` · `/tags/clojure/2026` | by tag |
 | `/search?q=...` | full-text search |
 | `/feed.xml` | RSS |

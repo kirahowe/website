@@ -497,6 +497,19 @@ a:hover { text-decoration-thickness: 2px; }
   font: 500 var(--fs-sm) var(--mono);
 }
 
+/* Type indexes continue through stable numbered pages. Three fixed slots keep
+   the status centred even when the first/last page has only one direction. */
+.pagination {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: var(--sp3);
+  align-items: baseline;
+  margin: var(--sp5) var(--gutter);
+  font: 500 var(--fs-sm) var(--mono);
+}
+.pagination-status { color: var(--muted); }
+.pagination-older { text-align: right; }
+
 /* --------------------------------------------------------------------------
    Article — single post, static pages. Full reading measure, no sidebar.
    -------------------------------------------------------------------------- */

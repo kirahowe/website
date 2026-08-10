@@ -151,34 +151,41 @@
 
 ;; --- type and tag listings ----------------------------------------------
 
-(defn type-page [config index type year tag entries]
+(defn type-page [config index type year tag all-entries {:keys [entries page pages total]}]
   (let [slug (str (name type) "s")
         ;; The listing's canonical URL for any (year, tag) selection — the
         ;; one place the path shape lives, so chips, the × clears, the Years
         ;; nav and the tag facet all stay consistent.
-        path (fn [y t] (str (if y (str "/" y "/" slug) (str "/" slug))
-                            (when t (str "?tag=" (name t)))))
+        path (fn [y t p]
+               (str (if y (str "/" y "/" slug) (str "/" slug))
+                    (when (< 1 p) (str "/page/" p))
+                    (when t (str "?tag=" (name t)))))
         label (str/capitalize slug)
         ;; Year and tag each render as their own muted chip; each × clears
         ;; only itself, leaving the other facet applied.
         heading (header-parts label
-                              [(when year (filter-chip (str year) (path nil tag)))
-                               (when tag (filter-chip (str "#" (name tag)) (path year nil)))])
+                              [(when year (filter-chip (str year) (path nil tag 1)))
+                               (when tag (filter-chip (str "#" (name tag)) (path year nil 1)))])
         ;; Facet the Years list to this type — every year that holds one,
         ;; not the global year set — regardless of the year filter in view,
         ;; and narrowed further to the applied tag so no year link dead-ends.
         scope (cond->> (get (:by-type index) type)
                 tag (filter #(contains? (set (:tags %)) tag)))
         years (distinct (map #(-> % :date :year) scope))]
-    (layout/page config {:title (cond-> label year (str " / " year) tag (str " / #" (name tag)))
-                         ;; the clean (query-free) listing is the canonical
-                         ;; form of every ?tag= facet variant
-                         :path (path year nil)}
-                 (c/page-header heading (c/count-label (count entries)))
-                 (c/cols (c/feed entries)
+    (layout/page config {:title (cond-> label
+                                 year (str " / " year)
+                                 tag (str " / #" (name tag))
+                                 (< 1 page) (str " / Page " page))
+                         ;; Every numbered page has its own canonical URL;
+                         ;; the query-free form remains canonical when a tag
+                         ;; facet is applied.
+                         :path (path year nil page)}
+                 (c/page-header heading (c/count-label total))
+                 (c/cols (list (c/feed entries)
+                               (c/pagination page pages #(path year tag %)))
                          (c/sidebar config
-                                    (year-nav years year #(path % tag))
-                                    (facet-tags entries tag #(path year %)))))))
+                                    (year-nav years year #(path % tag 1))
+                                    (facet-tags all-entries tag #(path year % 1)))))))
 
 (defn- related-tags [entries tag]
   (let [counts (->> entries (mapcat :tags) (remove #{tag}) frequencies

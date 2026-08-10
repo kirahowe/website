@@ -15,6 +15,7 @@
 
 (def public-cache "public, max-age=300, stale-while-revalidate=86400")
 (def no-store "no-store")
+(def default-type-page-entries 10)
 
 (defn- html
   ([body] (html body 200 public-cache))
@@ -61,6 +62,25 @@
     (filterv #(contains? (set (:tags %)) tag) entries)
     entries))
 
+(defn- paginate
+  "The requested 1-based slice of entries plus pager metadata, or nil when
+  the page is past the end. A bad configured size falls back to the default
+  rather than making every listing disappear."
+  [config entries page]
+  (let [configured (:type-page-entries config)
+        per-page (if (and (int? configured) (pos? configured))
+                   configured
+                   default-type-page-entries)
+        page (or page 1)
+        total (count entries)
+        pages (quot (+ total (dec per-page)) per-page)
+        start (* (dec page) per-page)]
+    (when (and (pos? total) (<= page pages))
+      {:entries (subvec (vec entries) start (min total (+ start per-page)))
+       :page page
+       :pages pages
+       :total total})))
+
 (defn- tag-param
   "The ?tag= facet on a listing, as a keyword (or nil) — lets a sidebar tag
   refine the current type/year view instead of leaving for its own page."
@@ -106,12 +126,14 @@
       (html (v.home/home config index)))
 
     :type-list
-    (let [{:keys [type year]} params
-          tag (tag-param req)]
-      (some-entries config (-> (get (:by-type index) type)
-                               (filter-year year)
-                               (filter-tag tag))
-                    #(v.archive/type-page config index type year tag %)))
+    (let [{:keys [type year page]} params
+          tag (tag-param req)
+          all-entries (-> (get (:by-type index) type)
+                          (filter-year year)
+                          (filter-tag tag))]
+      (if-let [pagination (paginate config all-entries page)]
+        (html (v.archive/type-page config index type year tag all-entries pagination))
+        (not-found config)))
 
     :tag
     (let [{:keys [tag year]} params]

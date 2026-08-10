@@ -261,6 +261,21 @@
 (defn count-label [n]
   (str n " " (if (= 1 n) "entry" "entries")))
 
+(defn pagination
+  "Previous/next navigation for a newest-first listing. `href` maps a page
+  number to its canonical listing URL; page 1 therefore remains the clean
+  index URL."
+  [page pages href]
+  (when (< 1 pages)
+    [:nav.pagination {:aria-label "Pagination"}
+     [:span.pagination-newer
+      (when (< 1 page)
+        [:a {:href (href (dec page)) :rel "prev"} "← Newer"])]
+     [:span.pagination-status (str "Page " page " of " pages)]
+     [:span.pagination-older
+      (when (< page pages)
+        [:a {:href (href (inc page)) :rel "next"} "Older →"])]]))
+
 (defn type-summary
   "A per-type breakdown line — \"4 posts / 1 quote / 9 links\" — in nav
   order; the word singularizes on a count of one. When `link?`, each type

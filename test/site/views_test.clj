@@ -405,6 +405,36 @@
       ;; lets several items through
       (is (< 1 (count (re-seq #"<item>" body)))))))
 
+(deftest type-listings-are-paginated
+  (let [h (app/make-app (assoc config :type-page-entries 1)
+                        (atom (content/build-index config)))
+        get-page (fn
+                   ([uri] (h {:request-method :get :uri uri}))
+                   ([uri query] (h {:request-method :get :uri uri
+                                    :query-string query})))
+        first-page (:body (get-page "/posts"))
+        second-page (:body (get-page "/posts/page/2"))]
+    (testing "the first page shows only its slice and the total count"
+      (is (str/includes? first-page "Hello, world"))
+      (is (not (str/includes? first-page "caching-thought")))
+      (is (str/includes? first-page "3 entries"))
+      (is (str/includes? first-page "href=\"/posts/page/2\""))
+      (is (str/includes? first-page "Older →")))
+    (testing "middle pages link in both directions and have their own canonical URL"
+      (is (str/includes? second-page "caching-thought"))
+      (is (not (str/includes? second-page "Hello, world")))
+      (is (str/includes? second-page "href=\"/posts\" rel=\"prev\""))
+      (is (str/includes? second-page "href=\"/posts/page/3\" rel=\"next\""))
+      (is (str/includes? second-page "Page 2 of 3"))
+      (is (str/includes? second-page "<title>Posts / Page 2 — Test Site</title>"))
+      (is (str/includes? second-page
+                         "href=\"https://example.com/posts/page/2\" rel=\"canonical\"")))
+    (testing "pagination preserves an active tag facet"
+      (let [body (:body (get-page "/posts" "tag=clojure"))]
+        (is (str/includes? body "href=\"/posts/page/2?tag=clojure\""))))
+    (testing "pages past the end are a 404"
+      (is (= 404 (:status (get-page "/posts/page/4")))))))
+
 (deftest static-assets
   (let [{:keys [status headers]} (GET "/css/style.css")]
     (is (= 200 status))

@@ -210,7 +210,9 @@ surface Archives {
     @guidance
         -- /YYYY, /YYYY/<mon> and /YYYY/<mon>/<D> are the date
         -- archives; /posts, /links, ... list by type (optionally
-        -- year-scoped as /YYYY/posts); /tags is the tag index with
+        -- year-scoped as /YYYY/posts), with older type entries on
+        -- stable /page/N URLs capped by config.type_page_entries;
+        -- /tags is the tag index with
         -- counts, /tags/<tag> the entries for one tag (optionally
         -- year-scoped as /tags/<tag>/YYYY). /archive redirects to the
         -- most recent year that has content.
