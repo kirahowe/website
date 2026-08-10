@@ -103,6 +103,7 @@
                           ;; heading — relevance order, so no day grouping
                           (for [e shown] (c/day-group [e] {:terms terms})))
                     (c/sidebar
+                     config
                      (type-facets config q type tag
                                   (search/apply-filters matches {:tag tag}))
                      (tag-facets q type tag

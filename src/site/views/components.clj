@@ -277,11 +277,64 @@
 
 ;; --- sidebar -------------------------------------------------------------
 
-(defn sidebar [& sections]
-  (into [:aside.sidebar] (remove nil? sections)))
-
 (defn side-section [title & body]
   (into [:section.side [:h2 title]] body))
+
+;; The email follow widget — the one section every sidebar carries, baked
+;; into `sidebar` below. The search bar's command-bar form (POSTing to
+;; Buttondown) plus the "follow by email or RSS" pitch; the sidebar
+;; counterpart to the Follow section in the post footer on entry pages.
+
+(defn follow-form
+  "The email follow form — the search prompt's command-bar shape reused: a
+  leading mark, a borderless email field on the accent baseline, and a mono
+  Follow button. POSTs to the configured Buttondown account; until one is set
+  the action is a no-op placeholder (#). `size` is :full (the /follow page) or
+  :compact (post footer, sidebar). `id` keeps each instance's input unique."
+  [config {:keys [size id] :or {size :full id "follow-email"}}]
+  (let [user (:buttondown-username config)
+        action (if user
+                 (str "https://buttondown.com/api/emails/embed-subscribe/" user)
+                 "#")]
+    [:form.follow-form (cond-> {:class (name size) :action action :method "post"}
+                         user (assoc :target "popupwindow"
+                                     :onsubmit (str "window.open('https://buttondown.com/"
+                                                    user "','popupwindow')")))
+     [:span.prompt-mark {:aria-hidden "true"} ">"]
+     [:input {:type "email" :name "email" :id id
+              :placeholder "you@example.com"
+              :autocomplete "email" :aria-label "Your email address"
+              :required true}]
+     ;; Buttondown's embed marker
+     [:input {:type "hidden" :name "embed" :value "1"}]
+     [:button {:type "submit"} [:span "Follow"] [:span.key "↵"]]]))
+
+(defn follow-pitch
+  "The one-line 'follow by email or RSS' offer, shared by the sidebar widget
+  and the post-footer section: 'email' leads to the /follow page, 'RSS' to
+  the feed."
+  []
+  [:p.follow-pitch
+   "Follow by " [:a {:href "/follow"} "email"]
+   " or " [:a {:href "/feed.xml"} "RSS"] "."])
+
+(defn follow-widget
+  "The Follow section: the pitch line, then the compact email form. Baked into
+  every sidebar (below); also placed in the post footer on entry pages."
+  [config]
+  (side-section "Follow"
+                (follow-pitch)
+                (follow-form config {:size :compact :id "follow-side"})))
+
+(defn sidebar
+  "The right rail. Composes the page's own widgets (recents, tag cloud, year
+  nav, calendar, facets…) and always ends with the Follow widget, so the email
+  offer reaches every archive/index page. `config` feeds the baked-in form;
+  `sections` are the page's widgets, in order, above it."
+  [config & sections]
+  (into [:aside.sidebar]
+        (conj (vec (remove nil? sections))
+              (follow-widget config))))
 
 (defn cols
   "The two-column shell: main feed on the left, sidebar on the right, with a
@@ -346,45 +399,3 @@
   [entries n]
   (side-section "Recent"
                 (entry-list (take n entries))))
-
-;; --- follow (email signup) -----------------------------------------------
-
-(defn follow-form
-  "The email follow form — the search prompt's command-bar shape reused: a
-  leading mark, a borderless email field on the accent baseline, and a mono
-  Follow button. POSTs to the configured Buttondown account; until one is set
-  the action is a no-op placeholder (#). `size` is :full (the /follow page) or
-  :compact (footer, sidebar). `id` keeps each instance's input label unique."
-  [config {:keys [size id] :or {size :full id "follow-email"}}]
-  (let [user (:buttondown-username config)
-        action (if user
-                 (str "https://buttondown.com/api/emails/embed-subscribe/" user)
-                 "#")]
-    [:form.follow-form (cond-> {:class (name size) :action action :method "post"}
-                         user (assoc :target "popupwindow"
-                                     :onsubmit (str "window.open('https://buttondown.com/"
-                                                    user "','popupwindow')")))
-     [:span.prompt-mark {:aria-hidden "true"} ">"]
-     [:input {:type "email" :name "email" :id id
-              :placeholder "you@example.com"
-              :autocomplete "email" :aria-label "Your email address"
-              :required true}]
-     ;; Buttondown's embed marker
-     [:input {:type "hidden" :name "embed" :value "1"}]
-     [:button {:type "submit"} [:span "Follow"] [:span.key "↵"]]]))
-
-(defn follow-pitch
-  "The one-line 'follow by email or RSS' offer shared by the short sections
-  (footer band, sidebar widget): 'email' leads to the /follow page, 'RSS' to
-  the feed."
-  []
-  [:p.follow-pitch
-   "Follow by " [:a {:href "/follow"} "email"]
-   " or " [:a {:href "/feed.xml"} "RSS"] "."])
-
-(defn follow-widget
-  "The sidebar's Follow section: the pitch line, then the compact email form."
-  [config]
-  (side-section "Follow"
-                (follow-pitch)
-                (follow-form config {:size :compact :id "follow-side"})))

@@ -85,7 +85,8 @@
                          :path (str "/" year)}
                  (c/page-header heading (c/count-label (count entries)))
                  (c/cols (month-index year entries)
-                         (c/sidebar (year-nav years year year-href)
+                         (c/sidebar config
+                                    (year-nav years year year-href)
                                     (facet-tags entries tag tag-href))))))
 
 ;; --- month page: the feed + a mini calendar ------------------------------
@@ -139,7 +140,8 @@
                  (c/page-header title (c/count-label (count entries)))
                  [:div.type-summary (c/type-summary entries true)]
                  (c/cols (c/feed entries)
-                         (c/sidebar (calendar index year month)
+                         (c/sidebar config
+                                    (calendar index year month)
                                     (nearby newer older))))))
 
 (defn day-page [config year month day entries]
@@ -174,7 +176,8 @@
                          :path (path year nil)}
                  (c/page-header heading (c/count-label (count entries)))
                  (c/cols (c/feed entries)
-                         (c/sidebar (year-nav years year #(path % tag))
+                         (c/sidebar config
+                                    (year-nav years year #(path % tag))
                                     (facet-tags entries tag #(path year %)))))))
 
 (defn- related-tags [entries tag]
@@ -197,7 +200,8 @@
                                 :title (str "RSS for #" (name tag))}}
                  (c/page-header heading (c/count-label (count entries)))
                  (c/cols (c/feed entries)
-                         (c/sidebar (related-tags entries tag)
+                         (c/sidebar config
+                                    (related-tags entries tag)
                                     (tag-feeds tag))))))
 
 ;; Live filtering for the tag index: hides tags whose name doesn't contain

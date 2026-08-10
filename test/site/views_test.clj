@@ -257,9 +257,10 @@
   (testing "the site footer no longer carries a follow band"
     (is (not (str/includes? (:body (GET "/")) "follow-band"))))
 
-  (testing "the home sidebar carries the Follow widget"
-    (let [{:keys [body]} (GET "/")]
-      (is (str/includes? body ">Follow</h2>")))))
+  (testing "every archive/index sidebar carries the Follow widget"
+    (doseq [uri ["/" "/2026" "/2026/jul" "/tags/clojure" "/posts"]]
+      (is (str/includes? (:body (GET uri)) ">Follow</h2>")
+          (str uri " sidebar should carry the Follow widget")))))
 
 (deftest image-lede-posts
   (testing "a post that opens on an image previews with a small linked image plus prose"

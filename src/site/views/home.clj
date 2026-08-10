@@ -37,7 +37,6 @@
     (layout/page config {:path "/"}
                  (c/cols (list (c/feed shown)
                                (when next-entry (older-link next-entry)))
-                         (c/sidebar
-                          (c/recent-links (:entries index) 10)
-                          (c/follow-widget config)
-                          (c/top-tags (:tag-counts index) 5))))))
+                         (c/sidebar config
+                                    (c/recent-links (:entries index) 10)
+                                    (c/top-tags (:tag-counts index) 5))))))
