@@ -8,14 +8,14 @@
    1. Two voices. Sans carries content (titles, prose, excerpts); mono
       carries the metadata layer (dates, counts, types, tags, nav, labels),
       always at --fs-sm.
-   2. One link behaviour, two resting states. A link inside a run of text
-      rests underlined — in prose, colour alone isn't a cue. A link that
-      stands alone (nav, titles, ledger rows, tags, feet) rests bare, since
-      position already marks it. Both land on the same hover: a 2px accent
-      rule at one shared offset. Muted chrome links (tags, day headings,
-      "more") additionally warm to accent. Composite rows underline only
-      their title. The two filled controls (brand, search button) invert to
-      accent instead.
+   2. Links look like links. The browser underlines a link in the link colour;
+      we keep that, tint it to the accent, and thicken it to a 2px rule on
+      hover. Three kinds opt out: links with no text to rule (the wordmark and
+      filled buttons invert to an accent fill; the icon and × glyph controls
+      warm to accent); a composite row — one anchor over a date or count as
+      well as its title — rules the title alone; and the runs read as
+      navigation from position, the header nav and the day headings, rest bare
+      and reveal the rule on hover.
    3. One ledger row. Every dense entry list — year archive, related list,
       sidebar recents — is the same row: mono date, type dot, accent title.
    4. One gutter. Every full-width container shares --gutter, so the page
@@ -138,46 +138,30 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* The one link behaviour: accent, with two resting states (rule 2) that
-   land on the same hover — a 2px accent rule at one shared offset. */
-a {
-  color: var(--accent);
-  text-decoration-line: none;
-  text-underline-offset: 2px;
-  text-decoration-thickness: 1px;
-}
-a:hover { text-decoration-line: underline; text-decoration-thickness: 2px; }
+/* A link looks like a link: the browser's underline, tinted to the accent and
+   resting at a hairline, thickening to a 2px rule on hover. The opt-outs below
+   have no text to rule, wrap metadata that shouldn't be ruled, or are read as
+   navigation from position alone (rule 2). */
+a { color: var(--accent); text-underline-offset: 2px; text-decoration-thickness: 1px; }
+a:hover { text-decoration-thickness: 2px; }
 
-/* Prose links rest underlined: inside a run of text, colour is the only
-   cue a reader gets, and colour alone doesn't carry (WCAG 1.4.1). The
-   thinner resting rule keeps a linked paragraph from turning into a fence;
-   hover thickens it to 2px, same as everywhere else.
+/* No text to rule. The wordmark and buttons are shapes (they invert to an
+   accent fill on hover — see .brand, .btn); the icon and × glyph controls
+   carry their own muted → accent hover at their own definitions (.permalink,
+   .field-clear, .filter-x). */
+.brand, .btn, .permalink { text-decoration: none; }
 
-   Longhand, never the `text-decoration` shorthand: the shorthand resets
-   thickness to auto, and at equal specificity these rules sit *after*
-   a:hover — so a shorthand here silently erases the hover's 2px and a
-   prose link ends up with no hover state at all. */
-.article a,
-.article-meta a,
-.entry-body a,
-.entry-excerpt a,
-.entry blockquote a,
-.quote-cite a { text-decoration-line: underline; }
+/* A ledger row and a search facet are each a single anchor spanning a date
+   or a count as well as a title — rule the title, not the metadata beside it. */
+.index-row, .facet { text-decoration: none; }
+.index-row .title, .facet .title { text-decoration-line: underline; text-decoration-thickness: 1px; }
+.index-row:hover .title, .facet:hover .title { text-decoration-thickness: 2px; }
 
-/* Headings are titles, not prose — a rule under 36px display type reads as
-   damage. They keep the bare resting state. */
-.article h1 a, .article h2 a, .article h3 a { text-decoration-line: none; }
-
-/* Composite row links underline only their title, never the whole row */
-.brand:hover, .index-row:hover, .side-link:hover, .facet:hover { text-decoration-line: none; }
-.index-row:hover .title, .side-link:hover .title, .facet:hover .title {
-  text-decoration-line: underline;
-  text-decoration-thickness: 2px;
-}
-
-/* Muted chrome links warm to accent on hover */
-.tag, .day-heading a, .excerpt-more { color: var(--muted); }
-.tag:hover, .day-heading a:hover, .excerpt-more:hover { color: var(--accent); }
+/* The header nav and the day headings read as navigation from position alone —
+   a bar of words, a dated section rule — so they rest bare and reveal the 2px
+   rule only on hover. */
+.site-nav a, .day-heading a { text-decoration: none; }
+.site-nav a:hover, .day-heading a:hover { text-decoration-line: underline; text-decoration-thickness: 2px; }
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
@@ -348,7 +332,7 @@ a:hover { text-decoration-line: underline; text-decoration-thickness: 2px; }
 /* Applied tag facet: smaller and muted next to the title, with an × that
    clears it back to the un-filtered listing. */
 .page-header .filter { font: 400 var(--fs-md) var(--mono); color: var(--muted); }
-.page-header .filter-x { margin-left: var(--sp1); color: var(--muted); }
+.page-header .filter-x { margin-left: var(--sp1); color: var(--muted); text-decoration: none; }
 .page-header .filter-x:hover { color: var(--accent); }
 
 /* Per-type count summary under a month header */
@@ -742,7 +726,7 @@ a:hover { text-decoration-line: underline; text-decoration-thickness: 2px; }
   padding: var(--sp2) var(--sp3);
   font: 400 var(--fs) var(--sans);
   color: var(--head);
-  background: transparent;       /* the control carries the surface */
+  background: var(--bg);
   border: 0;
   -webkit-appearance: none;
   appearance: none;
@@ -785,8 +769,9 @@ a:hover { text-decoration-line: underline; text-decoration-thickness: 2px; }
   background: none;
   border: 0;
   cursor: pointer;
+  text-decoration: none;
 }
-.field-clear:hover { color: var(--accent); text-decoration-line: none; }
+.field-clear:hover { color: var(--accent); }
 .field-clear[hidden] { display: none; }
 
 /* Context — only the surrounding rhythm differs; the control above is shared.
@@ -872,7 +857,7 @@ a:hover { text-decoration-line: underline; text-decoration-thickness: 2px; }
   color: var(--muted);
   cursor: pointer;
 }
-.theme-toggle:hover { color: var(--accent); }  /* muted chrome warms to accent — rule 2 */
+.theme-toggle:hover { color: var(--accent); }  /* a glyph control: warms to accent, no rule to draw — rule 2 */
 /* Ships hidden until theme-toggle-script confirms JS can drive it (see
    layout.clj); [hidden] alone loses to the display: flex above without this. */
 .theme-toggle[hidden] { display: none; }
@@ -911,8 +896,6 @@ a:hover { text-decoration-line: underline; text-decoration-thickness: 2px; }
   font: 400 var(--fs-sm) var(--sans);
   color: var(--muted);
 }
-.follow-pitch a { color: var(--muted); }
-.follow-pitch a:hover { color: var(--accent); }
 
 /* On the /follow page the form sits under the prose; in the post footer it
    sits in the Tags / Related rhythm, capped so it doesn't run the full
