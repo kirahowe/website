@@ -106,47 +106,12 @@
                           :heading clean-id-heading)]
      (md/->hiccup renderers (md/parse parse-ctx (preprocess s))))))
 
-;; --- introspection for publish-time lints --------------------------------
+;; --- the lede: what a feed row previews ----------------------------------
 
-(defn- lines-outside-fences [s]
-  (first (reduce (fn [[out in-fence?] line]
-                   (cond
-                     (fence-line? line) [out (not in-fence?)]
-                     in-fence? [out true]
-                     :else [(conj out line) false]))
-                 [[] false]
-                 (str/split-lines (str s)))))
-
-(defn wikilinks-in
-  "Targets of [[wikilinks]] (embeds excluded, code fences skipped) — what
-  a publish lint checks for resolvability."
-  [s]
-  (->> (lines-outside-fences s)
-       (mapcat #(re-seq #"(?<!!)\[\[([^\]|#]+)[^\]]*\]\]" %))
-       (map (comp str/trim second))))
-
-(defn attachments-in
-  "Image files a markdown string references, via ![[embeds]] or
-  (/)attachments/ links — what a publish lint checks exist."
-  [s]
-  (->> (lines-outside-fences s)
-       (mapcat (fn [line]
-                 (concat (map second (re-seq #"!\[\[([^\]|]+?)(?:\|[^\]]*)?\]\]" line))
-                         (map second (re-seq #"\]\(/?attachments/([^)\s]+)\)" line)))))
-       (map #(-> % str/trim (str/replace "%20" " ")))
-       (filter #(image-extensions (str/lower-case (or (peek (str/split % #"\.")) ""))))))
-
-(defn lede
+(defn- lede
   "The first paragraph of a markdown string."
   [s]
   (first (str/split (str s) #"\n\s*\n" 2)))
-
-(defn one-block?
-  "Whether a body is a single block — one paragraph, with nothing after
-  it. A post this short previews whole in the feed, so its continuation
-  link leads nowhere new; `bb publish` warns and suggests `type: note`."
-  [s]
-  (= 1 (count (remove str/blank? (str/split (str s) #"\n\s*\n")))))
 
 (defn lede-image
   "When a body opens on an image — its first block is a lone markdown
