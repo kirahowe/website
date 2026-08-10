@@ -892,3 +892,76 @@ a:hover { text-decoration-line: underline; text-decoration-thickness: 2px; }
   /* Thinner matte where every pixel of width counts */
   .article img, .entry img { padding: var(--sp2); }
 }
+
+/* --------------------------------------------------------------------------
+   Follow — the email signup, wearing the search prompt's command-bar clothes.
+   Shared by the /follow page (.full) and the footer band + sidebar (.compact).
+   -------------------------------------------------------------------------- */
+
+.follow-pitch {
+  margin: 0 0 var(--sp3);
+  font: 400 var(--fs-sm) var(--sans);
+  color: var(--muted);
+}
+.follow-pitch a { color: var(--muted); }
+.follow-pitch a:hover { color: var(--accent); }
+
+.follow-form {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp3);
+  padding-bottom: var(--sp3);
+  border-bottom: 2px solid var(--accent);
+}
+.follow-form .prompt-mark { font: 600 var(--fs-lg) var(--mono); color: var(--accent); }
+.follow-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  font: 400 var(--fs-lg) var(--sans);
+  letter-spacing: var(--ls-tight);
+  color: var(--head);
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.follow-form input:focus { outline: none; }  /* the accent baseline is the focus cue */
+.follow-form input::placeholder { color: var(--muted); }
+.follow-form button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp2);
+  padding: 0;
+  border: 0;
+  font: 600 var(--fs-sm) var(--mono);
+  text-transform: uppercase;
+  letter-spacing: var(--ls-caps);
+  color: var(--muted);
+  background: none;
+  cursor: pointer;
+}
+.follow-form button .key { letter-spacing: 0; transform: translateY(-1px); }
+.follow-form button:hover { color: var(--accent); }
+
+/* The /follow page instance sits under the prose at reading width. */
+.follow-form.full { margin-top: var(--sp5); }
+
+/* Compact instances (footer band, sidebar widget): one type tier down so the
+   bar sits inside its container instead of dominating it. */
+.follow-form.compact { gap: var(--sp2); padding-bottom: var(--sp2); }
+.follow-form.compact .prompt-mark { font-size: var(--fs); }
+.follow-form.compact input { font-size: var(--fs); }
+
+/* Footer follow band: a strip above the © / social row, on the footer gutter
+   and hairline rhythm. */
+.follow-band {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp3) var(--sp5);
+  padding: var(--sp4) var(--gutter);
+  border-top: 1px solid var(--hair);
+}
+.follow-band .follow-pitch { margin: 0; flex: none; }
+.follow-band .follow-form { flex: 1; min-width: 15rem; }

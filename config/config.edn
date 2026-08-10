@@ -23,6 +23,12 @@
  ;; Short bio shown in the footer of every entry page.
  :bio "Kira Howe is a software engineer writing about building with care in the age of AI."
 
+ ;; Email follow. Buttondown collects the addresses; the follow form POSTs to
+ ;; its embed endpoint at buttondown.com/api/emails/embed-subscribe/<username>.
+ ;; nil until the account exists — the form then renders as a placeholder that
+ ;; posts nowhere (action="#"), so the design is in place ahead of the plumbing.
+ :buttondown-username nil
+
  ;; Footer social links, [label url]. RSS is always included first.
  :social [["GitHub" "https://github.com/kirahowe"]]
 
