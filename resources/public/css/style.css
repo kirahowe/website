@@ -126,7 +126,7 @@
 *, *::before, *::after { box-sizing: border-box; }
 
 body {
-  max-width: 53.75rem;
+  max-width: 61rem;
   margin: 0 auto;
   font-family: var(--sans);
   font-size: var(--fs);
@@ -299,7 +299,7 @@ a:hover { text-decoration-line: underline; text-decoration-thickness: 2px; }
 
 .cols {
   display: grid;
-  grid-template-columns: 1fr 18.75rem;
+  grid-template-columns: 1fr 22rem;
 }
 /* min-width: 0 on both grid children: a grid item's min-width defaults to
    auto, so a wide image (its intrinsic size) would inflate the 1fr track
@@ -518,7 +518,12 @@ a:hover { text-decoration-line: underline; text-decoration-thickness: 2px; }
    Article — single post, static pages. Full reading measure, no sidebar.
    -------------------------------------------------------------------------- */
 
-.article { padding: var(--sp6) var(--gutter) var(--sp5); }
+/* Reading pages narrow to a centred column under the full-width chrome: the
+   shell stays wide for the two-column feed, but a post — its body AND its
+   footer (see .post-footer) — reads better in a tighter, centred measure.
+   Both use the same 46rem so they line up; the header/nav/footer keep the
+   full shell width, so they don't shift between page types. */
+.article { max-width: 46rem; margin-inline: auto; padding: var(--sp6) var(--gutter) var(--sp5); }
 .article h1 {
   margin: 0 0 var(--sp3);
   font: 700 var(--fs-xl) var(--sans);
@@ -642,6 +647,9 @@ a:hover { text-decoration-line: underline; text-decoration-thickness: 2px; }
    Post footer — tag chips, related ledger, bio
    -------------------------------------------------------------------------- */
 
+/* Same measure as .article, so a post's body and its footer read as one
+   centred column beneath the full-width chrome. */
+.post-footer { max-width: 46rem; margin-inline: auto; }
 .post-footer .section {
   padding: var(--sp5) var(--gutter);
   border-top: 1px solid var(--hair);
@@ -729,7 +737,7 @@ a:hover { text-decoration-line: underline; text-decoration-thickness: 2px; }
 .field {
   flex: 1;
   min-width: 0;
-  padding: var(--sp3);
+  padding: var(--sp2) var(--sp3);
   font: 400 var(--fs) var(--sans);
   color: var(--head);
   background: transparent;       /* the control carries the surface */
@@ -750,7 +758,7 @@ a:hover { text-decoration-line: underline; text-decoration-thickness: 2px; }
   display: inline-flex;
   align-items: center;
   gap: var(--sp2);
-  padding: var(--sp2) var(--sp4);
+  padding: var(--sp2) var(--sp3);
   font: 600 var(--fs-sm) var(--mono);
   text-transform: uppercase;
   letter-spacing: var(--ls-caps);
@@ -783,11 +791,6 @@ a:hover { text-decoration-line: underline; text-decoration-thickness: 2px; }
    The offset shadow needs a little right/bottom room so it isn't clipped. */
 .field-form.search { margin: var(--sp6) var(--gutter) var(--sp1); }
 .field-form.tag-filter { margin: var(--sp5) var(--gutter) var(--sp1); }
-
-/* In the ~300px sidebar the field has no room beside the button, so the
-   control stacks — field on top, the button as its full-width base. */
-.side .field-form { flex-direction: column; }
-.side .field-form .btn { justify-content: center; }
 
 .search-summary,
 .search-hint {
