@@ -330,8 +330,8 @@
   the feed."
   []
   [:p.follow-pitch
-   "Follow by " [:a {:href "/follow"} "email"]
-   " or " [:a {:href "/feed.xml"} "RSS"] "."])
+   "Get a " [:a {:href "/follow"} "weekly digest"]
+   " of new posts in your inbox."])
 
 (defn follow-widget
   "The Follow section: the pitch line, then the compact email form. Baked into
@@ -385,20 +385,19 @@
 ;; --- ledger rows (year archive, related list, sidebar recents) ------------
 
 (defn index-row
-  "The one dense-list row: a right-aligned mono date, the type dot, then
-  the title. The year archive and the entry-list both render as columns
-  of these."
+  "The one dense-list row: the title, the type dot, then a right-aligned mono
+  date. The year archive and the entry-list both render as columns of these."
   [{:keys [href date type title]}]
   [:a.index-row {:href href}
-   [:span.meta date]
+   [:span.title title]
    (dot type)
-   [:span.title title]])
+   [:span.meta date]])
 
 (defn entry-list
-  "The dense ledger shared by the related grid and the sidebar recents: each
-  entry as a `mono date | dot | title` row, the date carrying its year. One
-  component — the CSS sizes it to its container (the wide post-footer
-  truncates titles, the narrow sidebar wraps them)."
+  "The dense ledger shared by the related list and the sidebar recents: each
+  entry as a `title · dot · mono date` line that flows inline, so the title
+  leads and wraps when it must and the date (carrying its year) trails it —
+  no pinned date column, so the dates don't line up down the list."
   [entries]
   (into [:div.entry-list]
         (for [e entries]

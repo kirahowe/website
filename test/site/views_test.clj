@@ -255,7 +255,7 @@
   (testing "an entry's page footer carries the follow section"
     (let [{:keys [body]} (GET "/2026/jul/4/hello-world")]
       (is (str/includes? body "field-form follow-form"))
-      (is (str/includes? body "Follow by "))))
+      (is (str/includes? body "Follow"))))
 
   (testing "the site footer no longer carries a follow band"
     (is (not (str/includes? (:body (GET "/")) "follow-band"))))

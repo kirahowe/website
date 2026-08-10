@@ -195,10 +195,13 @@ a:hover { text-decoration-thickness: 2px; }
   color: var(--muted);
 }
 
-/* Ledger row: every dense entry list is `mono date | dot | title` */
+/* Ledger row: every dense entry list is `title | dot | mono date`. The title
+   takes the flexible column and wraps when it must; the date sits in a fixed
+   column on the right, so dates line up down the list however long the titles
+   run. */
 .index-row {
   display: grid;
-  grid-template-columns: 3.5rem auto 1fr;
+  grid-template-columns: 1fr auto 3.5rem;
   gap: var(--sp3);
   align-items: baseline;
   padding: var(--sp1) 0;
@@ -206,45 +209,39 @@ a:hover { text-decoration-thickness: 2px; }
 .index-row .meta {
   font: 400 var(--fs-sm) var(--mono);
   text-align: right;
+  white-space: nowrap;
   color: var(--muted);
 }
-.index-row .dot { align-self: center; }
+.index-row .dot { align-self: baseline; }
 .index-row .title {
   min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
   font: 400 var(--fs) var(--sans);
   line-height: var(--lh-tight);
 }
 
-/* The related list and the sidebar recents are both entry-lists: the ledger
-   row, but the date now carries its year, so the date column widens to fit
-   "Dec 30, 2026". Sized in rem rather than em: the column has to clear the
-   date's own --fs-sm mono, not the reading size the row inherits. */
-.entry-list .index-row { grid-template-columns: 7rem auto 1fr; }
-
-/* In the sidebar the row flows as one line of inline content — date, dot,
-   title — so a long title wraps the full width, its later lines running back
-   under the date rather than indenting under a title column. */
-.side .entry-list .index-row {
+/* The related list and the sidebar recents are both entry-lists: the row flows
+   as one line of inline content — title, dot, date — so the title leads and a
+   long one wraps the full width, the dot and date trailing its last line. The
+   dates deliberately don't line up in a column the way the year archive's do;
+   leading with the title reads better than that alignment did. The date still
+   carries its year here. */
+.entry-list .index-row {
   display: block;
   padding: var(--sp2) 0;
   line-height: var(--lh-tight);
 }
-.side .entry-list .index-row .meta { margin-right: var(--sp2); }
-.side .entry-list .index-row .dot { margin-right: var(--sp2); vertical-align: middle; }
-.side .entry-list .index-row .title {
-  display: inline;
-  overflow: visible;
-  white-space: normal;
-}
+.entry-list .index-row .title { display: inline; margin-right: var(--sp2); }
+.entry-list .index-row .dot { margin-right: var(--sp2); vertical-align: middle; }
 
 /* --------------------------------------------------------------------------
    Header — wordmark + colour-coded nav (the nav doubles as the type legend)
    -------------------------------------------------------------------------- */
 
 .site-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
   padding: var(--sp5) var(--gutter) var(--sp3);
   border-bottom: 1px solid var(--hair);
 }
@@ -252,7 +249,6 @@ a:hover { text-decoration-thickness: 2px; }
 .brand {
   display: inline-block;
   padding: var(--sp1) var(--sp2);
-  margin-left: calc(var(--sp2) * -1);
   border-radius: var(--r);
   transition: background .12s ease, color .12s ease;
 }
@@ -266,6 +262,7 @@ a:hover { text-decoration-thickness: 2px; }
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: var(--sp2) var(--sp4);
   margin-top: var(--sp4);
   font: 500 var(--fs) var(--mono);
@@ -496,7 +493,7 @@ a:hover { text-decoration-thickness: 2px; }
 .article blockquote > :last-child { margin-bottom: 0; }
 .feed-more {
   display: inline-block;
-  margin: var(--sp5) var(--gutter) 0;
+  margin: var(--sp5) var(--gutter);
   font: 500 var(--fs-sm) var(--mono);
 }
 
@@ -648,8 +645,11 @@ a:hover { text-decoration-thickness: 2px; }
   gap: var(--sp1) var(--sp3);
 }
 
-.bio { font: 400 var(--fs) var(--sans); line-height: var(--lh); color: var(--muted); }
-.bio .more { display: inline-block; margin-top: var(--sp3); }
+.bio {
+  color: var(--muted);
+  margin-top: 0;
+  margin-bottom: var(--sp1);
+}
 
 /* --------------------------------------------------------------------------
    Year archive — month index with per-type counts, days as ledger rows
@@ -892,9 +892,9 @@ a:hover { text-decoration-thickness: 2px; }
    -------------------------------------------------------------------------- */
 
 .follow-pitch {
-  margin: 0 0 var(--sp3);
   font: 400 var(--fs-sm) var(--sans);
   color: var(--muted);
+  padding: var(--sp2) 0;
 }
 
 /* On the /follow page the form sits under the prose; in the post footer it
