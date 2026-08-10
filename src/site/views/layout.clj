@@ -147,6 +147,7 @@
      ;; than becoming a third space-between child (see .footer-end).
      [:div.footer-end
       [:span.social
+       [:a {:href "/follow"} "Email"]
        [:a {:href "/feed.xml"} "RSS"]
        (for [[label url] (:social config)]
          [:a {:href url} label])]

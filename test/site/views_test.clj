@@ -257,6 +257,9 @@
   (testing "the site footer no longer carries a follow band"
     (is (not (str/includes? (:body (GET "/")) "follow-band"))))
 
+  (testing "the site footer links to the /follow page"
+    (is (str/includes? (:body (GET "/")) "<a href=\"/follow\">Email</a>")))
+
   (testing "every archive/index sidebar carries the Follow widget"
     (doseq [uri ["/" "/2026" "/2026/jul" "/tags/clojure" "/posts"]]
       (is (str/includes? (:body (GET uri)) ">Follow</h2>")
