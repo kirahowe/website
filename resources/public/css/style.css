@@ -895,7 +895,7 @@ a:hover { text-decoration-line: underline; text-decoration-thickness: 2px; }
 
 /* --------------------------------------------------------------------------
    Follow — the email signup, wearing the search prompt's command-bar clothes.
-   Shared by the /follow page (.full) and the footer band + sidebar (.compact).
+   Shared by the /follow page (.full) and the post footer + sidebar (.compact).
    -------------------------------------------------------------------------- */
 
 .follow-pitch {
@@ -953,15 +953,6 @@ a:hover { text-decoration-line: underline; text-decoration-thickness: 2px; }
 .follow-form.compact .prompt-mark { font-size: var(--fs); }
 .follow-form.compact input { font-size: var(--fs); }
 
-/* Footer follow band: a strip above the © / social row, on the footer gutter
-   and hairline rhythm. */
-.follow-band {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--sp3) var(--sp5);
-  padding: var(--sp4) var(--gutter);
-  border-top: 1px solid var(--hair);
-}
-.follow-band .follow-pitch { margin: 0; flex: none; }
-.follow-band .follow-form { flex: 1; min-width: 15rem; }
+/* In the post footer, the follow section sits in the Tags / Related rhythm;
+   cap the field so it doesn't stretch the full reading measure. */
+.post-footer .follow-form { max-width: 26rem; }

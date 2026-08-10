@@ -4,8 +4,7 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [hiccup2.core :as h]
-            [site.markdown :as markdown]
-            [site.views.components :as c]))
+            [site.markdown :as markdown]))
 
 ;; The wordmark logotype, inlined once so it inherits the theme colour via
 ;; currentColor and inverts on hover. Read once, not per request.
@@ -142,20 +141,16 @@
 
 (defn- footer [config]
   (let [year (.getYear (java.time.LocalDate/now))]
-    (list
-     [:section.follow-band
-      (c/follow-pitch)
-      (c/follow-form config {:size :compact :id "follow-foot"})]
-     [:footer.site-footer
-      [:span "© " year " " (:site-title config) " / made with ♥ in Yarmouth, NS"]
-      ;; Grouped so the toggle lands beside .social at the right edge rather
-      ;; than becoming a third space-between child (see .footer-end).
-      [:div.footer-end
-       [:span.social
-        [:a {:href "/feed.xml"} "RSS"]
-        (for [[label url] (:social config)]
-          [:a {:href url} label])]
-       theme-toggle]])))
+    [:footer.site-footer
+     [:span "© " year " " (:site-title config) " / made with ♥ in Yarmouth, NS"]
+     ;; Grouped so the toggle lands beside .social at the right edge rather
+     ;; than becoming a third space-between child (see .footer-end).
+     [:div.footer-end
+      [:span.social
+       [:a {:href "/feed.xml"} "RSS"]
+       (for [[label url] (:social config)]
+         [:a {:href url} label])]
+      theme-toggle]]))
 
 (defn page
   "config, opts, hiccup content → full HTML string. opts:

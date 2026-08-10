@@ -249,11 +249,13 @@
       ;; the prose comes through from example-content/pages/follow.md
       (is (str/includes? body "unsubscribes in one"))))
 
-  (testing "every page carries the footer follow band"
-    (let [{:keys [body]} (GET "/")]
-      (is (str/includes? body "class=\"follow-band\""))
+  (testing "an entry's page footer carries the follow section"
+    (let [{:keys [body]} (GET "/2026/jul/4/hello-world")]
       (is (str/includes? body "follow-form compact"))
       (is (str/includes? body "Follow by "))))
+
+  (testing "the site footer no longer carries a follow band"
+    (is (not (str/includes? (:body (GET "/")) "follow-band"))))
 
   (testing "the home sidebar carries the Follow widget"
     (let [{:keys [body]} (GET "/")]

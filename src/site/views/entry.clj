@@ -54,6 +54,10 @@
         [:h2 "Related"]
         (c/entry-list rel)])
      [:section.section
+      [:h2 "Follow"]
+      (c/follow-pitch)
+      (c/follow-form config {:size :compact :id "follow-post"})]
+     [:section.section
       [:p.bio (or (:bio config) default-bio)]
       [:a.more {:href "/about"} (str "More about " (first-name config) " →")]]]))
 
