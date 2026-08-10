@@ -7,6 +7,7 @@
             [site.util :as util]
             [site.views.archive :as v.archive]
             [site.views.entry :as v.entry]
+            [site.views.follow :as v.follow]
             [site.views.home :as v.home]
             [site.views.layout :as v.layout]
             [site.views.search :as v.search])
@@ -145,6 +146,9 @@
     (if-let [page (get (:pages index) (:slug params))]
       (html (v.layout/static-page config page))
       (not-found config))
+
+    :follow
+    (html (v.follow/follow-page config (get (:pages index) "follow")))
 
     :feed
     (rss-ok (feed/rss config index))

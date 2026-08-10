@@ -14,6 +14,7 @@
   /tags/clojure/2026       ... filtered by year
   /tags/clojure/feed.xml   RSS scoped to the tag
   /search?q=...            search
+  /follow                  email follow page (Buttondown signup)
   /feed.xml                RSS
   /drafts/<name>?preview=  token-gated draft preview
   /<slug>                  static page (pages/<slug>.md), e.g. /about"
@@ -48,6 +49,7 @@
           (= a "search") {:handler :search}
           (= a "archive") {:handler :archive}
           (= a "tags") {:handler :tags}
+          (= a "follow") {:handler :follow}
           (plural->type a) {:handler :type-list :params {:type (plural->type a)}}
           (util/parse-year a) {:handler :year :params {:year (util/parse-year a)}}
           :else {:handler :page :params {:slug a}})

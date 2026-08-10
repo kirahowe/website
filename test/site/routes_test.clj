@@ -42,6 +42,7 @@
   (is (= {:handler :search} (match "/search")))
   (is (= {:handler :feed} (match "/feed.xml")))
   (is (= {:handler :page :params {:slug "about"}} (match "/about")))
+  (is (= {:handler :follow} (match "/follow")))
   (is (= {:handler :draft :params {:name "an-idea-brewing"}} (match "/drafts/an-idea-brewing"))))
 
 (deftest no-match

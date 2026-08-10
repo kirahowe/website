@@ -237,6 +237,28 @@
     (is (= 404 (:status (GET "/nope"))))
     (is (= 404 (:status (GET "/2026/jul/4/nope"))))))
 
+(deftest follow
+  (testing "the /follow page: static prose from the markdown + the email form"
+    (let [{:keys [status body]} (GET "/follow")]
+      (is (= 200 status))
+      (is (str/includes? body "follow-form full"))
+      (is (str/includes? body "name=\"email\""))
+      (is (str/includes? body "name=\"embed\""))
+      ;; no Buttondown account in the test config → placeholder action
+      (is (str/includes? body "action=\"#\""))
+      ;; the prose comes through from example-content/pages/follow.md
+      (is (str/includes? body "unsubscribes in one"))))
+
+  (testing "every page carries the footer follow band"
+    (let [{:keys [body]} (GET "/")]
+      (is (str/includes? body "class=\"follow-band\""))
+      (is (str/includes? body "follow-form compact"))
+      (is (str/includes? body "Follow by "))))
+
+  (testing "the home sidebar carries the Follow widget"
+    (let [{:keys [body]} (GET "/")]
+      (is (str/includes? body ">Follow</h2>")))))
+
 (deftest image-lede-posts
   (testing "a post that opens on an image previews with a small linked image plus prose"
     (let [{:keys [body]} (GET "/")]
