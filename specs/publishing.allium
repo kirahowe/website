@@ -23,8 +23,8 @@
 --   - Rendering, the URL scheme, archives, feeds, search — the content
 --     & serving model (content.allium)
 --   - Dev-only conveniences: live reload, per-request reindexing and
---     /drafts previews. Dev serves the vault directly and has nothing
---     to refresh.
+--     /drafts previews. Dev serves the content directory directly and
+--     has nothing to refresh.
 -- Dependencies: none. The Entry model (entries.allium) is deliberately
 --   not imported: the server's unit of freshness is a content revision,
 --   not an entry.

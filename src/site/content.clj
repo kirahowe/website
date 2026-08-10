@@ -8,11 +8,11 @@
   Layout of the content repo:
     drafts/<name>.md          — unpublished; served only via dev preview
     pages/<slug>.md           — static pages (about, ...)
-    attachments/              — images pasted in Obsidian, served at /attachments/
+    attachments/              — pasted images, served at /attachments/
     YYYY/MM/DD/<name>.md      — published entries; date comes from the path
 
   Frontmatter dialects, detected by the first line:
-    ---   YAML — what Obsidian writes (the Properties panel). Natural
+    ---   YAML — the Obsidian Properties-panel shape. Natural
           property names map onto the entry model: link → :link-url,
           via → :link-via, author → :source, source → :source-url
           (a quote's cite URL; a tool's source code),
@@ -260,7 +260,7 @@
 (defn load-content
   "Walks the content repo → {:entries [...] :drafts {name entry} :pages {slug page}}.
   Markdown files that are neither dated entries, drafts, nor pages are ignored
-  (so stray Obsidian files can't break the site)."
+  (so stray files can't break the site)."
   [config]
   (let [root (:content-path config)
         classified (group-by (fn [f]

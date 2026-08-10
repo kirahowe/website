@@ -43,9 +43,8 @@
          :body (io/input-stream res)}))))
 
 (defn- attachment-response
-  "Serves images pasted into the vault: /attachments/<file> comes from
-  the content repo's attachments/ folder, so an image never needs a
-  site deploy."
+  "Serves pasted images: /attachments/<file> comes from the content
+  repo's attachments/ folder, so an image never needs a site deploy."
   [config uri]
   (when (str/starts-with? uri "/attachments/")
     (let [name (URLDecoder/decode (subs uri (count "/attachments/")) "UTF-8")
@@ -71,8 +70,8 @@
 
 (defn- refresh-response
   "POST /refresh — the content repo's push webhook lands here. Only
-  exists when content comes from git (prod); dev serves the vault
-  directly and has nothing to refresh. Unauthenticated by design: all it
+  exists when content comes from git (prod); dev serves the content
+  directory directly and has nothing to refresh. Unauthenticated by design: all it
   can do is pull a public repo, sync/refresh! bounds how often, and the
   site keeps its no-secrets property."
   [config index-atom refresh-state req]

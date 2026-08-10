@@ -71,7 +71,7 @@
 
 (defn- raw-html
   "Raw HTML in the source passes through unescaped; the author's own
-  vault is the only input."
+  content is the only input."
   [_ctx node]
   (h/raw (md/node->text node)))
 

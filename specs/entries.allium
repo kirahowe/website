@@ -29,7 +29,7 @@ enum EntryType { post | note | link | quote | release | tool }
 
 entity Entry {
     file_title: String              -- the filename (minus .md): the entry's identity in
-                                    -- the vault, and how [[wikilinks]] address it
+                                    -- the content repo, and how [[wikilinks]] address it
     type: EntryType                 -- defaults to post when the file declares nothing
     body: String
     tags: Set<String>

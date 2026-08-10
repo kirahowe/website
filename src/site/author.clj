@@ -2,7 +2,7 @@
   "Authoring tasks (`bb new`, `bb suggest-tags`, `bb suggest-slug`). These
   run in babashka only — they use babashka.fs and babashka.process, which
   the server never needs. They always operate on the dev environment: the
-  vault."
+  local content directory."
   (:require [babashka.fs :as fs]
             [babashka.process :as p]
             [clojure.string :as str]
@@ -16,7 +16,7 @@
   "YAML frontmatter, matching what Obsidian's Properties panel edits.
   `date` defaults to today — the day you start the draft, but it's yours
   to edit (e.g. to backdate something written over several days). `publish`
-  starts false; it's a legacy workflow toggle the vault's templates still
+  starts false; it's a legacy workflow toggle older drafts still
   carry, but the site ignores it now — publishing happens through the
   admin app. A post needs nothing beyond tags — the filename is the title."
   [type]
@@ -85,8 +85,8 @@
 
 (defn new-draft
   "bb new [type] [title words...] — scaffolds drafts/<Title>.md in the
-  content repo. The filename is the title, exactly as Obsidian would
-  create it. With no type, pick one from the configured entry types; when
+  content repo. The filename is the title, kept verbatim — spaces,
+  capitalisation and all. With no type, pick one from the configured entry types; when
   invoked with nothing at all, it then also prompts for an optional title."
   [& args]
   (let [cfg (config/load-config :dev)
@@ -208,7 +208,7 @@
 
 (defn list-drafts
   "bb drafts — lists every draft in drafts/, queued ones first. There is
-  no publish flush anymore; the queue marker just surfaces the vault's
+  no publish flush anymore; the queue marker just surfaces the draft's
   legacy publish: true flag, which the site otherwise ignores. The
   collision marker still warns when a queued draft's target URL is
   already owned by a published entry."
@@ -559,8 +559,8 @@
 (defn- suggest-quote-name!
   "The quote branch: a quote has no meaningful title and only a
   filename-derived slug, so suggest one short phrase and rename the draft
-  file to it. The filename is the note's title in the vault and, slugified,
-  its URL slug — no `title`/`slug` properties, the same single source every
+  file to it. The filename is the note's title and, slugified, its URL
+  slug — no `title`/`slug` properties, the same single source every
   other type uses. The phrase is slugified for the collision check, so a URL
   that's already taken is refused; an existing draft of that name is never
   clobbered."
@@ -598,8 +598,8 @@
 
 (defn- suggest-slug-for!
   "Name one draft for its URL. A quote — untitled, addressed only by its
-  filename — is renamed to a short suggested phrase (the note's title in the
-  vault and, slugified, its URL); every other type gets a pinned `slug`
+  filename — is renamed to a short suggested phrase (the note's title
+  and, slugified, its URL); every other type gets a pinned `slug`
   property. Either way the author picks a candidate (or types their own with
   +), and a URL that would collide with an existing entry is refused."
   [cfg src]

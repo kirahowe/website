@@ -1,6 +1,6 @@
 (ns site.livereload
   "Dev-only live reload with code hot-swapping. A background thread polls the
-  content vault, the site's CSS/assets, and its own source for changes; on any
+  content directory, the site's CSS/assets, and its own source for changes; on any
   change it re-requires whatever .clj source was edited (so code edits take
   effect without a restart) and tells connected browsers — held on an SSE
   connection — to refresh. Wired in only under `bb dev` (:dev?); the production
@@ -14,7 +14,7 @@
 ;; here means changing that path too.
 (def endpoint "/__livereload")
 
-;; Beyond the content vault (added at start-watcher! time), these project roots
+;; Beyond the content directory (added at start-watcher! time), these project roots
 ;; are watched. Editing anything here refreshes the browser; a changed .clj
 ;; under src/ is also hot-reloaded into the running server.
 (def ^:private watch-roots ["resources/public" "src"])
@@ -64,7 +64,7 @@
           [(.getPath f) (.lastModified f)])))
 
 (defn- source?
-  "A changed project source file (relative 'src/...'), not vault content (whose
+  "A changed project source file (relative 'src/...'), not content files (whose
   paths are absolute)."
   [path]
   (and (str/starts-with? path "src/")
@@ -96,7 +96,7 @@
             (println "reload failed:" ns-sym "—" (ex-message e))))))))
 
 (defn start-watcher!
-  "Poll the content vault and project roots ~3x/second. On any change, hot-swap
+  "Poll the content directory and project roots ~3x/second. On any change, hot-swap
   the source files that changed and tell connected browsers to refresh.
   Idempotent — a second call is a no-op, so repeated start! in a REPL won't
   spawn threads."

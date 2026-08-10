@@ -9,8 +9,8 @@ Babashka app, zero external deps. Tests: `bb test` (that's CI, not verification)
 
 ## Launch
 
-- `bb dev` (background) → http://localhost:8100, serving the real Obsidian
-  vault (`config/dev.edn` :content-path), reindexed per request — realistic
+- `bb dev` (background) → http://localhost:8100, serving the local content
+  repo (`config/dev.edn` :content-path), reindexed per request — realistic
   content volume (~100 tags, years of entries).
 - Ready when `curl -s localhost:8100/` returns 200 (a couple of seconds).
 - Stop it with `lsof -ti tcp:8100 | xargs kill`.

@@ -1,5 +1,7 @@
-{;; Development: serve the Obsidian vault directly, no git syncing.
- :content-path "~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Blog"
+{;; Development: serve the local content repo directly, no git syncing.
+ ;; This is the same repo prod clones (kirahowe-content); authoring now
+ ;; happens in the standalone app
+ :content-path "~/code/projects/kirahowe-content"
  :content-git-url nil
 
  ;; `claude` wrapped with this machine's personal config dir

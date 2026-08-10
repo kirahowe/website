@@ -2,7 +2,7 @@
   "Configuration is file-first and env-var-free. It all lives in config/:
   config/config.edn is the base that always applies (site identity, entry
   types). On top of it, exactly one environment file is merged:
-  config/dev.edn (`bb dev` — your vault, no git syncing) or config/prod.edn
+  config/dev.edn (`bb dev` — your local content repo, no git syncing) or config/prod.edn
   (`bb prod` — the cloned content repo). The port is environment-specific
   (dev 8100, prod 8080). Dev-only behavior follows the environment, so dev
   and prod can't drift apart on a forgotten flag."
@@ -16,7 +16,7 @@
       (edn/read-string (slurp f)))))
 
 (defn- expand-home
-  "\"~/vault\" → \"/Users/you/vault\" — vault paths live under home."
+  "\"~/content\" → \"/Users/you/content\" — content paths live under home."
   [p]
   (if (and p (str/starts-with? p "~"))
     (str (System/getProperty "user.home") (subs p 1))
@@ -32,8 +32,8 @@
 
 (defn load-config
   "config/config.edn ← config/<env>.edn, where env is :dev or :prod.
-  Authoring tasks (`bb new`, `bb publish`, ...) run with :dev — they
-  operate on the vault."
+  Authoring tasks (`bb new`, `bb suggest-tags`, ...) run with :dev —
+  they operate on the content directory."
   [env]
   (resolve-config (read-edn "config/config.edn")
                   (read-edn (str "config/" (name env) ".edn"))

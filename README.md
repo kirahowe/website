@@ -1,7 +1,7 @@
 # website
 
 My personal weblog of posts, links, quotes, and more — markdown files in a git repo, rendered by a small Clojure program using [babashka](https://babashka.org).
-Writing and publishing happen in a companion admin app (`website-admin`, its own repo); the tooling here turns the published files into a website — parsing frontmatter, `[[wikilinks]]`, pasted images, and organizing the content. The format is Obsidian's, where the site began, and dev mode still serves an Obsidian vault directly.
+Writing and publishing happen in a companion admin app (`website-admin`, its own repo); the tooling here turns the published files into a website — parsing frontmatter, `[[wikilinks]]`, pasted images, and organizing the content. The format is Obsidian's, where the site began, and dev mode serves a local checkout of the content repo directly.
 
 This project was written almost entirely by Claude (Opus 4.8 and Fable 5). See [PLAN.md](PLAN.md) for the original AI-generated architecture and its rationale. More details about how it works are below, and instructions in case you ever want to clone this and up a similar website.
 
@@ -9,7 +9,7 @@ This project was written almost entirely by Claude (Opus 4.8 and Fable 5). See [
 
 ```sh
 # install babashka ≥ 1.12.196 (https://github.com/babashka/babashka#installation), then:
-bb dev        # serve the vault configured in config/dev.edn at http://localhost:8100
+bb dev        # serve the content directory configured in config/dev.edn at http://localhost:8100
 bb test       # run the test suite
 ```
 
@@ -57,28 +57,29 @@ One-time setup:
    the push event. No secret needed — the endpoint is unauthenticated by
    design, because all it can do is trigger a debounced pull of a public
    repo (and the site keeps its no-secrets property).
-3. For local writing, point `:content-path` in `config/dev.edn` at an
-   Obsidian vault (or any folder with the same layout) and `bb dev`.
+3. For local writing, point `:content-path` in `config/dev.edn` at a
+   local checkout of the content repo (or any folder with the same
+   layout) and `bb dev`.
 
 ## Writing
 
 - **A file is an entry.** The filename is the title. A bare file with no
   frontmatter publishes as a post — frontmatter is entirely optional.
   Drafts belong to the admin app; locally, `bb new` scaffolds one under
-  the dev vault's `drafts/` for previewing with `bb dev`.
-- **Properties, not metadata.** Frontmatter is YAML — Obsidian's
-  Properties panel. `tags` autocomplete against the vault; other entry
+  the local content dir's `drafts/` for previewing with `bb dev`.
+- **Properties, not metadata.** Frontmatter is YAML — the shape
+  Obsidian's Properties panel writes. Set `tags`; other entry
   types set `type: note` / `type: link` / `type: quote` plus their
   natural fields (`link`, `via`, `author`, `source`).
 - **`date` and `publish` are workflow properties, not entry data** — the
   site itself ignores both (a published entry's date is its folder path).
   `date` is what publishing files the entry under, falling back to today;
-  `publish` is a legacy queue toggle older vault drafts still carry.
+  `publish` is a legacy queue toggle older drafts still carry.
 - **Link with `[[wikilinks]]`.** They resolve by filename to the entry's
   URL at render time. An unresolved link (e.g. to a still-unpublished
   draft) degrades to plain text — never a dead link.
-- **Paste images.** Obsidian files them under `attachments/`; the admin
-  app stages and promotes them the same way. The server serves them at
+- **Paste images.** Pasted images live under `attachments/`; the admin
+  app stages and promotes them. The server serves them at
   `/attachments/...` — an image never requires a site deploy.
 - **Slugs are automatic**: `slugify(filename)`. A `slug:` property exists
   only to pin a URL (e.g. one inherited from an old blog).
@@ -93,12 +94,12 @@ One-time setup:
   bulk-redirects CSV to serve from wherever the old domain now points.
 
 ```sh
-bb new post My great idea      # scaffolds drafts/My great idea.md in the dev vault
+bb new post My great idea      # scaffolds drafts/My great idea.md in the dev content dir
 # ...write — with `bb dev` running, preview at localhost:8100/drafts/My great idea
 bb suggest-tags my-great-idea  # LLM-suggested tags, written into the draft
 bb suggest-slug my-great-idea  # LLM-suggested URL slugs, pinned to the draft
 bb reindex                     # validate that everything parses
-bb drafts                      # list every draft in the dev vault
+bb drafts                      # list every draft in the dev content dir
 ```
 
 Don't feel like typing a name? Run these with no argument and they hand
@@ -120,8 +121,8 @@ refreshes the site the same way.
 Whatever `:content-path` points at:
 
 ```
-my-vault/
-├── drafts/                      # dev-vault drafts (never published from here)
+content-repo/
+├── drafts/                      # local drafts (never published from here)
 │   └── An idea brewing.md
 ├── pages/                       # static pages → /about, etc.
 │   └── about.md
@@ -164,7 +165,7 @@ Three committed files under `config/`, no environment variables, no secrets:
   base URL, entry types, `:llm-command` (what `bb suggest-tags` shells
   out to).
 - **`config/dev.edn`** — merged in by `bb dev` and the authoring tasks:
-  your vault path, `:content-git-url nil` (no git syncing locally),
+  your content directory path, `:content-git-url nil` (no git syncing locally),
   personal `:llm-command` override, `:port 8100`.
 - **`config/prod.edn`** — merged in by `bb prod`: the clone target, the
   content repo URL, the fallback sync interval, `:port 8080` (what Fly

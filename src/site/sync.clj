@@ -6,9 +6,9 @@
   repo — the timed pull here is demoted to a fallback that heals a
   webhook delivery GitHub failed to make (it does not retry those).
 
-  Local development never needs this — CONTENT_PATH just points at your
-  vault directly. Uses clojure.java.shell so it runs under bb and the JVM
-  alike."
+  Local development never needs this — :content-path just points at your
+  local content directory. Uses clojure.java.shell so it runs under bb and
+  the JVM alike."
   (:require [clojure.java.io :as io]
             [clojure.java.shell :as sh]
             [clojure.string :as str]
