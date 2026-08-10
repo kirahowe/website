@@ -56,7 +56,8 @@
 (def ^:private analytics-script
   [:script {:defer true
             :src "https://kirasumami.pikapod.net/script.js"
-            :data-website-id "e54cf840-1328-45a5-a617-7f15ef917005"}])
+            :data-website-id "e54cf840-1328-45a5-a617-7f15ef917005"
+            :data-do-not-track true}])
 
 ;; The button's accessible name, one phrasing shared by the server-rendered
 ;; attribute and by the click handler below (which is built from this same
