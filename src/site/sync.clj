@@ -12,6 +12,7 @@
   (:require [clojure.java.io :as io]
             [clojure.java.shell :as sh]
             [clojure.string :as str]
+            [site.cdn :as cdn]
             [site.content :as content]))
 
 (defn- git [dir & args]
@@ -58,25 +59,29 @@
   so a rebuild that failed (broken file pushed) is retried every tick
   until the content is fixed. NEVER throws: any failure is logged and
   the last good index keeps serving. → :updated | :unchanged | :error"
-  [config index-atom]
-  (try
-    (if-not (.exists (io/file (:content-path config)))
-      (do (ensure-content! config)
-          (reset! index-atom (build-indexed config))
-          (println "content sync: cloned and indexed")
-          :updated)
-      (if (= :error (pull! config))
-        :error
-        (let [rev (head-rev (:content-path config))]
-          (if (= rev (:git-rev (meta @index-atom)))
-            :unchanged
-            (do (reset! index-atom (build-indexed config))
-                (println (str "content sync: reindexed at " (subs rev 0 7)))
-                :updated)))))
-    (catch Exception e
-      (binding [*out* *err*]
-        (println "content sync failed — keeping previous content:" (ex-message e)))
-      :error)))
+  ([config index-atom]
+   (sync-once! config index-atom cdn/purge-home!))
+  ([config index-atom purge-fn]
+   (try
+     (if-not (.exists (io/file (:content-path config)))
+       (do (ensure-content! config)
+           (reset! index-atom (build-indexed config))
+           (purge-fn config)
+           (println "content sync: cloned and indexed")
+           :updated)
+       (if (= :error (pull! config))
+         :error
+         (let [rev (head-rev (:content-path config))]
+           (if (= rev (:git-rev (meta @index-atom)))
+             :unchanged
+             (do (reset! index-atom (build-indexed config))
+                 (purge-fn config)
+                 (println (str "content sync: reindexed at " (subs rev 0 7)))
+                 :updated)))))
+     (catch Exception e
+       (binding [*out* *err*]
+         (println "content sync failed — keeping previous content:" (ex-message e)))
+       :error))))
 
 (defn make-refresh-state
   "The debounce state one server owns: when the last accepted refresh ran

@@ -1,6 +1,6 @@
-# Fly.io config. All app config lives in config.edn (including
-# :content-git-url — the content repo is public); there are no secrets
-# and no env vars. Before first deploy:
+# Fly.io config. Site behavior lives in config.edn. Cloudflare homepage
+# purging is enabled by CLOUDFLARE_ZONE_ID and CLOUDFLARE_API_TOKEN secrets.
+# Before first deploy:
 #   1. change `app` to your (globally unique) app name
 #   2. fly deploy
 app = "kirahowe-website"

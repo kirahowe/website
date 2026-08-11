@@ -1,11 +1,11 @@
 (ns site.config
-  "Configuration is file-first and env-var-free. It all lives in config/:
-  config/config.edn is the base that always applies (site identity, entry
-  types). On top of it, exactly one environment file is merged:
-  config/dev.edn (`bb dev` — your local content repo, no git syncing) or config/prod.edn
-  (`bb prod` — the cloned content repo). The port is environment-specific
-  (dev 8100, prod 8080). Dev-only behavior follows the environment, so dev
-  and prod can't drift apart on a forgotten flag."
+  "Configuration is file-first. It all lives in config/: config/config.edn
+  is the base that always applies. On top of it, exactly one environment file
+  is merged: config/dev.edn (`bb dev` — your local content repo, no git syncing)
+  or config/prod.edn (`bb prod` — the cloned content repo). The port is
+  environment-specific (dev 8100, prod 8080). The only environment variables
+  are production's Cloudflare purge credentials. Dev-only behavior follows the
+  environment, so dev and prod can't drift apart on a forgotten flag."
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.string :as str]))
@@ -33,8 +33,16 @@
 (defn load-config
   "config/config.edn ← config/<env>.edn, where env is :dev or :prod.
   Authoring tasks (`bb new`, `bb suggest-tags`, ...) run with :dev —
-  they operate on the content directory."
+  they operate on the content directory. Production-only Cloudflare
+  credentials come from Fly secrets rather than committed EDN."
   [env]
-  (resolve-config (read-edn "config/config.edn")
-                  (read-edn (str "config/" (name env) ".edn"))
-                  env))
+  (let [resolved (resolve-config (read-edn "config/config.edn")
+                                 (read-edn (str "config/" (name env) ".edn"))
+                                 env)]
+    (if (= env :prod)
+      (cond-> resolved
+        (seq (System/getenv "CLOUDFLARE_ZONE_ID"))
+        (assoc :cloudflare-zone-id (System/getenv "CLOUDFLARE_ZONE_ID"))
+        (seq (System/getenv "CLOUDFLARE_API_TOKEN"))
+        (assoc :cloudflare-api-token (System/getenv "CLOUDFLARE_API_TOKEN")))
+      resolved)))

@@ -14,6 +14,8 @@
   (:import [java.net URLDecoder]))
 
 (def public-cache "public, max-age=300, stale-while-revalidate=86400")
+(def homepage-browser-cache "public, max-age=0, must-revalidate")
+(def homepage-cdn-cache "public, max-age=86400")
 (def no-store "no-store")
 (def default-type-page-entries 10)
 
@@ -92,7 +94,8 @@
   [config index {:keys [handler params]} req]
   (case handler
     :home
-    (html (v.home/home config index))
+    (assoc-in (html (v.home/home config index) 200 homepage-browser-cache)
+              [:headers "Cloudflare-CDN-Cache-Control"] homepage-cdn-cache)
 
     :year
     (let [{:keys [year]} params

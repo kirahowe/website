@@ -29,7 +29,9 @@
   (testing "home is a day-grouped feed; posts preview, short types are full"
     (let [{:keys [status body headers]} (GET "/")]
       (is (= 200 status))
-      (is (str/includes? (get headers "Cache-Control") "public"))
+      (is (= "public, max-age=0, must-revalidate" (get headers "Cache-Control")))
+      (is (= "public, max-age=86400"
+             (get headers "Cloudflare-CDN-Cache-Control")))
       (is (str/includes? body "Hello, world"))
       (is (str/includes? body "nextjournal/markdown"))
       (is (str/includes? body "Rich Hickey"))
@@ -49,8 +51,11 @@
       (is (str/includes? body "\"/2026/jul/4\""))))
 
   (testing "single entry page renders markdown"
-    (let [{:keys [status body]} (GET "/2026/jul/4/hello-world")]
+    (let [{:keys [status body headers]} (GET "/2026/jul/4/hello-world")]
       (is (= 200 status))
+      (is (= "public, max-age=300, stale-while-revalidate=86400"
+             (get headers "Cache-Control")))
+      (is (nil? (get headers "Cloudflare-CDN-Cache-Control")))
       (is (str/includes? body "How it works</h2>"))  ; ## heading
       (is (str/includes? body "<code"))              ; inline code
       (is (str/includes? body "entry-url")))

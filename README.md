@@ -211,9 +211,19 @@ is just a git push; content changes never require a deploy.
 # once:
 fly launch --copy-config --no-deploy     # then edit `app` in fly.toml if taken
 
+# purge only the homepage after a successful content refresh
+fly secrets set CLOUDFLARE_ZONE_ID=<zone-id> CLOUDFLARE_API_TOKEN=<token>
+
 # every code change:
 fly deploy
 ```
+
+The Cloudflare token only needs `Zone.Cache Purge` permission for this zone.
+The homepage tells browsers to revalidate on every visit while
+`Cloudflare-CDN-Cache-Control` keeps it at the edge for a day. Each successful
+content reindex purges that one URL; other public pages retain their normal
+cache policy. A missing credential or failed purge never turns a successful
+content sync into a failure.
 
 - Every public page gets CDN-friendly cache headers; put Cloudflare (or any
   CDN) in front and traffic spikes never reach the server.
