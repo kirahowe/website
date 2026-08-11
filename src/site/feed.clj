@@ -15,6 +15,23 @@
       (.atOffset ZoneOffset/UTC)
       (.format DateTimeFormatter/ISO_OFFSET_DATE_TIME)))
 
+(defn- absolutize
+  "Root-relative src/href in an entry's rendered HTML → absolute URLs under
+  `base-url`. On the site `/attachments/x.jpg` resolves against our own host;
+  in a feed there is nothing to resolve it against, because the base URI in
+  effect for the Atom document never reaches HTML that rides inside it as
+  escaped text. Readers fall back to their own origin, so every pasted image
+  and every wikilink arrives broken.
+
+  Rewritten on the rendered string rather than the hiccup tree so it also
+  reaches raw HTML blocks, which the renderer passes through opaquely. At
+  this point a code sample showing markup is already escaped (`src=&quot;/`),
+  so only real attributes match. Protocol-relative `//host/...` already
+  carries a host and is left alone."
+  [base-url html]
+  (str/replace html #"\b(src|href)=([\"'])/(?!/)"
+               (fn [[_ attr quote]] (str attr "=" quote base-url "/"))))
+
 (defn- entry-element [config entry]
   (let [url (str (:base-url config) (:path entry))
         timestamp (rfc-3339 (:date entry))]
@@ -27,7 +44,8 @@
      ;; `type=html` is escaped HTML by definition; feed readers decode the
      ;; text and then render it as HTML. Hiccup performs the XML escaping.
      [:content {:type "html"}
-      (str (h/html (markdown/render (:body entry) (:wikilinks entry))))]]))
+      (absolutize (:base-url config)
+                  (str (h/html (markdown/render (:body entry) (:wikilinks entry)))))]]))
 
 (defn atom-feed
   "The most recent of `entries` (:feed-entries cap, default 20) as an Atom
