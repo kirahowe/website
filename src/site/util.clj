@@ -75,6 +75,23 @@
   [tag]
   (str (tag-url tag) "/feed.xml"))
 
+(defn feed-scope
+  "A page's own Atom feed, from {:kind :value} — :type with an entry type,
+  :tag with a tag — or nil for a page with none. Returns {:href :title
+  :scope}: :title names the feed to a reader discovering it (the <link> in
+  <head>), :scope names it inside the sentence under the signup form. One
+  descriptor resolved in one place, so the two can't name different feeds."
+  [{:keys [kind value]}]
+  (case kind
+    :type (let [label (str (name value) "s")]
+            {:href (type-feed-url value)
+             :title (str "Atom for " (str/capitalize label))
+             :scope label})
+    :tag {:href (tag-feed-url value)
+          :title (str "Atom for #" (name value))
+          :scope (str "#" (name value))}
+    nil))
+
 (defn format-date
   "{:year 2026 :month 7 :day 4} → \"July 4, 2026\""
   [{:keys [year month day]}]

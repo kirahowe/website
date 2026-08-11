@@ -297,7 +297,7 @@
 
 ;; The email follow widget — the one section every sidebar carries, baked
 ;; into `sidebar` below. A one-line pitch above the shared signup form
-;; (POSTing to Buttondown), closed by a slashed mono foot naming the Atom
+;; (POSTing to Buttondown), closed by a prose sentence naming the Atom
 ;; feeds on offer — the sidebar counterpart to the Follow section in the
 ;; post footer on entry pages.
 
@@ -340,16 +340,6 @@
       :aside [:input {:type "hidden" :name "embed" :value "1"}]
       :submit "Subscribe"})))
 
-(defn- resolve-follow-feed
-  "The page's own Atom feed, when it has one: a type index's or a tag's.
-  {:href :scope}, where :scope is the word naming it inside the sentence
-  `follow-feeds` builds."
-  [{:keys [kind value]}]
-  (case kind
-    :type {:href (util/type-feed-url value) :scope (str (name value) "s")}
-    :tag {:href (util/tag-feed-url value) :scope (str "#" (name value))}
-    nil))
-
 (defn follow-feeds
   "The Atom offer under the signup form. With no scoped feed there is only one
   feed to name, and the sentence names it — \"the Atom feed\" is itself the
@@ -361,7 +351,7 @@
    [:p.follow-feeds
     "Or subscribe to the " [:a {:href "/feed.xml"} "Atom feed"] "."])
   ([feed]
-   (if-let [{:keys [href scope]} (resolve-follow-feed feed)]
+   (if-let [{:keys [href scope]} (util/feed-scope feed)]
      [:p.follow-feeds
       "Or subscribe by Atom — "
       [:a {:href href} (str "just " scope)]
@@ -389,8 +379,9 @@
   every archive/index page carries it for free.
 
   An options map may lead the sections. {:follow :inline} lets the caller
-  position the widget itself; :feed supplies {:href :label} for the contextual
-  Atom link. The default is the whole-site feed."
+  position the widget itself; :feed takes the page's own feed descriptor
+  ({:kind :value}, see util/feed-scope) for the contextual Atom link. The
+  default (nil) is the whole-site feed."
   [config & sections]
   (let [[opts sections] (if (map? (first sections))
                           [(first sections) (rest sections)]

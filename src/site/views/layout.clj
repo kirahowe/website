@@ -4,7 +4,8 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [hiccup2.core :as h]
-            [site.markdown :as markdown]))
+            [site.markdown :as markdown]
+            [site.util :as util]))
 
 ;; The wordmark logotype, inlined once so it inherits the theme colour via
 ;; currentColor and inverts on hover. Read once, not per request.
@@ -166,14 +167,16 @@
                 listing; pages with no stable URL (drafts, 404) pass none.
     :canonical  an absolute URL that replaces the self rel=canonical — an
                 entry whose canonical home is elsewhere points there.
-    :feed       {:href :title} of an Atom feed scoped to this page (a tag's),
+    :feed       {:kind :value} descriptor (see util/feed-scope) of an Atom
+                feed scoped to this page (a type index's, a tag's),
                 advertised for discovery ahead of the site feed."
   [config {:keys [title path canonical feed]} & content]
   (let [full-title (if title
                      (str title " — " (:site-title config))
                      (:site-title config))
         self-url   (when path (str (:base-url config) path))
-        og-image   (str (:base-url config) (asset-url config "/images/og.png"))]
+        og-image   (str (:base-url config) (asset-url config "/images/og.png"))
+        feed       (util/feed-scope feed)]
     (str
      (h/html {:mode :html}
              (h/raw "<!DOCTYPE html>\n")

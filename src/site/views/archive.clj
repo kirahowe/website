@@ -171,7 +171,8 @@
         ;; and narrowed further to the applied tag so no year link dead-ends.
         scope (cond->> (get (:by-type index) type)
                 tag (filter #(contains? (set (:tags %)) tag)))
-        years (distinct (map #(-> % :date :year) scope))]
+        years (distinct (map #(-> % :date :year) scope))
+        feed {:kind :type :value type}]
     (layout/page config {:title (cond-> label
                                  year (str " / " year)
                                  tag (str " / #" (name tag))
@@ -180,12 +181,11 @@
                          ;; the query-free form remains canonical when a tag
                          ;; facet is applied.
                          :path (path year nil page)
-                         :feed {:href (util/type-feed-url type)
-                                :title (str "Atom for " label)}}
+                         :feed feed}
                  (c/page-header heading (c/count-label total))
                  (c/cols (list (c/feed entries)
                                (c/pagination page pages #(path year tag %)))
-                         (c/sidebar config {:feed {:kind :type :value type}}
+                         (c/sidebar config {:feed feed}
                                     (year-nav years year #(path % tag 1))
                                     (facet-tags all-entries tag #(path year % 1)))))))
 
@@ -197,14 +197,14 @@
 
 (defn tag-page [config tag year entries]
   (let [heading (header-parts (list [:span.hash "#"] (name tag))
-                              [(when year (filter-chip (str year) (str "/tags/" (name tag))))])]
+                              [(when year (filter-chip (str year) (str "/tags/" (name tag))))])
+        feed {:kind :tag :value tag}]
     (layout/page config {:title (str "#" (name tag) (when year (str " / " year)))
                          :path (str (util/tag-url tag) (when year (str "/" year)))
-                         :feed {:href (util/tag-feed-url tag)
-                                :title (str "Atom for #" (name tag))}}
+                         :feed feed}
                  (c/page-header heading (c/count-label (count entries)))
                  (c/cols (c/feed entries)
-                         (c/sidebar config {:feed {:kind :tag :value tag}}
+                         (c/sidebar config {:feed feed}
                                     (related-tags entries tag))))))
 
 ;; Live filtering for the tag index: hides tags whose name doesn't contain
