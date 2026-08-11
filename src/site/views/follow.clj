@@ -12,7 +12,7 @@
   [config page]
   (let [title (or (:title page) "Follow")
         blocks (when (:body page) (rest (markdown/render (:body page) nil)))
-        [intro detail] (split-at 1 blocks)]
+        [intro detail] (split-at 3 blocks)]
     (layout/page config {:title title :path "/follow"}
                  [:article.article
                   [:h1 title]

@@ -138,7 +138,8 @@
     [:a {:href "/tags"} "Tags"]
     [:a {:href "/archive"} "Archive"]
     [:a {:href "/search"} "Search"]
-    [:a {:href "/about"} "About"]]])
+    [:a {:href "/about"} "About"]
+    [:a {:href "/follow"} "Follow"]]])
 
 (defn- footer [config]
   (let [year (.getYear (java.time.LocalDate/now))]
@@ -151,7 +152,6 @@
      ;; than becoming a third space-between child (see .footer-end).
      [:div.footer-end
       [:span.social
-       [:a {:href "/follow"} "Email"]
        [:a {:href "/feed.xml"} "Atom"]
        (for [[label url] (:social config)]
          [:a {:href url} label])]

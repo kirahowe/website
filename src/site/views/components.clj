@@ -296,9 +296,10 @@
   (into [:section.side [:h2 title]] body))
 
 ;; The email follow widget — the one section every sidebar carries, baked
-;; into `sidebar` below. The search bar's command-bar form (POSTing to
-;; Buttondown) plus the "follow by email or Atom" pitch; the sidebar
-;; counterpart to the Follow section in the post footer on entry pages.
+;; into `sidebar` below. A one-line pitch above the shared signup form
+;; (POSTing to Buttondown), closed by a slashed mono foot naming the Atom
+;; feeds on offer — the sidebar counterpart to the Follow section in the
+;; post footer on entry pages.
 
 (defn field-form
   "The one input+button pair — search, the tag filter, and the follow form all
@@ -339,31 +340,57 @@
       :aside [:input {:type "hidden" :name "embed" :value "1"}]
       :submit "Subscribe"})))
 
-(defn follow-pitch
-  "The one-line 'follow by email or Atom' offer, shared by the sidebar widget
-  and the post-footer section: 'email' leads to the /follow page, 'Atom' to
-  the feed."
-  []
-  [:p.follow-pitch
-   "Get a " [:a {:href "/follow"} "weekly digest"]
-   " of new posts in your inbox."])
+(defn- resolve-follow-feed
+  "The page's own Atom feed, when it has one: a type index's or a tag's.
+  {:href :scope}, where :scope is the word naming it inside the sentence
+  `follow-feeds` builds."
+  [{:keys [kind value]}]
+  (case kind
+    :type {:href (util/type-feed-url value) :scope (str (name value) "s")}
+    :tag {:href (util/tag-feed-url value) :scope (str "#" (name value))}
+    nil))
+
+(defn follow-feeds
+  "The Atom offer under the signup form. With no scoped feed there is only one
+  feed to name, and the sentence names it — \"the Atom feed\" is itself the
+  anchor, rather than a second link repeating what the sentence just said.
+  Given a page's own feed (a type index's, a tag's), the two choices read as a
+  parallel pair after the lead. Prose rather than a slashed run because a long
+  tag name outruns the sidebar's measure, and prose simply wraps."
+  ([]
+   [:p.follow-feeds
+    "Or subscribe to the " [:a {:href "/feed.xml"} "Atom feed"] "."])
+  ([feed]
+   (if-let [{:keys [href scope]} (resolve-follow-feed feed)]
+     [:p.follow-feeds
+      "Or subscribe by Atom — "
+      [:a {:href href} (str "just " scope)]
+      " or "
+      [:a {:href "/feed.xml"} "everything"]
+      "."]
+     (follow-feeds))))
 
 (defn follow-widget
-  "The Follow section: the pitch line, then the compact email form. Baked into
-  every sidebar (below); also placed in the post footer on entry pages."
-  [config]
-  (side-section "Follow"
-                (follow-pitch)
-                (follow-form config {:id "follow-side"})))
+  "The site's one Follow UI: heading, a one-line pitch, the shared signup
+  form, and the feeds foot. Callers supply only page context. `:variant
+  :entry` changes the outer section class to match an article footer; all
+  content remains shared."
+  ([config] (follow-widget config nil))
+  ([config {:keys [feed variant form-id]}]
+   [(if (= :entry variant) :section.section :section.side)
+    [:h2 "Follow"]
+    [:p.follow-pitch "Get a weekly digest of new posts in your inbox"]
+    (follow-form config {:id (or form-id "follow-side")})
+    (follow-feeds feed)]))
 
 (defn sidebar
   "The right rail. Composes the page's own widgets (recents, tag cloud, year
   nav, calendar, facets…) and, by default, appends the Follow widget last, so
   every archive/index page carries it for free.
 
-  An options map may lead the sections: {:follow :inline} suppresses the
-  append and lets the caller position (follow-widget config) among the
-  sections itself — the home page uses this to sit Follow above Top tags."
+  An options map may lead the sections. {:follow :inline} lets the caller
+  position the widget itself; :feed supplies {:href :label} for the contextual
+  Atom link. The default is the whole-site feed."
   [config & sections]
   (let [[opts sections] (if (map? (first sections))
                           [(first sections) (rest sections)]
@@ -372,7 +399,7 @@
     (into [:aside.sidebar]
           (if (= :inline (:follow opts))
             sections
-            (concat sections [(follow-widget config)])))))
+            (concat sections [(follow-widget config {:feed (:feed opts)})])))))
 
 (defn cols
   "The two-column shell: main feed on the left, sidebar on the right, with a

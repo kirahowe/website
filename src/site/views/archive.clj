@@ -185,23 +185,15 @@
                  (c/page-header heading (c/count-label total))
                  (c/cols (list (c/feed entries)
                                (c/pagination page pages #(path year tag %)))
-                         (c/sidebar config
+                         (c/sidebar config {:feed {:kind :type :value type}}
                                     (year-nav years year #(path % tag 1))
-                                    (facet-tags all-entries tag #(path year % 1))
-                                    (c/side-section "Feeds"
-                                                    (c/side-link {:path (util/type-feed-url type)
-                                                                  :title (str "Atom for " label)})))))))
+                                    (facet-tags all-entries tag #(path year % 1)))))))
 
 (defn- related-tags [entries tag]
   (let [counts (->> entries (mapcat :tags) (remove #{tag}) frequencies
                     (sort-by (fn [[t n]] [(- n) (name t)])))]
     (when (seq counts)
       (c/side-section "Related tags" (c/tag-cloud (take 6 counts))))))
-
-(defn- tag-feeds [tag]
-  (c/side-section "Feeds"
-                  (c/side-link {:path (util/tag-feed-url tag) :title (str "Atom for #" (name tag))})
-                  (c/side-link {:path "/tags" :title "All tags"})))
 
 (defn tag-page [config tag year entries]
   (let [heading (header-parts (list [:span.hash "#"] (name tag))
@@ -212,9 +204,8 @@
                                 :title (str "Atom for #" (name tag))}}
                  (c/page-header heading (c/count-label (count entries)))
                  (c/cols (c/feed entries)
-                         (c/sidebar config
-                                    (related-tags entries tag)
-                                    (tag-feeds tag))))))
+                         (c/sidebar config {:feed {:kind :tag :value tag}}
+                                    (related-tags entries tag))))))
 
 ;; Live filtering for the tag index: hides tags whose name doesn't contain
 ;; the query. Matching is against the link's own text node ("#clojure"), so

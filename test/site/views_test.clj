@@ -280,8 +280,6 @@
       (is (str/includes? body "field-form follow-form"))
       (is (str/includes? body "name=\"email\""))
       (is (str/includes? body "name=\"embed\""))
-      ;; no Buttondown account in the test config → placeholder action
-      (is (str/includes? body "action=\"#\""))
       ;; the prose comes through from example-content/pages/follow.md, with
       ;; the form between the opening invitation and the privacy detail
       (is (str/includes? body "how I treat privacy"))
@@ -293,13 +291,19 @@
   (testing "an entry's page footer carries the follow section"
     (let [{:keys [body]} (GET "/2026/jul/4/hello-world")]
       (is (str/includes? body "field-form follow-form"))
-      (is (str/includes? body "Follow"))))
+      (is (str/includes? body "Follow"))
+      (is (str/includes? body
+                         "href=\"/feed.xml\">Atom feed</a>"))))
 
   (testing "the site footer no longer carries a follow band"
     (is (not (str/includes? (:body (GET "/")) "follow-band"))))
 
-  (testing "the site footer links to the /follow page"
-    (is (str/includes? (:body (GET "/")) "<a href=\"/follow\">Email</a>")))
+  (testing "the site nav links to the /follow page"
+    (let [body (:body (GET "/"))]
+      (is (str/includes? body "<a href=\"/follow\">Follow</a>"))
+      ;; it lives in the header nav, so it precedes the footer entirely
+      (is (< (str/index-of body "<a href=\"/follow\">Follow</a>")
+             (str/index-of body "class=\"site-footer\"")))))
 
   (testing "the left side of the site footer links to the privacy page"
     (let [body (:body (GET "/"))]
@@ -311,6 +315,28 @@
       (is (str/includes? (:body (GET uri)) ">Follow</h2>")
           (str uri " sidebar should carry the Follow widget"))))
 
+  (testing "Follow uses the most specific available Atom feed"
+    (let [tag-bodies (map (comp :body GET) ["/tags/clojure" "/tags/clojure/2026"])
+          type-bodies (map (comp :body GET) ["/posts" "/2026/posts"])
+          archive-body (:body (GET "/2026"))]
+      (doseq [body tag-bodies]
+        (is (str/includes? body
+                           "href=\"/tags/clojure/feed.xml\">just #clojure</a>"))
+        (is (str/includes? body "href=\"/feed.xml\">everything</a>")))
+      (doseq [body type-bodies]
+        (is (str/includes? body
+                           "href=\"/posts/feed.xml\">just posts</a>"))
+        (is (str/includes? body "href=\"/feed.xml\">everything</a>")))
+      (is (str/includes? archive-body
+                         "href=\"/feed.xml\">Atom feed</a>"))
+      (is (str/includes? archive-body
+                         "Get a weekly digest of new posts in your inbox"))
+      (is (not (str/includes? (first tag-bodies) ">Feeds</h2>")))
+      (is (= 1 (count (re-seq #">Follow</h2>" (first tag-bodies)))))
+      ;; the whole point of the single sentence: with only one feed on offer,
+      ;; "Atom feed" is itself the anchor — no second link naming it again
+      (is (not (str/includes? archive-body ">everything</a>")))))
+
   (testing "on the home page the Follow widget sits above Top tags"
     (let [body (:body (GET "/"))]
       (is (< (str/index-of body ">Follow</h2>")
@@ -318,7 +344,7 @@
 
   (testing "elsewhere the Follow widget stays last in the sidebar"
     (let [body (:body (GET "/tags/clojure"))]
-      (is (< (str/index-of body ">Feeds</h2>")
+      (is (< (str/index-of body ">Related tags</h2>")
              (str/index-of body ">Follow</h2>"))))))
 
 (deftest image-lede-posts

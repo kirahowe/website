@@ -56,10 +56,9 @@
      [:section.section
       [:p.bio (or (:bio config) default-bio)]
       [:a.more {:href "/about"} (str "More about " (first-name config) " →")]]
-     [:section.section
-      [:h2 "Follow"]
-      (c/follow-pitch)
-      (c/follow-form config {:id "follow-post"})]]))
+     (c/follow-widget config
+                      {:variant :entry
+                       :form-id "follow-post"})]))
 
 (defn entry-page [config index entry]
   (layout/page config {:title (or (:title entry) (util/format-date (:date entry)))

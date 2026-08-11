@@ -900,15 +900,25 @@ a:hover { text-decoration-thickness: 2px; }
 }
 
 /* --------------------------------------------------------------------------
-   Follow — the email signup. The form itself is the shared field/button pair
-   above; only the pitch line and a little context spacing are follow-specific.
+   Follow — a one-line pitch above the shared signup form, and an Atom
+   sentence below it.
    -------------------------------------------------------------------------- */
 
-.follow-pitch {
+/* Both prose lines bracket the form in the same quiet voice; only their
+   margins differ. */
+.follow-pitch,
+.follow-feeds {
   font: 400 var(--fs-sm) var(--sans);
   color: var(--muted);
-  padding: var(--sp2) 0;
+  line-height: var(--lh);
 }
+.follow-pitch { margin: var(--sp3) 0 var(--sp4); }
+.follow-feeds { margin: var(--sp4) 0 0; }
+
+/* The feed links are metadata, not prose — the mono --fs-sm voice every tag
+   and foot label wears, set inside the sans sentence around them. They keep
+   their underline: a .tag is a metadata link too, and still looks like one. */
+.follow-feeds a { font: 400 var(--fs-sm) var(--mono); }
 
 /* On the /follow page the form separates the opening invitation from the
    privacy detail; in the post footer it sits in the Tags / Related rhythm,

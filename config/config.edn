@@ -28,9 +28,8 @@
 
  ;; Email follow. Buttondown collects the addresses; the follow form POSTs to
  ;; its embed endpoint at buttondown.com/api/emails/embed-subscribe/<username>.
- ;; nil until the account exists — the form then renders as a placeholder that
- ;; posts nowhere (action="#"), so the design is in place ahead of the plumbing.
- :buttondown-username nil
+ ;; nil until the account exists
+ :buttondown-username "kirahowe"
 
  ;; Footer social links, [label url]. Atom is always included first.
  :social [["GitHub" "https://github.com/kirahowe"]]
