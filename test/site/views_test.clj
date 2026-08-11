@@ -217,7 +217,12 @@
       (is (str/includes? body "<content type=\"html\">"))
       ;; the channel names its own address, so a reader never has to
       ;; re-derive it from the channel link
-      (is (str/includes? body "href=\"https://example.com/feed.xml\" rel=\"self\""))))
+      (is (str/includes? body "href=\"https://example.com/feed.xml\" rel=\"self\""))
+      ;; root-relative refs inside entry content are absolutized: a feed
+      ;; reader renders this HTML against its own host, not ours
+      (is (str/includes? body "https://example.com/attachments/caching-diagram.png"))
+      (is (not (str/includes? body "src=&quot;/")))
+      (is (not (str/includes? body "href=&quot;/")))))
 
   (testing "tag feed: the site channel scoped to one tag"
     (let [{:keys [status body headers]} (GET "/tags/clojure/feed.xml")]
@@ -280,12 +285,13 @@
       (is (str/includes? body "field-form follow-form"))
       (is (str/includes? body "name=\"email\""))
       (is (str/includes? body "name=\"embed\""))
-      ;; the prose comes through from example-content/pages/follow.md, with
-      ;; the form between the opening invitation and the privacy detail
-      (is (str/includes? body "how I treat privacy"))
-      (is (< (str/index-of body "Same writing")
-             (str/index-of body "field-form follow-form")
-             (str/index-of body "how I treat privacy")))
+      ;; The form splits the prose: body above, closing note below. Asserted
+      ;; as structure, not wording — the page's text lives in the content
+      ;; repo and gets edited freely.
+      (let [article (subs body (str/index-of body "<article") (str/index-of body "</article>"))
+            form (str/index-of article "field-form follow-form")]
+        (is (< (str/index-of article "<p") form))
+        (is (< form (str/last-index-of article "<p"))))
       (is (str/includes? body "href=\"/privacy\""))))
 
   (testing "an entry's page footer carries the follow section"
