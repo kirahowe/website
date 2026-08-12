@@ -143,7 +143,10 @@
 (defn- footer [config]
   (let [year (.getYear (java.time.LocalDate/now))]
     [:footer.site-footer
-     [:span "© " year " " (:site-title config) " / made with ♥ in Yarmouth, NS"]
+     [:div.footer-start
+      [:span "© " year " " (:site-title config)
+       " / made with ♥ in Yarmouth, NS / "
+       [:a {:href "/privacy"} "Privacy"]]]
      ;; Grouped so the toggle lands beside .social at the right edge rather
      ;; than becoming a third space-between child (see .footer-end).
      [:div.footer-end

@@ -910,8 +910,8 @@ a:hover { text-decoration-thickness: 2px; }
   padding: var(--sp2) 0;
 }
 
-/* On the /follow page the form sits under the prose; in the post footer it
-   sits in the Tags / Related rhythm, capped so it doesn't run the full
-   reading measure. */
-.article .follow-form { margin-top: var(--sp5); }
+/* On the /follow page the form separates the opening invitation from the
+   privacy detail; in the post footer it sits in the Tags / Related rhythm,
+   capped so it doesn't run the full reading measure. */
+.article .follow-form { margin: var(--sp5) 0; }
 .post-footer .follow-form { max-width: 26rem; }

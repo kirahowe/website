@@ -150,7 +150,8 @@
       (is (not-any? :draft? (:entries index))))
 
     (testing "pages load"
-      (is (= "About" (:title (get (:pages index) "about")))))))
+      (is (= "About" (:title (get (:pages index) "about"))))
+      (is (= "Privacy" (:title (get (:pages index) "privacy")))))))
 
 (deftest obsidian-native-entries
   (let [dir (str (Files/createTempDirectory "content-test" (into-array FileAttribute [])))

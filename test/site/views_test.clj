@@ -158,7 +158,10 @@
   (testing "static page"
     (let [{:keys [status body]} (GET "/about")]
       (is (= 200 status))
-      (is (str/includes? body "personal weblog"))))
+      (is (str/includes? body "personal weblog")))
+    (let [{:keys [status body]} (GET "/privacy")]
+      (is (= 200 status))
+      (is (str/includes? body "Email subscriptions"))))
 
   (testing "search: relevance order, highlights, facet rails"
     (let [{:keys [status body headers]} (GET "/search" "q=babashka")]
@@ -254,8 +257,13 @@
       (is (str/includes? body "name=\"embed\""))
       ;; no Buttondown account in the test config → placeholder action
       (is (str/includes? body "action=\"#\""))
-      ;; the prose comes through from example-content/pages/follow.md
-      (is (str/includes? body "unsubscribes in one"))))
+      ;; the prose comes through from example-content/pages/follow.md, with
+      ;; the form between the opening invitation and the privacy detail
+      (is (str/includes? body "how I treat privacy"))
+      (is (< (str/index-of body "Same writing")
+             (str/index-of body "field-form follow-form")
+             (str/index-of body "how I treat privacy")))
+      (is (str/includes? body "href=\"/privacy\""))))
 
   (testing "an entry's page footer carries the follow section"
     (let [{:keys [body]} (GET "/2026/jul/4/hello-world")]
@@ -267,6 +275,11 @@
 
   (testing "the site footer links to the /follow page"
     (is (str/includes? (:body (GET "/")) "<a href=\"/follow\">Email</a>")))
+
+  (testing "the left side of the site footer links to the privacy page"
+    (let [body (:body (GET "/"))]
+      (is (str/includes? body "class=\"footer-start\""))
+      (is (str/includes? body "Yarmouth, NS / <a href=\"/privacy\">Privacy</a>"))))
 
   (testing "every archive/index sidebar carries the Follow widget"
     (doseq [uri ["/" "/2026" "/2026/jul" "/tags/clojure" "/posts"]]
