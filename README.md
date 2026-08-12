@@ -43,6 +43,9 @@ The server clones the content repo at boot and refreshes two ways:
   scheduled sync, never dropped.
 - **A fallback pull** every `:content-sync-seconds` (30 minutes in prod)
   heals a webhook delivery GitHub failed to make — it doesn't retry them.
+- **A CDN purge**, if Cloudflare credentials are configured, clears the
+  cached homepage after each successful reindex, so the edge doesn't
+  have to wait out its TTL.
 
 Publishing never deploys anything: content changes flow through git, code
 changes through `fly deploy`, and neither triggers the other.
@@ -56,10 +59,17 @@ One-time setup:
    `https://<your-site>/refresh`, content type `application/json`, just
    the push event. No secret needed — the endpoint is unauthenticated by
    design, because all it can do is trigger a debounced pull of a public
-   repo (and the site keeps its no-secrets property).
+   repo.
 3. For local writing, point `:content-path` in `config/dev.edn` at a
    local checkout of the content repo (or any folder with the same
    layout) and `bb dev`.
+4. Optional: for the homepage to update at the edge immediately instead
+   of waiting out its cache TTL, set `CLOUDFLARE_ZONE_ID` and
+   `CLOUDFLARE_API_TOKEN` as Fly secrets —
+   `fly secrets set CLOUDFLARE_ZONE_ID=<zone-id> CLOUDFLARE_API_TOKEN=<token>`
+   — so each successful content refresh purges the cached homepage.
+   Without this, everything still works; the homepage just relies on its
+   TTL.
 
 ## Writing
 
@@ -159,7 +169,9 @@ Body in markdown, with [[Hello world|wikilinks]] and ![[screenshot.png]].
 
 ## Configuration
 
-Three committed files under `config/`, no environment variables, no secrets:
+Site behaviour is file-first, in three committed files under `config/`.
+The only environment variables are production's two Cloudflare purge
+credentials — secrets, so they live in Fly rather than in committed EDN:
 
 - **`config/config.edn`** — the base that always applies: site title,
   base URL, entry types, `:llm-command` (what `bb suggest-tags` shells
@@ -170,6 +182,11 @@ Three committed files under `config/`, no environment variables, no secrets:
 - **`config/prod.edn`** — merged in by `bb prod`: the clone target, the
   content repo URL, the fallback sync interval, `:port 8080` (what Fly
   routes to).
+- **`CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_API_TOKEN`** — optional Fly
+  secrets that enable a homepage cache purge after each successful
+  content refresh; the API token only needs Cloudflare's Zone.Cache
+  Purge permission. Absent, purging is simply skipped — the site works
+  normally, and the homepage relies on its cache TTL instead.
 
 The port is environment-specific, so dev and prod never collide on one.
 

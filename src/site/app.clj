@@ -71,9 +71,9 @@
 (defn- refresh-response
   "POST /refresh — the content repo's push webhook lands here. Only
   exists when content comes from git (prod); dev serves the content
-  directory directly and has nothing to refresh. Unauthenticated by design: all it
-  can do is pull a public repo, sync/refresh! bounds how often, and the
-  site keeps its no-secrets property."
+  directory directly and has nothing to refresh. Unauthenticated by
+  design: all it can do is pull a public repo, and sync/refresh! bounds
+  how often."
   [config index-atom refresh-state req]
   (when (and (= :post (:request-method req))
              (= "/refresh" (:uri req))
