@@ -481,7 +481,7 @@
       (is (< 1 (count (re-seq #"<entry>" body)))))))
 
 (deftest type-listings-are-paginated
-  (let [h (app/make-app (assoc config :type-page-entries 1)
+  (let [h (app/make-app (assoc config :page-entries 1)
                         (atom (content/build-index config)))
         get-page (fn
                    ([uri] (h {:request-method :get :uri uri}))
@@ -509,6 +509,85 @@
         (is (str/includes? body "href=\"/posts/page/2?tag=clojure\""))))
     (testing "pages past the end are a 404"
       (is (= 404 (:status (get-page "/posts/page/4")))))))
+
+(deftest tag-listings-are-paginated
+  ;; :clojure tags 5 example entries, newest first: nextjournal-markdown,
+  ;; hello-world, rich-hickey-on-simplicity, repl-driven, babashka.
+  (let [h (app/make-app (assoc config :page-entries 1)
+                        (atom (content/build-index config)))
+        get-page (fn [uri] (h {:request-method :get :uri uri}))
+        first-page (:body (get-page "/tags/clojure"))
+        last-page (:body (get-page "/tags/clojure/page/5"))]
+    (testing "the first page shows only its slice and the true total"
+      (is (str/includes? first-page "nextjournal/markdown"))
+      (is (not (str/includes? first-page "Babashka")))
+      (is (str/includes? first-page "5 entries"))
+      (is (str/includes? first-page "href=\"/tags/clojure/page/2\"")))
+    (testing "the last page links back and declares its own canonical URL"
+      (is (str/includes? last-page "Babashka"))
+      (is (not (str/includes? last-page "nextjournal/markdown")))
+      (is (str/includes? last-page "href=\"/tags/clojure/page/4\" rel=\"prev\""))
+      (is (str/includes? last-page "Page 5 of 5"))
+      (is (str/includes? last-page "<title>#clojure / Page 5 — Test Site</title>"))
+      (is (str/includes? last-page
+                         "href=\"https://example.com/tags/clojure/page/5\" rel=\"canonical\"")))
+    (testing "related tags describe the whole tag, not the current page's slice"
+      (is (str/includes? first-page "#workflow"))
+      (is (str/includes? last-page "#workflow")))
+    (testing "pages past the end are a 404"
+      (is (= 404 (:status (get-page "/tags/clojure/page/6")))))))
+
+(deftest month-listings-are-paginated
+  ;; July 2026 has 3 example entries, all on the 4th: nextjournal-markdown,
+  ;; hello-world, then the note, newest first.
+  (let [h (app/make-app (assoc config :page-entries 1)
+                        (atom (content/build-index config)))
+        get-page (fn [uri] (h {:request-method :get :uri uri}))
+        first-page (:body (get-page "/2026/jul"))
+        last-page (:body (get-page "/2026/jul/page/3"))]
+    (testing "the first page shows only its slice and the true total"
+      (is (str/includes? first-page "nextjournal/markdown"))
+      (is (not (str/includes? first-page "one thought")))
+      (is (str/includes? first-page "3 entries"))
+      (is (str/includes? first-page "href=\"/2026/jul/page/2\"")))
+    (testing "the type summary describes the whole month, not the slice"
+      (is (str/includes? first-page ">post</a>"))
+      (is (str/includes? first-page ">note</a>"))
+      (is (str/includes? first-page ">link</a>"))
+      (is (str/includes? last-page ">post</a>"))
+      (is (str/includes? last-page ">note</a>"))
+      (is (str/includes? last-page ">link</a>")))
+    (testing "the last page links back and declares its own canonical URL"
+      (is (str/includes? last-page "href=\"/2026/jul/page/2\" rel=\"prev\""))
+      (is (str/includes? last-page "Page 3 of 3"))
+      (is (str/includes? last-page "<title>July 2026 / Page 3 — Test Site</title>"))
+      (is (str/includes? last-page
+                         "href=\"https://example.com/2026/jul/page/3\" rel=\"canonical\"")))
+    (testing "pages past the end are a 404"
+      (is (= 404 (:status (get-page "/2026/jul/page/4")))))))
+
+(deftest day-listings-are-paginated
+  ;; July 4, 2026 has the same 3 entries as the month (it's the only day
+  ;; with content that month): nextjournal-markdown, hello-world, the note.
+  (let [h (app/make-app (assoc config :page-entries 1)
+                        (atom (content/build-index config)))
+        get-page (fn [uri] (h {:request-method :get :uri uri}))
+        first-page (:body (get-page "/2026/jul/4"))
+        last-page (:body (get-page "/2026/jul/4/page/3"))]
+    (testing "the first page shows only its slice"
+      (is (str/includes? first-page "nextjournal/markdown"))
+      (is (not (str/includes? first-page "one thought")))
+      (is (str/includes? first-page "href=\"/2026/jul/4/page/2\"")))
+    (testing "the last page links back and declares its own canonical URL"
+      (is (str/includes? last-page "one thought"))
+      (is (not (str/includes? last-page "nextjournal/markdown")))
+      (is (str/includes? last-page "href=\"/2026/jul/4/page/2\" rel=\"prev\""))
+      (is (str/includes? last-page "Page 3 of 3"))
+      (is (str/includes? last-page "<title>July 4, 2026 / Page 3 — Test Site</title>"))
+      (is (str/includes? last-page
+                         "href=\"https://example.com/2026/jul/4/page/3\" rel=\"canonical\"")))
+    (testing "pages past the end are a 404"
+      (is (= 404 (:status (get-page "/2026/jul/4/page/4")))))))
 
 (deftest static-assets
   (let [{:keys [status headers]} (GET "/css/style.css")]

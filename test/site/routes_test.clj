@@ -22,6 +22,23 @@
   (testing "trailing slashes don't matter"
     (is (= {:handler :year :params {:year 2026}} (match "/2026/")))))
 
+(deftest date-pagination-routes
+  (is (= {:handler :month :params {:year 2026 :month 7 :page 2}}
+         (match "/2026/jul/page/2")))
+  (is (= {:handler :day :params {:year 2026 :month 7 :day 4 :page 2}}
+         (match "/2026/jul/4/page/2")))
+  (testing "page 1 and non-canonical page numbers do not duplicate the index"
+    (is (nil? (match "/2026/jul/page/1")))
+    (is (nil? (match "/2026/jul/page/02")))
+    (is (nil? (match "/2026/jul/4/page/1")))
+    (is (nil? (match "/2026/jul/4/page/02"))))
+  (testing "a month page-N URL isn't mistaken for the entry route"
+    (is (nil? (match "/2026/jul/page/notanumber"))))
+  (testing "existing entry and type routes still resolve"
+    (is (= {:handler :entry :params {:year 2026 :month 7 :day 4 :slug "hello-world"}}
+           (match "/2026/jul/4/hello-world")))
+    (is (= {:handler :type-list :params {:type :link :year 2026}} (match "/2026/links")))))
+
 (deftest type-routes
   (is (= {:handler :type-list :params {:type :post}} (match "/posts")))
   (is (= {:handler :type-list :params {:type :note}} (match "/notes")))
@@ -43,7 +60,15 @@
   (is (= {:handler :tags} (match "/tags")))
   (is (= {:handler :tag :params {:tag :clojure}} (match "/tags/clojure")))
   (is (= {:handler :tag :params {:tag :clojure :year 2026}} (match "/tags/clojure/2026")))
-  (is (= {:handler :tag-feed :params {:tag :clojure}} (match "/tags/clojure/feed.xml"))))
+  (is (= {:handler :tag-feed :params {:tag :clojure}} (match "/tags/clojure/feed.xml")))
+  (is (= {:handler :tag :params {:tag :clojure :page 2}} (match "/tags/clojure/page/2")))
+  (is (= {:handler :tag :params {:tag :clojure :year 2026 :page 3}}
+         (match "/tags/clojure/2026/page/3")))
+  (testing "page 1 and non-canonical page numbers do not duplicate the index"
+    (is (nil? (match "/tags/clojure/page/1")))
+    (is (nil? (match "/tags/clojure/page/02")))
+    (is (nil? (match "/tags/clojure/2026/page/1")))
+    (is (nil? (match "/tags/clojure/2026/page/02")))))
 
 (deftest type-feed-routes
   (is (= {:handler :type-feed :params {:type :post}} (match "/posts/feed.xml")))

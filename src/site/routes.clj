@@ -5,7 +5,9 @@
   /                        home (recent entries)
   /2026                    year archive
   /2026/jul                month archive (numeric months accepted too)
+  /2026/jul/page/2         older entries of a month
   /2026/jul/4              day archive
+  /2026/jul/4/page/2       older entries of a day
   /2026/jul/4/my-post      single entry
   /posts /links ... type listings (derived from config :entry-types)
   /posts/feed.xml         Atom scoped to an entry type
@@ -14,7 +16,9 @@
   /2026/posts/page/2       ... filtered by year
   /tags                    tag index
   /tags/clojure            entries tagged clojure
+  /tags/clojure/page/2     older entries of a tag
   /tags/clojure/2026       ... filtered by year
+  /tags/clojure/2026/page/2 ... filtered by year, older entries
   /tags/clojure/feed.xml   Atom scoped to the tag
   /search?q=...            search
   /follow                  email follow page (Buttondown signup)
@@ -52,7 +56,7 @@
   "segments → {:handler <kw> :params {...}} or nil (→ 404)."
   [config segments]
   (let [plural->type (type-plurals config)
-        [a b c d] segments]
+        [a b c d e] segments]
     (case (count segments)
       0 {:handler :home}
 
@@ -111,11 +115,35 @@
                                         :year (util/parse-year a)
                                         :page (parse-page d)}}
 
+          (and (util/parse-year a) (util/parse-month b) (= c "page") (parse-page d))
+          {:handler :month :params {:year (util/parse-year a)
+                                    :month (util/parse-month b)
+                                    :page (parse-page d)}}
+
+          (and (= a "tags") (= c "page") (parse-page d))
+          {:handler :tag :params {:tag (keyword b)
+                                  :page (parse-page d)}}
+
           (and (util/parse-year a) (util/parse-month b) (util/parse-day c))
           {:handler :entry :params {:year (util/parse-year a)
                                     :month (util/parse-month b)
                                     :day (util/parse-day c)
                                     :slug d}}
+
+          :else nil)
+
+      5 (cond
+          (and (util/parse-year a) (util/parse-month b) (util/parse-day c)
+               (= d "page") (parse-page e))
+          {:handler :day :params {:year (util/parse-year a)
+                                  :month (util/parse-month b)
+                                  :day (util/parse-day c)
+                                  :page (parse-page e)}}
+
+          (and (= a "tags") (util/parse-year c) (= d "page") (parse-page e))
+          {:handler :tag :params {:tag (keyword b)
+                                  :year (util/parse-year c)
+                                  :page (parse-page e)}}
 
           :else nil)
 

@@ -13,8 +13,9 @@
  ;; whole days, then links onward to the month archives.
  :home-entries 10
 
- ;; How many entries each type index page (/posts, /notes, ...) carries.
- :type-page-entries 10
+ ;; How many entries each paginated listing (/posts, /tags/clojure, month
+ ;; and day pages, ...) carries per page.
+ :page-entries 10
 
  ;; How many recent entries the Atom feed (/feed.xml) carries, newest first.
  :feed-entries 20

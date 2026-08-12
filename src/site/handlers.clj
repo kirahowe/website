@@ -17,7 +17,7 @@
 (def homepage-browser-cache "public, max-age=0, must-revalidate")
 (def homepage-cdn-cache "public, max-age=86400")
 (def no-store "no-store")
-(def default-type-page-entries 10)
+(def default-page-entries 10)
 
 (defn- html
   ([body] (html body 200 public-cache))
@@ -69,10 +69,10 @@
   the page is past the end. A bad configured size falls back to the default
   rather than making every listing disappear."
   [config entries page]
-  (let [configured (:type-page-entries config)
+  (let [configured (:page-entries config)
         per-page (if (and (int? configured) (pos? configured))
                    configured
-                   default-type-page-entries)
+                   default-page-entries)
         page (or page 1)
         total (count entries)
         pages (quot (+ total (dec per-page)) per-page)
@@ -104,14 +104,18 @@
                     #(v.archive/year-page config index year tag %)))
 
     :month
-    (let [{:keys [year month]} params]
-      (some-entries config (get (:by-month index) [year month])
-                    #(v.archive/month-page config index year month %)))
+    (let [{:keys [year month page]} params
+          all-entries (get (:by-month index) [year month])]
+      (if-let [pagination (paginate config all-entries page)]
+        (html (v.archive/month-page config index year month all-entries pagination))
+        (not-found config)))
 
     :day
-    (let [{:keys [year month day]} params]
-      (some-entries config (get (:by-day index) [year month day])
-                    #(v.archive/day-page config year month day %)))
+    (let [{:keys [year month day page]} params
+          all-entries (get (:by-day index) [year month day])]
+      (if-let [pagination (paginate config all-entries page)]
+        (html (v.archive/day-page config year month day pagination))
+        (not-found config)))
 
     :entry
     (let [canonical (util/entry-url {:date params :slug (:slug params)})]
@@ -139,9 +143,11 @@
         (not-found config)))
 
     :tag
-    (let [{:keys [tag year]} params]
-      (some-entries config (filter-year (get (:by-tag index) tag) year)
-                    #(v.archive/tag-page config tag year %)))
+    (let [{:keys [tag year page]} params
+          all-entries (filter-year (get (:by-tag index) tag) year)]
+      (if-let [pagination (paginate config all-entries page)]
+        (html (v.archive/tag-page config tag year all-entries pagination))
+        (not-found config)))
 
     :tags
     (html (v.archive/tags-page config index))

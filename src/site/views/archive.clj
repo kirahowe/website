@@ -130,24 +130,34 @@
                      (when newer [:a {:href (util/month-url newer)} (util/month-label newer)])
                      (when older [:a {:href (util/month-url older)} (util/month-label older)])])))
 
-(defn month-page [config index year month entries]
+(defn- month-path [year month page]
+  (str (util/month-url [year month]) (when (< 1 page) (str "/page/" page))))
+
+(defn month-page [config index year month all-entries {:keys [entries page pages total]}]
   (let [months (:months index)                       ; newest first
         i (.indexOf months [year month])
         newer (when (pos? i) (nth months (dec i)))
         older (when (< (inc i) (count months)) (nth months (inc i)))
-        title (str (util/month-name month) " " year)]
-    (layout/page config {:title title :path (util/month-url [year month])}
-                 (c/page-header title (c/count-label (count entries)))
-                 [:div.type-summary (c/type-summary entries true)]
-                 (c/cols (c/feed entries)
+        label (str (util/month-name month) " " year)]
+    (layout/page config {:title (cond-> label (< 1 page) (str " / Page " page))
+                         :path (month-path year month page)}
+                 (c/page-header label (c/count-label total))
+                 [:div.type-summary (c/type-summary all-entries true)]
+                 (c/cols (list (c/feed entries)
+                               (c/pagination page pages #(month-path year month %)))
                          (c/sidebar config
                                     (calendar index year month)
                                     (nearby newer older))))))
 
-(defn day-page [config year month day entries]
-  (layout/page config {:title (util/format-date {:year year :month month :day day})
-                       :path (util/day-url {:year year :month month :day day})}
-               (c/feed entries)))
+(defn- day-path [year month day page]
+  (str (util/day-url {:year year :month month :day day}) (when (< 1 page) (str "/page/" page))))
+
+(defn day-page [config year month day {:keys [entries page pages]}]
+  (let [label (util/format-date {:year year :month month :day day})]
+    (layout/page config {:title (cond-> label (< 1 page) (str " / Page " page))
+                         :path (day-path year month day page)}
+                 (c/feed entries)
+                 (c/pagination page pages #(day-path year month day %)))))
 
 ;; --- type and tag listings ----------------------------------------------
 
@@ -195,17 +205,22 @@
     (when (seq counts)
       (c/side-section "Related tags" (c/tag-cloud (take 6 counts))))))
 
-(defn tag-page [config tag year entries]
+(defn- tag-path [tag year page]
+  (str (util/tag-url tag) (when year (str "/" year)) (when (< 1 page) (str "/page/" page))))
+
+(defn tag-page [config tag year all-entries {:keys [entries page pages total]}]
   (let [heading (header-parts (list [:span.hash "#"] (name tag))
-                              [(when year (filter-chip (str year) (str "/tags/" (name tag))))])
+                              [(when year (filter-chip (str year) (tag-path tag nil 1)))])
         feed {:kind :tag :value tag}]
-    (layout/page config {:title (str "#" (name tag) (when year (str " / " year)))
-                         :path (str (util/tag-url tag) (when year (str "/" year)))
+    (layout/page config {:title (cond-> (str "#" (name tag) (when year (str " / " year)))
+                                 (< 1 page) (str " / Page " page))
+                         :path (tag-path tag year page)
                          :feed feed}
-                 (c/page-header heading (c/count-label (count entries)))
-                 (c/cols (c/feed entries)
+                 (c/page-header heading (c/count-label total))
+                 (c/cols (list (c/feed entries)
+                               (c/pagination page pages #(tag-path tag year %)))
                          (c/sidebar config {:feed feed}
-                                    (related-tags entries tag))))))
+                                    (related-tags all-entries tag))))))
 
 ;; Live filtering for the tag index: hides tags whose name doesn't contain
 ;; the query. Matching is against the link's own text node ("#clojure"), so
