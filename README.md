@@ -189,7 +189,8 @@ so dev doesn't even have that.
 | `/posts` · `/notes` · `/links` · `/quotes` · `/releases` · `/tools` | paginated by type (`/posts/page/2`; `/2026/posts` filters by year) |
 | `/tags` · `/tags/clojure` · `/tags/clojure/2026` | by tag |
 | `/search?q=...` | full-text search |
-| `/feed.xml` | RSS |
+| `/feed.xml` | Atom 1.0 |
+| `/posts/feed.xml` · `/notes/feed.xml` · … | Atom 1.0 by entry type |
 | `/attachments/...` | images from the content repo |
 
 ## Deploying to Fly.io

@@ -61,8 +61,16 @@
 (defn tag-url [tag]
   (str "/tags/" (name tag)))
 
+(defn type-url [type]
+  (str "/" (name type) "s"))
+
+(defn type-feed-url
+  "An entry type's scoped Atom feed."
+  [type]
+  (str (type-url type) "/feed.xml"))
+
 (defn tag-feed-url
-  "A tag's scoped RSS. Built here so the page that advertises the feed and
+  "A tag's scoped Atom feed. Built here so the page that advertises it and
   the feed that names itself can't drift apart."
   [tag]
   (str (tag-url tag) "/feed.xml"))

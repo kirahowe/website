@@ -152,7 +152,7 @@
      [:div.footer-end
       [:span.social
        [:a {:href "/follow"} "Email"]
-       [:a {:href "/feed.xml"} "RSS"]
+       [:a {:href "/feed.xml"} "Atom"]
        (for [[label url] (:social config)]
          [:a {:href url} label])]
       theme-toggle]]))
@@ -166,8 +166,8 @@
                 listing; pages with no stable URL (drafts, 404) pass none.
     :canonical  an absolute URL that replaces the self rel=canonical — an
                 entry whose canonical home is elsewhere points there.
-    :feed       {:href :title} of a feed scoped to this page (a tag's
-                RSS), advertised for discovery ahead of the site feed."
+    :feed       {:href :title} of an Atom feed scoped to this page (a tag's),
+                advertised for discovery ahead of the site feed."
   [config {:keys [title path canonical feed]} & content]
   (let [full-title (if title
                      (str title " — " (:site-title config))
@@ -231,9 +231,9 @@
                ;; ahead of it is what quietly turns "subscribe to #clojure"
                ;; into "subscribe to everything".
                (when feed
-                 [:link {:rel "alternate" :type "application/rss+xml"
+                 [:link {:rel "alternate" :type "application/atom+xml"
                          :title (:title feed) :href (:href feed)}])
-               [:link {:rel "alternate" :type "application/rss+xml"
+               [:link {:rel "alternate" :type "application/atom+xml"
                        :title (:site-title config) :href "/feed.xml"}]
                (when-not (:dev? config) analytics-script)]
               [:body

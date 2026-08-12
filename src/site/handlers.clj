@@ -30,9 +30,9 @@
 (defn not-found [config]
   (html (v.layout/not-found config) 404 "public, max-age=60"))
 
-(defn- rss-ok [body]
+(defn- atom-ok [body]
   {:status 200
-   :headers {"Content-Type" "application/rss+xml; charset=utf-8"
+   :headers {"Content-Type" "application/atom+xml; charset=utf-8"
              "Cache-Control" public-cache}
    :body body})
 
@@ -176,11 +176,18 @@
     (html (v.follow/follow-page config (get (:pages index) "follow")))
 
     :feed
-    (rss-ok (feed/rss config index))
+    (atom-ok (feed/atom-feed config index))
+
+    :type-feed
+    ;; Configured but unused types have no listing and therefore no feed.
+    (let [{:keys [type]} params]
+      (if-let [entries (seq (get (:by-type index) type))]
+        (atom-ok (feed/type-atom config type entries))
+        (not-found config)))
 
     :tag-feed
     ;; A feed for a tag that has no entries 404s, like its listing would.
     (let [{:keys [tag]} params]
       (if-let [entries (seq (get (:by-tag index) tag))]
-        (rss-ok (feed/tag-rss config tag entries))
+        (atom-ok (feed/tag-atom config tag entries))
         (not-found config)))))

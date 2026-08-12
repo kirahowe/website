@@ -208,9 +208,13 @@
   (testing "feed"
     (let [{:keys [status body headers]} (GET "/feed.xml")]
       (is (= 200 status))
-      (is (str/includes? (get headers "Content-Type") "rss"))
-      (is (str/includes? body "<rss"))
+      (is (str/includes? (get headers "Content-Type") "application/atom+xml"))
+      (is (str/includes? body "<feed xmlns=\"http://www.w3.org/2005/Atom\""))
+      (is (= "feed" (name (:tag (xml/parse-str body)))))
       (is (str/includes? body "Hello, world"))
+      (is (str/includes? body "<id>https://example.com/feed.xml</id>"))
+      (is (str/includes? body "<updated>2026-07-04T12:00:00Z</updated>"))
+      (is (str/includes? body "<content type=\"html\">"))
       ;; the channel names its own address, so a reader never has to
       ;; re-derive it from the channel link
       (is (str/includes? body "href=\"https://example.com/feed.xml\" rel=\"self\""))))
@@ -218,7 +222,8 @@
   (testing "tag feed: the site channel scoped to one tag"
     (let [{:keys [status body headers]} (GET "/tags/clojure/feed.xml")]
       (is (= 200 status))
-      (is (str/includes? (get headers "Content-Type") "rss"))
+      (is (str/includes? (get headers "Content-Type") "application/atom+xml"))
+      (is (= "feed" (name (:tag (xml/parse-str body)))))
       (is (str/includes? body "Test Site / #clojure"))
       (is (str/includes? body "https://example.com/tags/clojure"))
       (is (str/includes? body "Hello, world"))
@@ -232,10 +237,30 @@
     ;; the tag page points at the scoped feed: sidebar link + head alternate
     (let [{:keys [body]} (GET "/tags/clojure")]
       (is (str/includes? body "href=\"/tags/clojure/feed.xml\""))
-      (is (str/includes? body "rel=\"alternate\" title=\"RSS for #clojure\""))
+      (is (str/includes? body "rel=\"alternate\" title=\"Atom for #clojure\""))
       ;; ...and it comes FIRST, ahead of the site-wide feed: autodiscovery
       ;; takes the first alternate, so the order is the subscription
       (is (< (str/index-of body "href=\"/tags/clojure/feed.xml\" rel=\"alternate\"")
+             (str/index-of body "href=\"/feed.xml\" rel=\"alternate\"")))))
+
+  (testing "type feed: the site feed scoped to one entry type"
+    (doseq [plural ["posts" "notes" "links" "quotes" "releases" "tools"]]
+      (let [{:keys [status body]} (GET (str "/" plural "/feed.xml"))]
+        (is (= 200 status) plural)
+        (is (= "feed" (name (:tag (xml/parse-str body)))) plural)))
+    (let [{:keys [status body headers]} (GET "/posts/feed.xml")]
+      (is (= 200 status))
+      (is (str/includes? (get headers "Content-Type") "application/atom+xml"))
+      (is (= "feed" (name (:tag (xml/parse-str body)))))
+      (is (str/includes? body "Test Site / Posts"))
+      (is (str/includes? body "<id>https://example.com/posts/feed.xml</id>"))
+      (is (str/includes? body "href=\"https://example.com/posts/feed.xml\" rel=\"self\""))
+      (is (str/includes? body "Hello, world"))
+      (is (not (str/includes? body "A note is one thought"))))
+    ;; A type listing advertises its scoped feed before the site-wide feed.
+    (let [body (:body (GET "/posts"))]
+      (is (str/includes? body "rel=\"alternate\" title=\"Atom for Posts\""))
+      (is (< (str/index-of body "href=\"/posts/feed.xml\" rel=\"alternate\"")
              (str/index-of body "href=\"/feed.xml\" rel=\"alternate\"")))))
 
   (testing "tags index carries the client-side filter, hidden until its JS runs"
@@ -412,16 +437,16 @@
       (is (str/includes? body "\"/2026/jun\"")))))
 
 (deftest feed-count-is-configurable
-  (testing ":feed-entries caps how many items the RSS feed carries"
+  (testing ":feed-entries caps how many entries the Atom feed carries"
     (let [h (app/make-app (assoc config :feed-entries 1)
                           (atom (content/build-index config)))
           body (:body (h {:request-method :get :uri "/feed.xml"}))]
-      (is (= 1 (count (re-seq #"<item>" body))))))
+      (is (= 1 (count (re-seq #"<entry>" body))))))
   (testing "without :feed-entries it falls back to the default"
     (let [body (:body (GET "/feed.xml"))]
       ;; example-content has more than one entry, so the default (20)
-      ;; lets several items through
-      (is (< 1 (count (re-seq #"<item>" body)))))))
+      ;; lets several entries through
+      (is (< 1 (count (re-seq #"<entry>" body)))))))
 
 (deftest type-listings-are-paginated
   (let [h (app/make-app (assoc config :type-page-entries 1)

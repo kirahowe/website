@@ -179,13 +179,18 @@
                          ;; Every numbered page has its own canonical URL;
                          ;; the query-free form remains canonical when a tag
                          ;; facet is applied.
-                         :path (path year nil page)}
+                         :path (path year nil page)
+                         :feed {:href (util/type-feed-url type)
+                                :title (str "Atom for " label)}}
                  (c/page-header heading (c/count-label total))
                  (c/cols (list (c/feed entries)
                                (c/pagination page pages #(path year tag %)))
                          (c/sidebar config
                                     (year-nav years year #(path % tag 1))
-                                    (facet-tags all-entries tag #(path year % 1)))))))
+                                    (facet-tags all-entries tag #(path year % 1))
+                                    (c/side-section "Feeds"
+                                                    (c/side-link {:path (util/type-feed-url type)
+                                                                  :title (str "Atom for " label)})))))))
 
 (defn- related-tags [entries tag]
   (let [counts (->> entries (mapcat :tags) (remove #{tag}) frequencies
@@ -195,7 +200,7 @@
 
 (defn- tag-feeds [tag]
   (c/side-section "Feeds"
-                  (c/side-link {:path (util/tag-feed-url tag) :title (str "RSS for #" (name tag))})
+                  (c/side-link {:path (util/tag-feed-url tag) :title (str "Atom for #" (name tag))})
                   (c/side-link {:path "/tags" :title "All tags"})))
 
 (defn tag-page [config tag year entries]
@@ -204,7 +209,7 @@
     (layout/page config {:title (str "#" (name tag) (when year (str " / " year)))
                          :path (str (util/tag-url tag) (when year (str "/" year)))
                          :feed {:href (util/tag-feed-url tag)
-                                :title (str "RSS for #" (name tag))}}
+                                :title (str "Atom for #" (name tag))}}
                  (c/page-header heading (c/count-label (count entries)))
                  (c/cols (c/feed entries)
                          (c/sidebar config

@@ -8,16 +8,17 @@
   /2026/jul/4              day archive
   /2026/jul/4/my-post      single entry
   /posts /links ... type listings (derived from config :entry-types)
+  /posts/feed.xml         Atom scoped to an entry type
   /2026/posts              type listing filtered by year
   /posts/page/2            older entries of a type
   /2026/posts/page/2       ... filtered by year
   /tags                    tag index
   /tags/clojure            entries tagged clojure
   /tags/clojure/2026       ... filtered by year
-  /tags/clojure/feed.xml   RSS scoped to the tag
+  /tags/clojure/feed.xml   Atom scoped to the tag
   /search?q=...            search
   /follow                  email follow page (Buttondown signup)
-  /feed.xml                RSS
+  /feed.xml                Atom
   /drafts/<name>?preview=  token-gated draft preview
   /<slug>                  static page (pages/<slug>.md), e.g. /about"
   (:require [clojure.string :as str]
@@ -66,6 +67,9 @@
           :else {:handler :page :params {:slug a}})
 
       2 (cond
+          (and (plural->type a) (= b "feed.xml"))
+          {:handler :type-feed :params {:type (plural->type a)}}
+
           (= a "tags")
           {:handler :tag :params {:tag (keyword b)}}
 

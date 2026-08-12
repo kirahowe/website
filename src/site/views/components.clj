@@ -297,7 +297,7 @@
 
 ;; The email follow widget — the one section every sidebar carries, baked
 ;; into `sidebar` below. The search bar's command-bar form (POSTing to
-;; Buttondown) plus the "follow by email or RSS" pitch; the sidebar
+;; Buttondown) plus the "follow by email or Atom" pitch; the sidebar
 ;; counterpart to the Follow section in the post footer on entry pages.
 
 (defn field-form
@@ -340,8 +340,8 @@
       :submit "Subscribe"})))
 
 (defn follow-pitch
-  "The one-line 'follow by email or RSS' offer, shared by the sidebar widget
-  and the post-footer section: 'email' leads to the /follow page, 'RSS' to
+  "The one-line 'follow by email or Atom' offer, shared by the sidebar widget
+  and the post-footer section: 'email' leads to the /follow page, 'Atom' to
   the feed."
   []
   [:p.follow-pitch

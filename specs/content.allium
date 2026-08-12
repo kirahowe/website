@@ -4,7 +4,7 @@
 -- Scope: The content & serving model for kirahowe.com — what the
 --   published site is made of and how visitors see it: entry display
 --   semantics, static pages, the URL scheme, archives, tag pages,
---   search, and the RSS feed.
+--   search, and the Atom feed.
 -- Includes: visitor-facing surfaces over the shared Entry model,
 --   the Page entity, canonical URLs (including cross-posts whose
 --   canonical home is elsewhere, and previous-URL redirects),
@@ -58,7 +58,7 @@ entity Page {
 config {
     home_entries: Integer = 10      -- the home feed shows at least this many recent
                                     -- entries, rounded up to whole days
-    feed_entries: Integer = 20      -- how many recent entries the RSS feed carries
+    feed_entries: Integer = 20      -- how many recent entries the Atom feed carries
 }
 
 ------------------------------------------------------------
@@ -229,7 +229,9 @@ surface SearchPage {
         -- Search responses are never cached.
 }
 
--- The RSS feed at /feed.xml.
+-- Atom feeds: the whole site at /feed.xml, entry types at
+-- /posts/feed.xml (and equivalent plural type paths), and tags at
+-- /tags/<tag>/feed.xml.
 surface Feed {
     facing visitor: Visitor
 
@@ -247,7 +249,7 @@ surface Feed {
     @guarantee StableItemIdentity
         -- Each item's identity is the entry's absolute canonical URL.
     @guidance
-        -- RSS 2.0; the config.feed_entries most recent entries,
+        -- Atom 1.0; the config.feed_entries most recent entries,
         -- newest first.
 }
 

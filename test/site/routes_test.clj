@@ -45,6 +45,11 @@
   (is (= {:handler :tag :params {:tag :clojure :year 2026}} (match "/tags/clojure/2026")))
   (is (= {:handler :tag-feed :params {:tag :clojure}} (match "/tags/clojure/feed.xml"))))
 
+(deftest type-feed-routes
+  (is (= {:handler :type-feed :params {:type :post}} (match "/posts/feed.xml")))
+  (is (= {:handler :type-feed :params {:type :note}} (match "/notes/feed.xml")))
+  (is (nil? (match "/essays/feed.xml"))))
+
 (deftest other-routes
   (is (= {:handler :search} (match "/search")))
   (is (= {:handler :feed} (match "/feed.xml")))

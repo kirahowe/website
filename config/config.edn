@@ -16,7 +16,7 @@
  ;; How many entries each type index page (/posts, /notes, ...) carries.
  :type-page-entries 10
 
- ;; How many recent entries the RSS feed (/feed.xml) carries, newest first.
+ ;; How many recent entries the Atom feed (/feed.xml) carries, newest first.
  :feed-entries 20
 
  ;; Entry types that may appear in frontmatter, in nav order.
@@ -32,7 +32,7 @@
  ;; posts nowhere (action="#"), so the design is in place ahead of the plumbing.
  :buttondown-username nil
 
- ;; Footer social links, [label url]. RSS is always included first.
+ ;; Footer social links, [label url]. Atom is always included first.
  :social [["GitHub" "https://github.com/kirahowe"]]
 
  ;; Command used by `bb suggest-tags` (invoked via your login shell, so

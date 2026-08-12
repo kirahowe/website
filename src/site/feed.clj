@@ -1,64 +1,81 @@
 (ns site.feed
-  "RSS 2.0, rendered with hiccup in XML mode — no XML library needed."
-  (:require [hiccup2.core :as h]
+  "Atom 1.0 feeds, rendered with hiccup in XML mode."
+  (:require [clojure.string :as str]
+            [hiccup2.core :as h]
             [site.markdown :as markdown]
             [site.util :as util])
-  (:import [java.time ZonedDateTime ZoneOffset]
+  (:import [java.time LocalDate ZoneOffset]
            [java.time.format DateTimeFormatter]))
 
 (def default-feed-entries 20)
 
-(defn- rfc-1123 [{:keys [year month day]}]
-  (.format DateTimeFormatter/RFC_1123_DATE_TIME
-           (ZonedDateTime/of year month day 12 0 0 0 ZoneOffset/UTC)))
+(defn- rfc-3339 [{:keys [year month day]}]
+  (-> (LocalDate/of year month day)
+      (.atTime 12 0)
+      (.atOffset ZoneOffset/UTC)
+      (.format DateTimeFormatter/ISO_OFFSET_DATE_TIME)))
 
-(defn- item [config entry]
-  (let [url (str (:base-url config) (:path entry))]
-    [:item
+(defn- entry-element [config entry]
+  (let [url (str (:base-url config) (:path entry))
+        timestamp (rfc-3339 (:date entry))]
+    [:entry
      [:title (:title entry)]
-     [:link url]
-     [:guid url]
-     [:pubDate (rfc-1123 (:date entry))]
-     ;; Escaped HTML content — hiccup escapes the rendered string for us.
-     [:description (str (h/html (markdown/render (:body entry) (:wikilinks entry))))]]))
+     [:id url]
+     [:link {:rel "alternate" :type "text/html" :href url}]
+     [:published timestamp]
+     [:updated timestamp]
+     ;; `type=html` is escaped HTML by definition; feed readers decode the
+     ;; text and then render it as HTML. Hiccup performs the XML escaping.
+     [:content {:type "html"}
+      (str (h/html (markdown/render (:body entry) (:wikilinks entry))))]]))
 
-(defn rss
-  "The most recent of `entries` (:feed-entries cap, default 20) as an RSS
-  2.0 XML string. The 2-arity is the site feed; the 3-arity takes its own
-  entries and channel identity — `path` is the site-relative page the
-  channel stands for, `feed-path` the feed's own address — so a scoped
-  feed (a tag's) is the same channel shape pointed elsewhere."
+(defn atom-feed
+  "The most recent of `entries` (:feed-entries cap, default 20) as an Atom
+  1.0 feed. The 2-arity is the site feed; the 3-arity supplies the entries
+  and identity for a scoped feed such as a tag feed."
   ([config index]
-   (rss config (:entries index) {:title (:site-title config)
-                                 :path ""
-                                 :feed-path "/feed.xml"
-                                 :description (:site-description config)}))
+   (atom-feed config (:entries index) {:title (:site-title config)
+                                       :path ""
+                                       :feed-path "/feed.xml"
+                                       :description (:site-description config)}))
   ([config entries {:keys [title path feed-path description]}]
-   (let [n (or (:feed-entries config) default-feed-entries)]
+   (let [n (or (:feed-entries config) default-feed-entries)
+         entries (vec (take n entries))
+         ;; Atom requires feed-level updated. A stable epoch keeps an empty
+         ;; site feed valid without making its representation change on every
+         ;; request; non-empty feeds use their newest entry.
+         updated (if-let [entry (first entries)]
+                   (rfc-3339 (:date entry))
+                   "1970-01-01T00:00:00Z")
+         page-url (str (:base-url config) path)
+         feed-url (str (:base-url config) feed-path)]
      (str "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
           (h/html {:mode :xml}
-                  [:rss {:version "2.0"
-                         :xmlns:atom "http://www.w3.org/2005/Atom"}
-                   [:channel
-                    [:title title]
-                    [:link (str (:base-url config) path)]
-                    ;; The feed's own address. Without it a reader that
-                    ;; re-resolves the feed has only the channel link to go
-                    ;; on — an HTML page — and re-runs autodiscovery there,
-                    ;; which is how a scoped feed silently widens into the
-                    ;; site feed.
-                    [:atom:link {:rel "self"
-                                 :type "application/rss+xml"
-                                 :href (str (:base-url config) feed-path)}]
-                    [:description description]
-                    (map #(item config %) (take n entries))]])))))
+                  [:feed {:xmlns "http://www.w3.org/2005/Atom"}
+                   [:title title]
+                   [:subtitle description]
+                   [:id feed-url]
+                   [:link {:rel "self" :type "application/atom+xml" :href feed-url}]
+                   [:link {:rel "alternate" :type "text/html" :href page-url}]
+                   [:updated updated]
+                   [:author [:name (:site-title config)]]
+                   (map #(entry-element config %) entries)])))))
 
-(defn tag-rss
-  "A tag's entries as RSS — the site channel scoped to one tag, linking
-  the tag's listing page."
+(defn tag-atom
+  "A tag's entries as Atom, linking to the tag's listing page."
   [config tag entries]
-  (rss config entries
-       {:title (str (:site-title config) " / #" (name tag))
-        :path (util/tag-url tag)
-        :feed-path (util/tag-feed-url tag)
-        :description (str "Entries tagged #" (name tag))}))
+  (atom-feed config entries
+             {:title (str (:site-title config) " / #" (name tag))
+              :path (util/tag-url tag)
+              :feed-path (util/tag-feed-url tag)
+              :description (str "Entries tagged #" (name tag))}))
+
+(defn type-atom
+  "An entry type's entries as Atom, linking to its listing page."
+  [config type entries]
+  (let [label (str (name type) "s")]
+    (atom-feed config entries
+               {:title (str (:site-title config) " / " (str/capitalize label))
+                :path (util/type-url type)
+                :feed-path (util/type-feed-url type)
+                :description (str "All " label " published on " (:site-title config))})))
