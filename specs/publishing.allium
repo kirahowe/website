@@ -7,8 +7,9 @@
 --   adopting a new revision, and surviving a refresh that fails.
 -- Includes: the Server and the revision it serves; the refresh
 --   announcement the content repo sends (its already-current short
---   circuit and its coalescing debounce); the timed fallback sync; what
---   a failed refresh does, and does not, do to the live site.
+--   circuit and its coalescing debounce); the timed fallback sync; the
+--   best-effort CDN purge that follows a revision the server adopts;
+--   what a failed refresh does, and does not, do to the live site.
 -- Excludes:
 --   - Authoring and publishing. Since 2026-08-06 an entry is written,
 --     queued and published in the admin app (repo website-admin, spec
@@ -183,7 +184,18 @@ rule ServerSyncTick {
 rule ServerAdoptsNewContent {
     when: ContentRefreshSucceeded(server, rev)
     requires: server.served_rev = null or server.served_rev != rev
-    ensures: server.served_rev = rev
+    ensures:
+        server.served_rev = rev
+        HomepagePurgeRequested(server: server)
+    @guidance
+        -- Adopting a revision is also what asks the CDN to drop its copy
+        -- of the home page. That one URL is the whole request: the home
+        -- page is the only surface pinned at the edge for a long TTL, so
+        -- every other page carries a short max-age and heals itself
+        -- without being asked. A refresh that changed nothing asks for
+        -- nothing. A fresh boot adopts its first revision through this
+        -- same rule — clone, index, purge — which is what makes a code
+        -- deploy visible on the pinned home page.
 }
 
 rule ServerToleratesFailedRefresh {
@@ -212,9 +224,13 @@ surface ContentRefreshEndpoint {
         ServerRunsQueuedRefresh
 
     @guarantee OpenButHarmless
-        -- The endpoint takes no credential. All it can be made to do is
-        -- fetch a public repo the site already serves, at a rate the
-        -- debounce bounds — so the site keeps its no-secrets property.
+        -- The endpoint takes no credential and needs none: all it can be
+        -- made to do is fetch a public repo the site already serves, at
+        -- a rate the debounce bounds. The server does hold secrets — the
+        -- CDN purge credentials — but this endpoint neither reads nor
+        -- discloses them; the most it can spend them on is a purge of
+        -- the site's own home page, and only when the public revision
+        -- actually moved.
     @guarantee CurrentRevisionCostsNothing
         -- An announcement naming the revision already served does no
         -- work at all: no fetch, no reindex.
@@ -248,12 +264,22 @@ surface ServerRuntime {
     timeout:
         ServerSyncTick
 
+    @guarantee PurgeNeverFailsARefresh
+        -- The home page purge that follows an adopted revision is best
+        -- effort: a purge that fails is logged and swallowed, and the
+        -- refresh that prompted it still reports success. Serving a
+        -- stale copy at the edge for a while is preferable to reporting
+        -- a good content refresh as broken because the CDN was
+        -- unreachable.
     @guidance
         -- The boot comes from the platform starting the machine; the
         -- refresh outcomes come from git against the public content
         -- repo. ContentRefreshAttempted going out and these coming back
-        -- is the entire conversation, whichever trigger — webhook or
-        -- fallback tick — asked for the refresh.
+        -- is the whole conversation about content, whichever trigger —
+        -- webhook or fallback tick — asked for the refresh.
+        -- HomepagePurgeRequested goes out the same way but is never
+        -- answered: no rule waits on its outcome, which is what makes it
+        -- best effort rather than a step in the pipeline.
 }
 
 -- The visitor-facing PublishedSite surface lives in content.allium,

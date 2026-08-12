@@ -4,11 +4,12 @@
 -- Scope: The content & serving model for kirahowe.com — what the
 --   published site is made of and how visitors see it: entry display
 --   semantics, static pages, the URL scheme, archives, tag pages,
---   search, and the Atom feed.
+--   search, the Atom feeds, and the email follow offer.
 -- Includes: visitor-facing surfaces over the shared Entry model,
 --   the Page entity, canonical URLs (including cross-posts whose
 --   canonical home is elsewhere, and previous-URL redirects),
---   404 semantics, feed shape, search contract, caching posture.
+--   404 semantics, feed shape, search contract, caching posture, and
+--   the site's one handoff of visitor data to a third party (/follow).
 -- Excludes:
 --   - Authoring and publishing: since 2026-08-06 those live in the
 --     admin app (repo website-admin, specs/authoring.allium there)
@@ -59,6 +60,8 @@ config {
     home_entries: Integer = 10      -- the home feed shows at least this many recent
                                     -- entries, rounded up to whole days
     feed_entries: Integer = 20      -- how many recent entries the Atom feed carries
+    page_entries: Integer = 10      -- how many entry previews a paginated listing
+                                    -- carries before the rest go to /page/N
 }
 
 ------------------------------------------------------------
@@ -130,11 +133,16 @@ surface PublishedSite {
         -- in its markup; a facetted listing variant (?tag=) declares
         -- the clean listing. The one exception: an entry with a
         -- canonical_url declares that instead (see EntryPage).
+    @guarantee AnalyticsHonoursDoNotTrack
+        -- The site's only measurement is a self-hosted, aggregate beacon
+        -- on every page — no third-party tracker, no advertising cookie,
+        -- no profile of a visitor — and a browser that sends Do Not
+        -- Track is not counted at all.
     @guidance
         -- The home page shows at least config.home_entries recent
         -- entries, rounded up to whole days, then links onward to the
-        -- month archives. Every page carries the self-hosted analytics
-        -- beacon. The production server exposes no admin surface.
+        -- month archives. The production server exposes no admin
+        -- surface.
 }
 
 -- A single published entry at its canonical URL.
@@ -208,14 +216,17 @@ surface Archives {
         -- empty year, month, day, type or tag page is
         -- indistinguishable from a mistyped URL.
     @guidance
-        -- /YYYY, /YYYY/<mon> and /YYYY/<mon>/<D> are the date
-        -- archives; /posts, /links, ... list by type (optionally
-        -- year-scoped as /YYYY/posts), with older type entries on
-        -- stable /page/N URLs capped by config.type_page_entries;
-        -- /tags is the tag index with
-        -- counts, /tags/<tag> the entries for one tag (optionally
-        -- year-scoped as /tags/<tag>/YYYY). /archive redirects to the
-        -- most recent year that has content.
+        -- /YYYY, /YYYY/<mon> and /YYYY/<mon>/<D> are the date archives;
+        -- /posts, /links, ... list by type (optionally year-scoped as
+        -- /YYYY/posts); /tags is the tag index with counts, /tags/<tag>
+        -- the entries for one tag (optionally year-scoped as
+        -- /tags/<tag>/YYYY). /archive redirects to the most recent year
+        -- that has content. Every listing that shows entry previews —
+        -- type listings, month and day archives, tag pages — carries at
+        -- most config.page_entries of them and puts the older ones on
+        -- stable /page/N URLs, page 1 keeping the listing's own URL. The
+        -- year overview lists bare titles rather than previews and is
+        -- not paginated.
 }
 
 -- Full-text search.
@@ -248,9 +259,53 @@ surface Feed {
         -- resolved — no truncation, no click-through teaser.
     @guarantee StableItemIdentity
         -- Each item's identity is the entry's absolute canonical URL.
+    @guarantee SelfContainedItems
+        -- Every link and image reference inside an item's body is an
+        -- absolute URL. A reader renders that body in its own document,
+        -- where a root-relative /attachments/x.jpg would resolve against
+        -- the reader's host, so every image and internal link would
+        -- arrive broken.
     @guidance
         -- Atom 1.0; the config.feed_entries most recent entries,
         -- newest first.
+}
+
+-- /follow: the email subscription offer. Its prose is a page from the
+-- content repo; the form is the site's, and this is the only place the
+-- site hands a visitor's data to anyone else.
+surface Follow {
+    facing visitor: Visitor
+
+    context page: Page where slug = "follow"
+
+    exposes:
+        page.display_title
+        page.body
+
+    @guarantee OneNamedRecipient
+        -- A submitted address goes to Buttondown — the email service
+        -- /privacy names — and nowhere else. It is the only visitor data
+        -- the site hands to a third party anywhere on the site.
+    @guarantee TheSiteKeepsNothing
+        -- The address never reaches this site: the form submits straight
+        -- to the named service, and the site has no store to put an
+        -- address in. With no account configured the form is inert — it
+        -- posts nowhere rather than somewhere unnamed.
+    @guarantee FollowingCostsNoAddress
+        -- Wherever the signup appears, the Atom feed is offered beside
+        -- it — the whole site's, or the feed for the type or tag being
+        -- read — so a visitor can follow without handing over anything.
+    @guarantee CollectionIsExplained
+        -- Where the address is asked for, the account of what becomes of
+        -- it — who receives it, what it is used for, how to stop — is
+        -- one link away at /privacy, which every page's footer carries.
+    @guidance
+        -- The page's prose is pages/follow.md, edited in the content
+        -- repo like any other page; the form sits between its body and
+        -- its closing note, so the prose leads into the ask and the
+        -- reassurance follows it. The same signup widget appears in the
+        -- sidebar of every archive and index page and in the footer of
+        -- every entry page.
 }
 
 -- Static pages such as /about.
@@ -264,3 +319,14 @@ surface StaticPage {
         page.display_title
         page.body
 }
+
+------------------------------------------------------------
+-- Open Questions
+------------------------------------------------------------
+
+-- Follow's failure modes are unwritten. With no account configured the
+-- form is inert, so a visitor who types an address and presses Subscribe
+-- is answered by nothing at all; and when the form does submit, both the
+-- confirmation and any refusal come from the subscription service's own
+-- page, not from here.
+open question "Follow: what does a visitor see when an address cannot be submitted, or is refused?"
