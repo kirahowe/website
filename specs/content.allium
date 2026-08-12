@@ -306,6 +306,12 @@ surface Follow {
         -- reassurance follows it. The same signup widget appears in the
         -- sidebar of every archive and index page and in the footer of
         -- every entry page.
+        --
+        -- Note where FollowingCostsNoAddress comes from. Everywhere the
+        -- widget appears, the widget itself carries the feed offer. On
+        -- /follow it is the page's own prose that names the feeds — so
+        -- that guarantee is one an edit in the content repo can quietly
+        -- break, and the only surface where code does not hold it up.
 }
 
 -- Static pages such as /about.
