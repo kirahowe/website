@@ -329,10 +329,7 @@
                  (str "https://buttondown.com/api/emails/embed-subscribe/" user)
                  "#")]
     (field-form
-     {:attrs (cond-> {:class "follow-form" :action action :method "post"}
-               user (assoc :target "popupwindow"
-                           :onsubmit (str "window.open('https://buttondown.com/"
-                                          user "','popupwindow')")))
+     {:attrs {:class "follow-form" :action action :method "post"}
       :field {:type "email" :name "email" :id id
               :placeholder "you@example.com"
               :autocomplete "email" :aria-label "Your email address"
