@@ -37,8 +37,8 @@
                            :timeout 5000
                            :throw false
                            :headers {"Authorization" (str "Bearer " cloudflare-api-token)
-                                    "Content-Type" "application/json"}
-                          :body (json/generate-string {:files [homepage]})})]
+                                     "Content-Type" "application/json"}
+                           :body (json/generate-string {:files [homepage]})})]
            (if (successful-response? response)
              (do (println "Cloudflare: purged homepage cache") :purged)
              (do (binding [*out* *err*]

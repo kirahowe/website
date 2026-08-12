@@ -53,21 +53,21 @@
           purge (fn [cfg]
                   (swap! purges conj cfg)
                   :failed)]
-        (testing "nothing new → :unchanged, index untouched, no purge"
-          (let [before @index-atom]
-            (is (= :unchanged (sync/sync-once! config index-atom purge)))
-            (is (identical? before @index-atom))
-            (is (empty? @purges))))
+      (testing "nothing new → :unchanged, index untouched, no purge"
+        (let [before @index-atom]
+          (is (= :unchanged (sync/sync-once! config index-atom purge)))
+          (is (identical? before @index-atom))
+          (is (empty? @purges))))
 
-        (testing "new commit → :updated, index rebuilt, purge attempted"
-          (entry! origin "2026/02/10/second.md" ";;;\n{:type :post :title \"Second\"}\n;;;\nmore")
-          (git! origin "add" "-A")
-          (git! origin "commit" "-q" "-m" "second")
-          ;; A CDN failure is deliberately irrelevant to the successful sync.
-          (is (= :updated (sync/sync-once! config index-atom purge)))
-          (is (= [config] @purges))
-          (is (= 2 (count (:entries @index-atom))))
-          (is (some? (get (:by-path @index-atom) "/2026/feb/10/second")))))))
+      (testing "new commit → :updated, index rebuilt, purge attempted"
+        (entry! origin "2026/02/10/second.md" ";;;\n{:type :post :title \"Second\"}\n;;;\nmore")
+        (git! origin "add" "-A")
+        (git! origin "commit" "-q" "-m" "second")
+        ;; A CDN failure is deliberately irrelevant to the successful sync.
+        (is (= :updated (sync/sync-once! config index-atom purge)))
+        (is (= [config] @purges))
+        (is (= 2 (count (:entries @index-atom))))
+        (is (some? (get (:by-path @index-atom) "/2026/feb/10/second")))))))
 
 (deftest sync-failures-never-throw-and-self-heal
   (let [origin (temp-dir)
