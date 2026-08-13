@@ -1,6 +1,6 @@
 (ns site.views.follow
   "The /follow page: static prose from pages/follow.md with the email follow
-  form between the body and its closing note. The prose is editable in the
+  form dropped in after its opening blocks. The prose is editable in the
   content repo like any other page; the form is code (it POSTs to
   Buttondown)."
   (:require [site.markdown :as markdown]
@@ -9,10 +9,14 @@
 
 (defn follow-page
   "config and the pages/follow.md page map (may be nil) → the /follow page.
-  The form sits between the body and its closing note: the last rendered
-  block trails the form, everything before it leads. That's a rule about
-  the page's shape, not an index into a document that lives in the content
-  repo and gets edited freely."
+  The form follows the page's third rendered block — the lead-in, the
+  heading over the offer, and the sentence that says to sign up below —
+  so the ask is what the reader has just finished when they reach the
+  field. Everything after it, the reassurance and the feed section,
+  trails the form.
+
+  Three is a position in that page, so reshaping its opening means
+  revisiting the number."
   [config page]
   (let [title (or (:title page) "Follow")
         blocks (when (:body page) (rest (markdown/render (:body page) nil)))

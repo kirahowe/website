@@ -279,24 +279,23 @@
     (is (= 404 (:status (GET "/2026/jul/4/nope"))))))
 
 (deftest follow
-  (testing "the /follow page: static prose from the markdown + the email form"
-    (let [{:keys [status body]} (GET "/follow")]
+  ;; example-content/pages/follow.md is six blocks — p, h2, p, p, h2, p — so
+  ;; the split shows up in the counts: three above the form, three below.
+  (testing "the signup form splits the /follow page after its third block"
+    (let [{:keys [status body]} (GET "/follow")
+          article (subs body (str/index-of body "<article") (str/index-of body "</article>"))
+          [above below] (str/split article #"<form[^>]*follow-form" 2)
+          blocks #(count (re-seq #"<(?:p|h2)[ >]" %))]
       (is (= 200 status))
-      (is (str/includes? body "field-form follow-form"))
-      (is (str/includes? body "name=\"email\""))
-      (is (str/includes? body "name=\"embed\""))
-      ;; The form splits the prose: body above, closing note below. Asserted
-      ;; as structure, not wording — the page's text lives in the content
-      ;; repo and gets edited freely.
-      (let [article (subs body (str/index-of body "<article") (str/index-of body "</article>"))
-            form (str/index-of article "field-form follow-form")]
-        (is (< (str/index-of article "<p") form))
-        (is (< form (str/last-index-of article "<p"))))
-      (is (str/includes? body "href=\"/privacy\""))))
+      (is (= 3 (blocks above)))
+      (is (= 3 (blocks below)))))
 
   (testing "an entry's page footer carries the follow section"
     (let [{:keys [body]} (GET "/2026/jul/4/hello-world")]
       (is (str/includes? body "field-form follow-form"))
+      (is (str/includes? body "name=\"email\""))
+      ;; the marker Buttondown's embed endpoint expects
+      (is (str/includes? body "name=\"embed\""))
       (is (str/includes? body "Follow"))
       (is (str/includes? body
                          "href=\"/feed.xml\">Atom feed</a>"))))
