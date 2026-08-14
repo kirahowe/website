@@ -64,7 +64,7 @@
   (layout/page config {:title (or (:title entry) (util/format-date (:date entry)))
                        :path (:path entry)
                        :canonical (:canonical-url entry)}
-               [:article.article
+               [:article.article.prose
                 (article-head entry)
                 (article-body entry)]
                (post-footer config index entry)))
@@ -72,7 +72,7 @@
 (defn draft-page [config entry]
   (layout/page config {:title (str "Draft: " (or (:title entry) (:draft-name entry)))}
                [:div.draft-banner "Draft — dev preview, not published."]
-               [:article.article
+               [:article.article.prose
                 (when (:title entry) [:h1 (:title entry)])
                 (when (seq (:tags entry))
                   [:div.tag-chips (c/tag-links (:tags entry))])

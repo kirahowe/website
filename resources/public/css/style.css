@@ -127,6 +127,9 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+/* The reading default every piece of content text inherits — a feed title, an
+   excerpt, a ledger row, a page of prose. A rule below restates type only to
+   change it; restating it unchanged is how two views drift apart. */
 body {
   max-width: 61rem;
   margin: 0 auto;
@@ -215,7 +218,6 @@ a:hover { text-decoration-thickness: 2px; }
 .index-row .dot { align-self: baseline; }
 .index-row .title {
   min-width: 0;
-  font: 400 var(--fs) var(--sans);
   line-height: var(--lh-tight);
 }
 
@@ -232,6 +234,154 @@ a:hover { text-decoration-thickness: 2px; }
 }
 .entry-list .index-row .title { display: inline; margin-right: var(--sp2); }
 .entry-list .index-row .dot { margin-right: var(--sp2); vertical-align: middle; }
+
+/* --------------------------------------------------------------------------
+   Prose — the one typography for rendered markdown, wherever it lands
+   -------------------------------------------------------------------------- */
+
+/* Markdown renders into three places: an entry page, a static page, and a feed
+   row. Those differ in measure and rhythm, not in type — a quote is italic, a
+   code chip is a chip, a list indents the same distance, whether it's read on
+   its own page or in the feed. So every container that holds rendered markdown
+   carries .prose (the views add it wherever they splice render output in), and
+   the rules below are the only place prose type is set. A view that starts
+   rendering markdown somewhere new adds the class and gets all of this.
+
+   Two conventions hold it together:
+
+   1. Family, size, line-height and colour are set once, on .prose itself, and
+      inherit. Children set spacing, and only the few things that genuinely are
+      per-element: a heading's weight, code's chip, a quote's rule.
+   2. No `font` shorthand on anything that inherits its type from .prose. The
+      shorthand resets font-style, so a container that restated its own
+      paragraph type silently un-italicised every blockquote inside it — which
+      is how quotes came to read italic in the feed and upright on their own
+      pages. The exceptions are the metadata voices that sit inside prose but
+      aren't prose — a figcaption, a quote's cite line — where switching to the
+      mono voice wholesale is exactly the intent.
+   -------------------------------------------------------------------------- */
+
+.prose {
+  font-family: var(--sans);
+  font-size: var(--fs);
+  line-height: var(--lh);
+  color: var(--fg);
+}
+
+.prose p,
+.prose ul,
+.prose ol,
+.prose pre { margin: 0 0 var(--sp4); }
+.prose ul,
+.prose ol { padding-left: var(--sp5); }
+.prose li { margin-bottom: var(--sp2); }
+.prose li::marker { color: var(--muted); }
+
+.prose h2 {
+  margin: var(--sp6) 0 var(--sp3);
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  line-height: var(--lh-tight);
+  letter-spacing: var(--ls-tight);
+  color: var(--head);
+}
+.prose h3 {
+  margin: var(--sp5) 0 var(--sp3);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  line-height: var(--lh-tight);
+  letter-spacing: var(--ls-tight);
+  color: var(--head);
+}
+
+/* Code stays upright whatever encloses it — a snippet inside a quote is still
+   a snippet, not an italic aside. */
+.prose code {
+  padding: 0.125rem 0.375rem;
+  border-radius: var(--r-sm);
+  font-family: var(--mono);
+  font-size: .86em;
+  font-style: normal;
+  background: var(--code-bg);
+  color: var(--head);
+}
+.prose pre {
+  padding: var(--sp4);
+  border: 1px solid var(--hair);
+  border-radius: var(--r);
+  background: var(--panel);
+  overflow-x: auto;
+}
+.prose pre code {
+  padding: 0;
+  border-radius: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh);
+  background: none;
+  color: var(--fg);
+}
+
+/* Blockquotes default to a conventional left-ruled, indented quote — a post's
+   pull-quote, a static page's, the one in a link/release/tool feed row. Only a
+   Quote-type entry opts out, into the hanging marks below. The italic sits on
+   the blockquote and inherits, so it survives into whatever blocks the quote
+   turns out to contain. */
+.prose blockquote {
+  margin: var(--sp4) 0;
+  padding-left: var(--sp4);
+  border-left: 2px solid var(--quote);
+  font-style: italic;
+  color: var(--head);
+}
+/* Quoted blocks sit a little tighter than body prose, and hug the rule and the
+   cite line at the ends. */
+.prose blockquote p,
+.prose blockquote ul,
+.prose blockquote ol { margin-bottom: var(--sp3); }
+.prose blockquote > :first-child { margin-top: 0; }
+.prose blockquote > :last-child { margin-bottom: 0; }
+
+/* A Quote-type entry drops the rule for the hanging serif marks that sign it:
+   the open one hangs in the left gutter (hence relative + the wider pad), the
+   close one tucks inline after the last word; margin:0 keeps it flush with its
+   cite line. */
+.prose blockquote.quote {
+  position: relative;
+  margin: 0;
+  padding-left: var(--sp6);
+  border-left: 0;
+}
+/* The open mark is a ::before on the blockquote itself, so it hangs in the left
+   gutter no matter what the first block is (paragraph, list, heading); the
+   close mark is a span tucked inline after the last word. Same glyph, size and
+   colour — only the placement differs. */
+.prose blockquote.quote::before,
+.quote-close {
+  font-family: var(--serif);
+  font-size: 2.5rem;
+  font-weight: 700;
+  font-style: normal;
+  line-height: 0;
+  color: var(--quote);
+}
+.prose blockquote.quote::before {
+  content: "\201C";
+  position: absolute;
+  left: 0.18em;
+  top: 0.5em;
+}
+.quote-close {
+  margin-left: var(--sp1);
+  vertical-align: -0.45em;
+}
+/* The "— source" line under a quote: the metadata voice, in both views.
+   Element+class so it outranks .prose p on the entry page, where the cite sits
+   inside the prose container rather than beside it. */
+p.quote-cite {
+  margin: var(--sp2) 0 0;
+  font: 400 var(--fs-sm) var(--mono);
+  color: var(--muted);
+}
 
 /* --------------------------------------------------------------------------
    Header — wordmark + colour-coded nav (the nav doubles as the type legend)
@@ -304,7 +454,7 @@ a:hover { text-decoration-thickness: 2px; }
 .side-link + .side-link { margin-top: var(--sp3); }
 /* Dot rides the first line (align-items: baseline above), not the centre
    of a wrapped multi-line title. */
-.side-link .title { font: 400 var(--fs) var(--sans); line-height: var(--lh-tight); }
+.side-link .title { line-height: var(--lh-tight); }
 
 /* --------------------------------------------------------------------------
    Page header — slim #tag / year / month banner
@@ -371,36 +521,33 @@ a:hover { text-decoration-thickness: 2px; }
   letter-spacing: var(--ls-tight);
 }
 
-/* Simon-style "(via)" credit after an outbound entry's title */
-.via { font-weight: 400; color: var(--muted); }
+/* Simon-style "(via)" credit after an outbound entry's title. Both titles are
+   tracked display type, and the credit opts out of that tracking in both —
+   only its size scales with the title it trails. */
+.via { font-weight: 400; letter-spacing: 0; color: var(--muted); }
 .entry-title .via { font-size: .6em; }
-.article h1 .via { font-size: .5em; letter-spacing: 0; }
+.article h1 .via { font-size: .5em; }
 
+/* An excerpt is a preview, not a body: it reads in the recessive voice that
+   marks it as standing in for something longer (see .excerpt-more). Its type
+   is the body default, inherited — the mute is the whole delta. */
 .entry-excerpt {
   margin: 0;
-  font: 400 var(--fs) var(--sans);
-  line-height: var(--lh);
-  color: var(--fg);
   opacity: .82;
 }
 .excerpt-more { font: 400 var(--fs-sm) var(--mono); white-space: nowrap; }
 
-/* A post that opens on an image previews with a little version of it —
-   the same photo-mount as .entry img, height-capped, linking to the post */
+/* A post that opens on an image previews with a little version of it — the
+   same photo-mount the prose images wear, height-capped, linking to the post
+   (sized where that mount is defined, since it sits outside the row's body) */
 .entry-thumb { display: block; width: fit-content; margin: 0 auto; }
-.entry-thumb img { max-height: 15rem; margin: var(--sp4) auto; }
 
-/* link / release / tool feed cards carry their full body — the comment
-   prose (muted, like an excerpt) plus any pull-quote, which reads as a
-   conventional left-rule blockquote (styled below) */
-.entry-body {
-  font: 400 var(--fs) var(--sans);
-  line-height: var(--lh);
-  color: var(--fg);
-}
-.entry-body > * { margin: 0 0 var(--sp3); }
+/* A feed row that carries a whole body — link, release, tool, note, quote —
+   wraps it in .prose, so it reads exactly as it does on its own page. Only the
+   row's own edge differs: the last block sits flush against the foot. A
+   preview is muted (see .entry-excerpt); a published body never is, wherever
+   it's read. */
 .entry-body > :last-child { margin-bottom: 0; }
-.entry-body p { opacity: .82; }
 
 .entry-foot {
   display: flex;
@@ -428,69 +575,6 @@ a:hover { text-decoration-thickness: 2px; }
   width: auto;
 }
 
-/* Blockquotes default to a conventional left-ruled, indented quote — used by
-   post bodies, static pages, and the pull-quote in a link/release/tool row.
-   Only a Quote-type entry opts out, into the hanging marks below. */
-.entry blockquote,
-.article blockquote {
-  margin: var(--sp4) 0;
-  padding-left: var(--sp4);
-  border-left: 2px solid var(--quote);
-  font: 400 italic var(--fs) var(--sans);
-  line-height: var(--lh);
-  color: var(--head);
-}
-/* A Quote-type entry drops the rule for the hanging serif marks that sign it:
-   the open one hangs in the left gutter (hence relative + the wider pad), the
-   close one tucks inline after the last word; margin:0 keeps it flush with
-   its cite line. */
-.entry blockquote.quote,
-.article blockquote.quote {
-  position: relative;
-  margin: 0;
-  padding-left: var(--sp6);
-  border-left: 0;
-}
-/* The open mark is a ::before on the blockquote itself, so it hangs in the
-   left gutter no matter what the first block is (paragraph, list, heading);
-   the close mark is a span tucked inline after the last word. Same
-   glyph/size/colour, only the placement differs. */
-.entry blockquote.quote::before,
-.article blockquote.quote::before,
-.quote-close {
-  font: 700 2.5rem/0 var(--serif);
-  font-style: normal;
-  color: var(--quote);
-}
-.entry blockquote.quote::before,
-.article blockquote.quote::before {
-  content: "\201C";
-  position: absolute;
-  left: 0.18em;
-  top: 0.5em;
-}
-.quote-close {
-  margin-left: var(--sp1);
-  vertical-align: -0.45em;
-}
-.quote-cite {
-  margin-top: var(--sp2);
-  font: 400 var(--fs-sm) var(--mono);
-  color: var(--muted);
-}
-/* Feed quotes carry their full body; space its blocks without disturbing
-   the row rhythm (the last block stays flush against the cite) */
-.entry blockquote p,
-.entry blockquote ul,
-.entry blockquote ol { margin: 0 0 var(--sp3); }
-.entry blockquote ul,
-.entry blockquote ol { padding-left: var(--sp5); }
-.entry blockquote li::marker { color: var(--muted); }
-/* Hug the border/cite: zero the outer child margins in any blockquote. */
-.entry blockquote > :first-child,
-.article blockquote > :first-child { margin-top: 0; }
-.entry blockquote > :last-child,
-.article blockquote > :last-child { margin-bottom: 0; }
 .feed-more {
   display: inline-block;
   margin: var(--sp5) var(--gutter);
@@ -536,57 +620,6 @@ a:hover { text-decoration-thickness: 2px; }
   color: var(--muted);
 }
 
-.article p,
-.article li {
-  margin: 0 0 var(--sp4);
-  font: 400 var(--fs) var(--sans);
-  line-height: var(--lh);
-  color: var(--fg);
-}
-.article h2 {
-  margin: var(--sp6) 0 var(--sp3);
-  font: 600 var(--fs-lg) var(--sans);
-  line-height: var(--lh-tight);
-  letter-spacing: var(--ls-tight);
-  color: var(--head);
-}
-.article h3 {
-  margin: var(--sp5) 0 var(--sp3);
-  font: 600 var(--fs-md) var(--sans);
-  line-height: var(--lh-tight);
-  letter-spacing: var(--ls-tight);
-  color: var(--head);
-}
-.article ul, .article ol { margin: 0 0 var(--sp4); padding-left: var(--sp5); }
-.article li { margin-bottom: var(--sp2); }
-.article li::marker { color: var(--muted); }
-
-.article code {
-  padding: 0.125rem 0.375rem;
-  border-radius: var(--r-sm);
-  font: 400 .86em var(--mono);
-  background: var(--code-bg);
-  color: var(--head);
-}
-.article pre {
-  margin: 0 0 var(--sp4);
-  padding: var(--sp4);
-  border: 1px solid var(--hair);
-  border-radius: var(--r);
-  background: var(--panel);
-  overflow-x: auto;
-}
-.article pre code {
-  padding: 0;
-  border-radius: 0;
-  font-size: var(--fs-sm);
-  line-height: var(--lh);
-  background: none;
-  color: var(--fg);
-}
-.article blockquote { margin: 0 0 var(--sp2); }
-.article .quote-cite { margin: 0 0 var(--sp4); }
-
 .unresolved-link { color: var(--muted); }
 
 /* --------------------------------------------------------------------------
@@ -595,8 +628,8 @@ a:hover { text-decoration-thickness: 2px; }
    same raised-panel treatment code blocks get, in both themes.
    -------------------------------------------------------------------------- */
 
-.article img,
-.entry img {
+.prose img,
+.entry-thumb img {
   display: block;
   max-width: 100%;
   height: auto;
@@ -607,15 +640,16 @@ a:hover { text-decoration-thickness: 2px; }
   border-radius: var(--r-sm);
   box-shadow: 0.25rem 0.25rem 0 var(--shadow);
 }
+/* The preview thumb wears the same mount, height-capped and tighter in the
+   row. It sits beside the row's body rather than inside it, so it names
+   itself here. */
+.entry-thumb img { max-height: 15rem; margin: var(--sp4) auto; }
 
 /* A (raw-HTML) <figure> owns the vertical rhythm; its caption is the mono
    metadata voice, centred under the mount. */
-.article figure,
-.entry figure { margin: var(--sp5) 0; }
-.article figure img,
-.entry figure img { margin: 0 auto; }
-.article figcaption,
-.entry figcaption {
+.prose figure { margin: var(--sp5) 0; }
+.prose figure img { margin: 0 auto; }
+.prose figcaption {
   max-width: 80%;
   margin: var(--sp3) auto 0;
   font: 400 var(--fs-sm) var(--mono);
@@ -625,16 +659,14 @@ a:hover { text-decoration-thickness: 2px; }
 
 /* Thematic break — five quiet em dashes in the mono voice, not a rule
    line; hairlines are for page structure, not prose. */
-.article hr,
-.entry hr {
+.prose hr {
   margin: var(--sp6) 0;
   border: 0;
   font: 400 var(--fs-sm) var(--mono);
   text-align: center;
   color: var(--muted);
 }
-.article hr::before,
-.entry hr::before {
+.prose hr::before {
   content: "— — — — —";
   word-spacing: var(--sp3);
 }
@@ -896,7 +928,7 @@ a:hover { text-decoration-thickness: 2px; }
   .site-nav { gap: var(--sp2) var(--sp3); }
   .nav-sep { display: none; }
   /* Thinner matte where every pixel of width counts */
-  .article img, .entry img { padding: var(--sp2); }
+  .prose img, .entry-thumb img { padding: var(--sp2); }
 }
 
 /* --------------------------------------------------------------------------

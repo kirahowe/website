@@ -22,7 +22,7 @@
         blocks (when (:body page) (rest (markdown/render (:body page) nil)))
         [intro detail] (split-at 3 blocks)]
     (layout/page config {:title title :path "/follow"}
-                 [:article.article
+                 [:article.article.prose
                   [:h1 title]
                   intro
                   (c/follow-form config {:id "follow-page-email"})

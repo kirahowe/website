@@ -85,7 +85,8 @@
   closing mark tucked onto the last block so it stays inline with the text.
   The opening mark is a CSS ::before on the blockquote itself, so it hangs in
   the gutter regardless of the first block. Shared by the feed row and entry
-  page."
+  page, both of which always nest it inside a .prose container — that's
+  where its type comes from, not this function."
   [entry]
   (let [blocks (vec (rest (markdown/render (:body entry) (:wikilinks entry))))
         blocks (cond-> blocks
@@ -143,9 +144,10 @@
 (defn- entry-body
   "An entry's full rendered body for a feed row: its block children (the
   comment paragraph and any blockquote) lifted out of the render wrapper,
-  so quotes survive where `excerpt` would drop them."
+  so quotes survive where `excerpt` would drop them. Carries .prose, the
+  shared prose typography, so the row reads exactly as its own page does."
   [entry]
-  (into [:div.entry-body] (rest (markdown/render (:body entry) (:wikilinks entry)))))
+  (into [:div.entry-body.prose] (rest (markdown/render (:body entry) (:wikilinks entry)))))
 
 (defn- read-more
   "A post's continuation link, closing its excerpt: the ellipsis into a
@@ -217,9 +219,10 @@
 ;; A quote is its blockquote and its attribution — no title of its own.
 (defmethod row-content :quote [entry {:keys [terms]}]
   (list
-   (if (seq terms)
-     [:blockquote.quote (highlight (row-excerpt entry terms) terms) [:span.quote-close {:aria-hidden "true"} "”"]]
-     (quote-blockquote entry))
+   [:div.entry-body.prose
+    (if (seq terms)
+      [:blockquote.quote (highlight (row-excerpt entry terms) terms) [:span.quote-close {:aria-hidden "true"} "”"]]
+      (quote-blockquote entry))]
    (quote-source entry)))
 
 (defn entry-row

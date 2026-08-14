@@ -248,13 +248,13 @@
 
 (defn static-page [config {:keys [title body path]}]
   (page config {:title title :path path}
-        [:article.article
+        [:article.article.prose
          [:h1 title]
          (rest (markdown/render body nil))]))
 
 (defn not-found [config]
   (page config {:title "Not found"}
-        [:article.article
+        [:article.article.prose
          [:h1 "404"]
          [:p "Nothing lives at this address. Try "
           [:a {:href "/"} "the homepage"] "."]]))
