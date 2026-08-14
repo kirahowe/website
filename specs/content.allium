@@ -253,6 +253,13 @@ surface Feed {
             entry.display_title
             entry.body
             entry.published_date
+            entry.type
+            entry.tags
+            entry.link_url
+            entry.via_url
+            entry.attribution
+            entry.attribution_url
+            entry.canonical_url
 
     @guarantee FullBodies
         -- Feed items carry the entry's full rendered body, wikilinks
@@ -265,9 +272,25 @@ surface Feed {
         -- where a root-relative /attachments/x.jpg would resolve against
         -- the reader's host, so every image and internal link would
         -- arrive broken.
+    @guarantee ItemsCarryTheirMetadata
+        -- An item carries everything the entry's page shows around its
+        -- body: its type, its tags, and every credit it holds — what it
+        -- links out to, where it was found (via_url), a tool's source
+        -- code, a quote's attribution, a cross-post's canonical home.
+        -- Each of these reaches a reader twice over: once structurally,
+        -- as categories and typed links a reader's software can act on,
+        -- and once visibly inside the item body, because most readers
+        -- show a visitor nothing but that body. A credit shown on the
+        -- page but missing from the feed is a defect, in either
+        -- direction: page and feed render one description of an entry's
+        -- metadata, so neither can carry a fact the other doesn't.
     @guidance
         -- Atom 1.0; the config.feed_entries most recent entries,
-        -- newest first.
+        -- newest first. Every feed — the site's, a type's, a tag's —
+        -- is the same channel over a different set of entries, so all
+        -- of the above holds equally of each. An item's body is the
+        -- entry as the site renders it: a quote travels as its
+        -- blockquote and attribution line, not as bare words.
 }
 
 -- /follow: the email subscription offer. Its prose is a page from the

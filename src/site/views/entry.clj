@@ -20,10 +20,7 @@
      [:h1 (if (:link-url entry)
             [:a {:href (:link-url entry)} title]
             title)
-      ;; a quote's via credit sits on its source line, not the title
-      (when-not (= :quote (:type entry))
-        (c/via-link entry))
-      (c/source-link entry)])
+      (c/title-credits entry)])
    [:div.article-meta
     (util/format-date (:date entry))
     (cond
@@ -31,10 +28,8 @@
       (list [:span.sep "/"] (util/host (:link-url entry)))
       (= :post (:type entry))
       (list [:span.sep "/"] (str (markdown/read-time (:body entry)) " min read")))
-    ;; A cross-post credits its canonical home visibly, not just in markup
-    (when-let [canonical (:canonical-url entry)]
-      (list [:span.sep "/"] "originally published at "
-            [:a {:href canonical} (util/host canonical)]))]))
+    (when-let [note (c/canonical-note entry)]
+      (list [:span.sep "/"] note))]))
 
 (defn- article-body [entry]
   (if (= :quote (:type entry))
@@ -48,7 +43,7 @@
     [:div.post-footer
      (when (seq (:tags entry))
        [:section.section
-        [:div.tag-chips (c/tag-links (:tags entry))]])
+        [:div.tag-chips (c/tag-links entry)]])
      (when (seq rel)
        [:section.section
         [:h2 "Related"]
@@ -75,5 +70,5 @@
                [:article.article.prose
                 (when (:title entry) [:h1 (:title entry)])
                 (when (seq (:tags entry))
-                  [:div.tag-chips (c/tag-links (:tags entry))])
+                  [:div.tag-chips (c/tag-links entry)])
                 (article-body entry)]))

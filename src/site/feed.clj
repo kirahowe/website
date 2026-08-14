@@ -1,9 +1,15 @@
 (ns site.feed
-  "Atom 1.0 feeds, rendered with hiccup in XML mode."
+  "Atom 1.0 feeds, rendered with hiccup in XML mode. Requiring
+  site.views.components is deliberate: a feed item's <content> is site
+  HTML, not a re-derivation of it, and sharing the same rendering atoms
+  (entry-body, quote-blockquote, quote-source, credit-link, tag-links,
+  canonical-note) is what stops the page and the feed from drifting apart
+  the way hand-duplicated markup always eventually does."
   (:require [clojure.string :as str]
             [hiccup2.core :as h]
-            [site.markdown :as markdown]
-            [site.util :as util])
+            [site.entry-meta :as m]
+            [site.util :as util]
+            [site.views.components :as c])
   (:import [java.time LocalDate ZoneOffset]
            [java.time.format DateTimeFormatter]))
 
@@ -32,6 +38,89 @@
   (str/replace html #"\b(src|href)=([\"'])/(?!/)"
                (fn [[_ attr quote]] (str attr "=" quote base-url "/"))))
 
+(defn- category-scheme
+  "The `<category scheme>` for `segment` (\"tags\" or \"types\") under
+  `base-url` — one helper so the two schemes below can't quietly diverge
+  from the URLs they echo or claim to identify."
+  [base-url segment]
+  (str base-url "/" segment "/"))
+
+(defn- credit-links
+  "One Atom <link> per credit the entry carries (site.entry-meta/credits)
+  — the outbound target, the via credit, a tool's source, a cross-post's
+  canonical home — so a feed reader's software can act on them, not just
+  a human reading the rendered text inside <content>. rel=\"alternate\"
+  is left alone as the entry's own permalink; a credit never claims it,
+  so <id>/alternate are still the only things that identify the item."
+  [entry]
+  (for [{:keys [rel url label]} (m/credits entry)]
+    [:link {:rel rel :href url :title label}]))
+
+(defn- category-elements
+  "One <category> per tag, under a scheme that doubles as the tag's own
+  listing URL — scheme+term reconstructs `/tags/<term>`, so the category
+  is both a label and an address. Plus one <category> for the entry's
+  type, under a scheme that is deliberately NOT an address (the site has
+  no /types/ page): it exists only so a reader's software can tell the
+  type term apart from a tag term that happens to share its name, sitting
+  in the same <entry>."
+  [config entry]
+  (let [tag-scheme (category-scheme (:base-url config) "tags")
+        type-scheme (category-scheme (:base-url config) "types")]
+    (concat
+     (for [t (m/tags entry)]
+       [:category {:scheme tag-scheme :term (name t) :label (str "#" (name t))}])
+     [[:category {:scheme type-scheme :term (name (:type entry))}]])))
+
+(defn- item-body
+  "An entry's body exactly as the site itself renders it: a quote is its
+  blockquote plus attribution line (the framing and the cite line survive
+  syndication, not just the words), everything else is `c/entry-body`.
+  Shared with the HTML views, not re-derived, so the feed can't quietly
+  fall out of step with what a browser shows.
+
+  The blockquote's closing mark is dropped (marks? false): it's real markup,
+  but its opening partner is a CSS ::before on .quote that no stylesheet
+  carries into a feed reader's document, so leaving it in would close a
+  quotation that never visibly opened."
+  [entry]
+  (if (= :quote (:type entry))
+    (list (c/quote-blockquote entry false) (c/quote-source entry))
+    (c/entry-body entry)))
+
+(defn- item-meta
+  "The facts most feed readers show only inside <content>, never in their
+  own chrome: the type, the outbound target (a feed item's <title> is
+  plain text, so this is the only place that link is clickable), the
+  credits that trail a title on the site, a cross-post's canonical note,
+  and the entry's tags — the same run of slashed parts as
+  site.views.entry/article-head's meta line.
+
+  The spacing is in the markup rather than left to CSS, unlike every
+  other line on the site: a reader renders this HTML in its own document,
+  with none of style.css, so a separator or a tag list that relies on a
+  flex gap arrives as `link/babashka.org(via)/#clojure#tools`.
+
+  Deliberately omits the site's permalink glyph: in a feed the permalink
+  already IS the item's own <id>/rel=\"alternate\", and the inlined SVG
+  has no intrinsic size outside the site's own CSS."
+  [entry]
+  (let [sep (list " " [:span.sep "/"] " ")
+        link (m/head-credit entry :link)
+        ;; the type, what the entry points at, and the credits that trail
+        ;; a title on the site — one part, because the credits are
+        ;; parentheticals on what precedes them, not items in the run
+        lead (list (name (:type entry))
+                   (when link
+                     (list sep [:a {:href (:url link)} (util/host (:url link))]))
+                   (c/title-credits entry))
+        parts (remove nil?
+                      [lead
+                       (c/canonical-note entry)
+                       (when (seq (m/tags entry))
+                         (interpose " " (c/tag-links entry)))])]
+    (into [:p.entry-meta] (interpose sep parts))))
+
 (defn- entry-element [config entry]
   (let [url (str (:base-url config) (:path entry))
         timestamp (rfc-3339 (:date entry))]
@@ -39,13 +128,19 @@
      [:title (:title entry)]
      [:id url]
      [:link {:rel "alternate" :type "text/html" :href url}]
+     (credit-links entry)
+     (category-elements config entry)
      [:published timestamp]
      [:updated timestamp]
      ;; `type=html` is escaped HTML by definition; feed readers decode the
      ;; text and then render it as HTML. Hiccup performs the XML escaping.
+     ;; The metadata line rides along inside <content> rather than as
+     ;; separate elements because most readers show only the body — a
+     ;; reader that never surfaces <category>/<link> would otherwise never
+     ;; show an entry's tags, via credit, or cross-post home at all.
      [:content {:type "html"}
       (absolutize (:base-url config)
-                  (str (h/html (markdown/render (:body entry) (:wikilinks entry)))))]]))
+                  (str (h/html (item-body entry) (item-meta entry))))]]))
 
 (defn atom-feed
   "The most recent of `entries` (:feed-entries cap, default 20) as an Atom

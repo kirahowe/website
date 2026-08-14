@@ -109,7 +109,11 @@
       (is (str/includes? body "prerequisite for reliability"))
       ;; the via credit sits on the cite line — once, even on a titled quote
       (is (str/includes? body "news.ycombinator.com"))
-      (is (= 1 (count (re-seq #"class=\"via\"" body))))))
+      (is (= 1 (count (re-seq #"class=\"via\"" body))))
+      ;; the closing mark is real markup; its opening partner is a CSS
+      ;; ::before on .quote, which style.css supplies on every page — so
+      ;; the entry page carries the closing span
+      (is (str/includes? body "class=\"quote-close\""))))
 
   (testing "a quote's via credit reaches the feed too"
     (let [{:keys [body]} (GET "/quotes")]
@@ -478,6 +482,115 @@
       ;; example-content has more than one entry, so the default (20)
       ;; lets several entries through
       (is (< 1 (count (re-seq #"<entry>" body)))))))
+
+;; --- feed entry metadata ---------------------------------------------------
+;; site.entry-meta is the one description of an entry's credits and tags;
+;; site.feed renders every fact it describes into each <entry>, structured
+;; (<link>/<category>, for a reader's software) as well as visibly (inside
+;; <content>, for the reader themselves — most feed apps show only that).
+;; These check the parsed XML tree rather than the raw string, because the
+;; whole point is that the *facts* arrived, not any particular rendering
+;; of them.
+
+(defn- xml-children
+  "The immediate children of `el` whose local (namespace-stripped) tag
+  name is `tag` — `xml/parse-str` qualifies every tag with the feed's
+  default Atom namespace, so a bare `:link` never matches without this."
+  [el tag]
+  (filter #(= (name tag) (name (:tag %))) (:content el)))
+
+(defn- feed-entries-by-title
+  "A feed body's <entry> elements keyed by their <title> text. Every
+  fixture entry used below has a distinct title, so a test can grab the
+  one it cares about without depending on feed order or the fixture's
+  full cast."
+  [body]
+  (into {}
+        (map (fn [e] [(first (:content (first (xml-children e :title)))) e]))
+        (xml-children (xml/parse-str body) :entry)))
+
+(defn- entry-links [entry-el] (map :attrs (xml-children entry-el :link)))
+(defn- entry-categories [entry-el] (map :attrs (xml-children entry-el :category)))
+
+(defn- entry-content
+  "An <entry>'s <content> text, already entity-decoded by the XML parser
+  back into ordinary HTML — the same markup `entry-body` would have
+  rendered, not the doubly-escaped form living in the raw feed string."
+  [entry-el]
+  (first (:content (first (xml-children entry-el :content)))))
+
+(def ^:private tag-scheme (str (:base-url config) "/tags/"))
+(def ^:private type-scheme (str (:base-url config) "/types/"))
+
+(deftest feed-entry-metadata
+  (testing "a link entry's outbound target and via credit are structured links, its tags structured categories"
+    (let [entry (get (feed-entries-by-title (:body (GET "/feed.xml"))) "Babashka")]
+      (is (some #(= {:rel "via" :href "https://clojure.org/community/resources" :title "via"} %)
+                (entry-links entry)))
+      (is (some #(= {:rel "related" :href "https://babashka.org" :title "link"} %)
+                (entry-links entry)))
+      ;; tag categories carry the tag's own scheme, in display order — the
+      ;; same order the chips and the feed rows use
+      (is (= [{:scheme tag-scheme :term "clojure" :label "#clojure"}
+              {:scheme tag-scheme :term "tools" :label "#tools"}]
+             (filter #(= tag-scheme (:scheme %)) (entry-categories entry))))
+      ;; the type category sits under its own, non-address scheme, so a
+      ;; reader can tell it apart from a tag category of the same term
+      (is (some #(= {:scheme type-scheme :term "link"} %) (entry-categories entry)))
+      (let [content (entry-content entry)]
+        (is (str/includes? content "clojure.org/community/resources"))
+        (is (str/includes? content "babashka.org"))
+        (is (str/includes? content "#clojure")))))
+
+  (testing "a quote's source and via reach the feed as links, and appear once each in content — the cite line, not a second copy in the meta line"
+    (let [entry (get (feed-entries-by-title (:body (GET "/feed.xml"))) "Simplicity is a choice")
+          content (entry-content entry)]
+      (is (str/includes? content "<blockquote class=\"quote\""))
+      (is (str/includes? content "Rich Hickey"))
+      (is (str/includes? content "news.ycombinator.com"))
+      ;; entry-meta's via/source are :head-only, and a quote's both sit on
+      ;; the cite line (:cite) instead — so the meta line contributes none
+      (is (= 1 (count (re-seq #"class=\"via\"" content))))
+      ;; the closing mark's opening partner is a CSS ::before on .quote —
+      ;; style.css never travels with a feed item, so a reader would see a
+      ;; quotation close that never visibly opened; the feed drops it
+      (is (not (str/includes? content "quote-close")))
+      (is (some #(= {:rel "related"
+                     :href "https://www.infoq.com/presentations/Simple-Made-Easy/"
+                     :title "source"} %)
+                (entry-links entry)))))
+
+  (testing "a tool's link and source credits are distinguished by title, and source is visible in content"
+    (let [entry (get (feed-entries-by-title (:body (GET "/feed.xml"))) "vault-publish")]
+      (is (some #(= {:rel "related" :href "https://tools.example.com/vault-publish" :title "link"} %)
+                (entry-links entry)))
+      (is (some #(= {:rel "related" :href "https://github.com/kirahowe/vault-publish" :title "source"} %)
+                (entry-links entry)))
+      (is (str/includes? (entry-content entry) ">source<"))))
+
+  (testing "an untitled cross-post's canonical home is a structured link and a visible credit"
+    (let [entry (get (feed-entries-by-title (:body (GET "/feed.xml"))) "caching-thought")]
+      (is (some #(= {:rel "canonical" :href "https://oldblog.example.org/2026/caching" :title "canonical"} %)
+                (entry-links entry)))
+      (is (str/includes? (entry-content entry) "originally published at"))))
+
+  (testing "an entry with no credits still renders, with no stray link/category/via markup"
+    (let [entry (get (feed-entries-by-title (:body (GET "/feed.xml"))) "Hello, world")]
+      ;; the only <link> is the entry's own permalink — no credit earned one
+      (is (= [{:rel "alternate" :href "https://example.com/2026/jul/4/hello-world" :type "text/html"}]
+             (entry-links entry)))
+      (is (not (str/includes? (entry-content entry) "class=\"via\"")))))
+
+  (testing "the same metadata reaches every feed — tag and type feeds share entry-element with the site feed"
+    (let [tag-entry (get (feed-entries-by-title (:body (GET "/tags/clojure/feed.xml"))) "Babashka")]
+      (is (some #(= "via" (:rel %)) (entry-links tag-entry)))
+      (is (= [{:scheme tag-scheme :term "clojure" :label "#clojure"}
+              {:scheme tag-scheme :term "tools" :label "#tools"}]
+             (filter #(= tag-scheme (:scheme %)) (entry-categories tag-entry)))))
+    (let [type-entry (get (feed-entries-by-title (:body (GET "/posts/feed.xml"))) "Hello, world")]
+      (is (= [{:scheme tag-scheme :term "clojure" :label "#clojure"}
+              {:scheme tag-scheme :term "meta" :label "#meta"}]
+             (filter #(= tag-scheme (:scheme %)) (entry-categories type-entry)))))))
 
 (deftest type-listings-are-paginated
   (let [h (app/make-app (assoc config :page-entries 1)

@@ -6,6 +6,7 @@
   (:require [clojure.java.io :as io]
             [clojure.set :as set]
             [hiccup2.core :as h]
+            [site.entry-meta :as m]
             [site.markdown :as markdown]
             [site.search :as search]
             [site.util :as util]))
@@ -48,37 +49,53 @@
   (or (:title entry) (util/format-date (:date entry))))
 
 (defn tag-links
-  "An entry's #tag links, sorted by name — the one tag atom, used by the
+  "An entry's #tag links, in display order — the one tag atom, used by the
   feed foot, the post footer, and draft pages."
-  [tags]
-  (for [t (sort-by name tags)]
-    [:a.tag {:href (str "/tags/" (name t))} (str "#" (name t))]))
-
-(defn via-link
-  "The “(via)” credit link shown after an outbound entry's title — or a
-  quote's source line — when the entry records where it was found."
   [entry]
-  (when-let [via (:link-via entry)]
-    [:span.via " (" [:a {:href via :aria-label (str "via " (util/host via))} "via"] ")"]))
+  (for [t (m/tags entry)]
+    [:a.tag {:href (util/tag-url t)} (str "#" (name t))]))
 
-(defn source-link
-  "The “(source)” link after a tool's title — where its source code lives,
-  when the entry records it. Wears the via styling: the same muted
-  parenthetical credit."
+(defn credit-link
+  "One credit (entry-meta's {:kind :label :url :description ...} map) as
+  the muted \"(label)\" parenthetical used after a title, after a quote's
+  cite, or in a feed item's metadata line. `description` becomes the
+  accessible name when the label alone (\"via\", \"source\") doesn't say
+  what it credits; a nil description (:link, :canonical) leaves the link
+  named by its surrounding text instead."
+  [{:keys [label url description]}]
+  [:span.via " (" [:a (cond-> {:href url} description (assoc :aria-label description)) label] ")"])
+
+(defn title-credits
+  "The credits that trail an entry's title wherever it appears — “(via)”
+  where it was found, “(source)” where a tool's code lives — in the shared
+  credit order. A quote's credits are not among them: entry-meta places
+  those on its cite line (see `quote-source`). In a feed item, whose
+  <title> is plain text, the metadata line stands in for the title and
+  carries these instead."
   [entry]
-  (when-let [url (and (= :tool (:type entry)) (:source-url entry))]
-    [:span.via " (" [:a {:href url :aria-label (str "Source code at " (util/host url))} "source"] ")"]))
+  (->> (m/head-credits entry)
+       (filter #(#{:via :source} (:kind %)))
+       (map credit-link)))
 
 (defn quote-source
   "The \"— source\" line under a quote, linked when a URL is known and
   closing with the (via) credit when one is recorded. Shared by the feed
-  row and the entry page."
-  [{:keys [source source-url] :as entry}]
+  row and the entry page. A quote's source and via are entry-meta's :cite
+  credits — that's why this reads them with `m/credit` rather than the
+  :head-only `m/head-credits` that `title-credits` uses."
+  [{:keys [source] :as entry}]
   (when source
-    [:p.quote-cite "— " (if source-url
-                          [:a {:href source-url} source]
-                          source)
-     (via-link entry)]))
+    (let [url (:url (m/credit entry :source))]
+      [:p.quote-cite "— " (if url [:a {:href url} source] source)
+       (some-> (m/credit entry :via) credit-link)])))
+
+(defn canonical-note
+  "\"originally published at host\" — a cross-post's visible credit to its
+  canonical home, not just the invisible rel=canonical in <head>. Shared
+  by the entry page's article-head and a feed item's metadata line."
+  [entry]
+  (when-let [{:keys [url]} (m/head-credit entry :canonical)]
+    (list "originally published at " [:a {:href url} (util/host url)])))
 
 (defn quote-blockquote
   "The quote body as a blockquote — the full rendered markdown, with the
@@ -86,12 +103,22 @@
   The opening mark is a CSS ::before on the blockquote itself, so it hangs in
   the gutter regardless of the first block. Shared by the feed row and entry
   page, both of which always nest it inside a .prose container — that's
-  where its type comes from, not this function."
-  [entry]
-  (let [blocks (vec (rest (markdown/render (:body entry) (:wikilinks entry))))
-        blocks (cond-> blocks
-                 (seq blocks) (update (dec (count blocks)) conj [:span.quote-close {:aria-hidden "true"} "”"]))]
-    (into [:blockquote.quote] blocks)))
+  where its type comes from, not this function.
+
+  `marks?` (default true) governs only the closing span, since it's the one
+  half of the pair that's real markup — the opening half doesn't exist here
+  to turn off. On the site the CSS is a given, so the two marks always arrive
+  as a pair. A feed item carries this HTML into a reader's own document,
+  where none of style.css travels with it; leaving the closing mark in would
+  show a quotation that closes but never opened, which reads worse than
+  showing neither."
+  ([entry] (quote-blockquote entry true))
+  ([entry marks?]
+   (let [blocks (vec (rest (markdown/render (:body entry) (:wikilinks entry))))
+         blocks (cond-> blocks
+                  (and marks? (seq blocks))
+                  (update (dec (count blocks)) conj [:span.quote-close {:aria-hidden "true"} "”"]))]
+     (into [:blockquote.quote] blocks))))
 
 ;; --- feed row ------------------------------------------------------------
 
@@ -132,20 +159,21 @@
    (when-not (self-titled-types (:type entry))
      (list [:span.sep {:aria-hidden "true"} "/"] (permalink entry)))
    (when (seq (:tags entry))
-     (cons [:span.sep {:aria-hidden "true"} "/"] (tag-links (:tags entry))))])
+     (cons [:span.sep {:aria-hidden "true"} "/"] (tag-links entry)))])
 
 (defn- entry-title [entry terms]
   (when (:title entry)
     [:h3.entry-title
      [:a {:href (outbound entry)} (highlight (:title entry) terms)]
-     (via-link entry)
-     (source-link entry)]))
+     (title-credits entry)]))
 
-(defn- entry-body
+(defn entry-body
   "An entry's full rendered body for a feed row: its block children (the
   comment paragraph and any blockquote) lifted out of the render wrapper,
   so quotes survive where `excerpt` would drop them. Carries .prose, the
-  shared prose typography, so the row reads exactly as its own page does."
+  shared prose typography, so the row reads exactly as its own page does.
+  Public because the Atom feed's `<content>` uses it too — a feed item's
+  body is site HTML, not a re-derivation of it."
   [entry]
   (into [:div.entry-body.prose] (rest (markdown/render (:body entry) (:wikilinks entry)))))
 
