@@ -44,7 +44,7 @@
     (rest (markdown/render (:body entry) (:wikilinks entry)))))
 
 (defn- post-footer [config index entry]
-  (let [rel (c/related (:entries index) entry 8)]
+  (let [rel (c/related (:entries index) entry 3)]
     [:div.post-footer
      (when (seq (:tags entry))
        [:section.section
