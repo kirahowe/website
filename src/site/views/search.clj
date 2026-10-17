@@ -84,6 +84,7 @@
   (let [terms (search/parse-query q)
         shown (search/apply-filters matches {:type type :tag tag})]
     (layout/page config {:title "Search" :path "/search"}
+                 (c/page-header "Search" nil)
                  (prompt q)
                  (cond
                    (nil? q)

@@ -418,6 +418,8 @@ p.quote-cite {
   border-bottom: 1px solid var(--hair);
 }
 
+.site-title { display: flex; margin: 0; font: inherit; }   /* the homepage's h1, wrapping .brand; flex so no line box pads it */
+
 .brand {
   display: inline-block;
   padding: var(--sp1) var(--sp2);

@@ -127,7 +127,10 @@
 
 (defn- header [config home?]
   [:header.site-header
-   [:a {:class (if home? "brand" "brand brand-sm") :href "/" :aria-label "Kira Howe — home"} (h/raw @wordmark)]
+   ;; On the homepage the site's name is the page's title, so the wordmark
+   ;; is its <h1>; every other page has its own h1 in <main>.
+   (let [brand [:a {:class (if home? "brand" "brand brand-sm") :href "/" :aria-label "Kira Howe — home"} (h/raw @wordmark)]]
+     (if home? [:h1.site-title brand] brand))
    ;; Two groups, types then pages, so a narrow screen can break the nav
    ;; between them rather than wherever the width runs out.
    [:nav.site-nav

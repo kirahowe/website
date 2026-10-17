@@ -807,6 +807,14 @@
       (is (str/includes? body "id=\"theme-toggle\""))
       (is (str/includes? body "class=\"i-light\"")))))
 
+(deftest one-h1-per-page
+  (doseq [[uri query] [["/"] ["/search"] ["/search" "q=babashka"] ["/tags/clojure"]
+                       ["/2026/jul/4/hello-world"]]]
+    (is (= 1 (count (re-seq #"<h1[ >]" (:body (GET uri query))))) (pr-str [uri query])))
+  (testing "the homepage's h1 is the wordmark; elsewhere it's just a link"
+    (is (str/includes? (:body (GET "/")) "<h1 class=\"site-title\"><a"))
+    (is (not (str/includes? (:body (GET "/tags/clojure")) "site-title")))))
+
 (deftest one-url-per-resource
   (testing "a trailing slash 301s to the slashless URL, query intact"
     (let [{:keys [status headers]} (GET "/tags/clojure/" "year=1")]
