@@ -386,7 +386,7 @@ The result is static-site resilience with dynamic-site flexibility.
 
 ### 6. Ingestion Writes Files — the Site Only Reads Them
 
-Future automated content sources (e.g. GitHub release notes flowing in as project updates) never get special code paths in the site. An ingestion script or GitHub Action fetches the external source and **writes ordinary markdown files** into the content repo (e.g. `:type :release`). The site's one invariant — "render the markdown files" — holds no matter how many sources feed it. Tone differences are handled by the type system: a `:release` entry can render compactly and be excluded from the main feed while remaining browsable and searchable.
+Automated content sources never get special code paths in the site; they produce ordinary markdown files like everything else. Library releases are the first: a daily GitHub Action in the drafts repo (website-admin's `releases/`) turns each new GitHub release into a `:type :release` **draft** that links to it and carries the notes, and the author rewrites it and publishes it through the admin app like any other entry. The site's one invariant — "render the markdown files" — holds no matter how many sources feed it. Tone differences are handled by the type system: a `:release` entry can render compactly and be excluded from the main feed while remaining browsable and searchable.
 
 ---
 
@@ -397,7 +397,7 @@ The design leaves room for future additions:
 | Feature | How to Add |
 |---------|------------|
 | **New entry types** | Add keyword to config + optional render method (e.g. `:release`, `:til`) |
-| **Automated ingestion** | GitHub Action fetches external source (release notes, etc.) and writes markdown files into the content repo |
+| **Automated ingestion** | GitHub Action fetches the external source and writes markdown drafts for the author to finish (releases already do) |
 | **Phone-only publishing** | GitHub Action moves a file out of `drafts/` into the date tree on some trigger, deriving the date from the merge date |
 | **Comments** | Add Disqus/Utterances embed, or build own |
 | **Webmentions** | New handler + storage for incoming mentions |
