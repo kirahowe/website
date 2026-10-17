@@ -244,7 +244,11 @@
       ;; reader renders this HTML against its own host, not ours
       (is (str/includes? body "https://example.com/attachments/caching-diagram.png"))
       (is (not (str/includes? body "src=&quot;/")))
-      (is (not (str/includes? body "href=&quot;/")))))
+      (is (not (str/includes? body "href=&quot;/")))
+      ;; entry content is HTML, not XML: no self-closing syntax leaks in
+      ;; from the feed's own XML render (an empty <td /> or <a /> is an
+      ;; unclosed element to the HTML parser a reader runs on it)
+      (is (not (str/includes? body "/&gt;")))))
 
   (testing "tag feed: the site channel scoped to one tag"
     (let [{:keys [status body headers]} (GET "/tags/clojure/feed.xml")]

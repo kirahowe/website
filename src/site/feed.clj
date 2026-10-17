@@ -138,9 +138,13 @@
      ;; separate elements because most readers show only the body — a
      ;; reader that never surfaces <category>/<link> would otherwise never
      ;; show an entry's tags, via credit, or cross-post home at all.
+     ;; The explicit :html mode is load-bearing: hiccup's mode is a dynamic
+     ;; binding, and this runs lazily inside atom-feed's :xml render, which
+     ;; would otherwise self-close every empty element. `<td />` or `<a />`
+     ;; is not a closed element to an HTML parser, just an open one.
      [:content {:type "html"}
       (absolutize (:base-url config)
-                  (str (h/html (item-body entry) (item-meta entry))))]]))
+                  (str (h/html {:mode :html} (item-body entry) (item-meta entry))))]]))
 
 (defn atom-feed
   "The most recent of `entries` (:feed-entries cap, default 20) as an Atom
