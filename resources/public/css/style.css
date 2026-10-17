@@ -953,12 +953,14 @@ p.quote-cite {
   .main { border-right: 0; }
   .sidebar { border-top: 1px solid var(--hair); }
   /* The nav stacks by role: the types as a 3-column grid (the legend
-     stays together), a short horizontal rule, then the pages, a size
-     down so all five hold one line on a phone. */
-  .site-nav { flex-direction: column; gap: var(--sp2) var(--sp3); }
-  .nav-types { display: grid; grid-template-columns: repeat(3, auto); justify-items: center; }
+     stays together), then the pages, a size down so all five hold one
+     line on a phone. Between them the divider turns horizontal and runs
+     edge to edge through the gutter, like every other rule, so the pages
+     sit in a band above the header's own bottom border. */
+  .site-nav { align-self: stretch; flex-direction: column; gap: var(--sp2) var(--sp3); }
+  .nav-types { display: grid; grid-template-columns: repeat(3, auto); justify-content: center; justify-items: center; }
   .nav-pages { font-size: var(--fs-sm); column-gap: var(--sp2); }
-  .nav-sep { align-self: center; width: 4rem; height: 1px; margin: 0; }
+  .nav-sep { width: auto; height: 1px; margin: var(--sp1) calc(var(--gutter) * -1) 0; background: var(--hair); }
   /* Thinner matte where every pixel of width counts */
   .prose img, .entry-thumb img { padding: var(--sp2); }
 }
