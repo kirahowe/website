@@ -28,6 +28,7 @@
                    [site.util-test]
                    [site.config-test]
                    [site.content-test]
+                   [site.feed-test]
                    [site.markdown-test]
                    [site.routes-test]
                    [site.search-test]

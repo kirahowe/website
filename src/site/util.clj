@@ -39,6 +39,17 @@
     (let [n (parse-long s)]
       (when (<= 1 n 31) n))))
 
+(defn published-at
+  "The instant an entry went out: its `published` stamp when the admin app
+  recorded one, else noon UTC on its date. Noon keeps a date-only entry on
+  its own calendar day in every timezone from UTC-12 to UTC+11, so a
+  reader can't show it under the day before or after."
+  ^java.time.Instant [{:keys [published date]}]
+  (or published
+      (-> (java.time.LocalDate/of (:year date) (:month date) (:day date))
+          (.atTime 12 0)
+          (.toInstant java.time.ZoneOffset/UTC))))
+
 (defn entry-url
   "Canonical URL path for an entry: /2026/jul/4/my-slug"
   [{:keys [date slug]}]

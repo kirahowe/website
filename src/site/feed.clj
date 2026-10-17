@@ -10,14 +10,13 @@
             [site.entry-meta :as m]
             [site.util :as util]
             [site.views.components :as c])
-  (:import [java.time LocalDate ZoneOffset]
+  (:import [java.time ZoneOffset]
            [java.time.format DateTimeFormatter]))
 
 (def default-feed-entries 20)
 
-(defn- rfc-3339 [{:keys [year month day]}]
-  (-> (LocalDate/of year month day)
-      (.atTime 12 0)
+(defn- rfc-3339 [^java.time.Instant t]
+  (-> t
       (.atOffset ZoneOffset/UTC)
       (.format DateTimeFormatter/ISO_OFFSET_DATE_TIME)))
 
@@ -123,7 +122,7 @@
 
 (defn- entry-element [config entry]
   (let [url (str (:base-url config) (:path entry))
-        timestamp (rfc-3339 (:date entry))]
+        timestamp (rfc-3339 (util/published-at entry))]
     [:entry
      [:title (:title entry)]
      [:id url]
@@ -160,9 +159,12 @@
          entries (vec (take n entries))
          ;; Atom requires feed-level updated. A stable epoch keeps an empty
          ;; site feed valid without making its representation change on every
-         ;; request; non-empty feeds use their newest entry.
-         updated (if-let [entry (first entries)]
-                   (rfc-3339 (:date entry))
+         ;; request; non-empty feeds use their latest item. That isn't always
+         ;; the first one: a backdated entry sorts under its own day but
+         ;; went out after the entries above it.
+         updated (if (seq entries)
+                   (rfc-3339 (reduce #(if (pos? (compare %1 %2)) %1 %2)
+                                     (map util/published-at entries)))
                    "1970-01-01T00:00:00Z")
          page-url (str (:base-url config) path)
          feed-url (str (:base-url config) feed-path)]

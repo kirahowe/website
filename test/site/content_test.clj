@@ -257,3 +257,33 @@
         (spit (io/file f "bad.md") ";;;\n{:type :essay}\n;;;\nbody")
         (is (thrown-with-msg? Exception #"Unknown entry type"
                               (content/build-index (assoc config :content-path dir))))))))
+
+(deftest publish-stamps
+  (let [make (fn [files]
+               (let [dir (str (Files/createTempDirectory "content-test" (into-array FileAttribute [])))
+                     day (io/file dir "2026" "07" "10")]
+                 (.mkdirs day)
+                 (doseq [[name content] files]
+                   (spit (io/file day name) content))
+                 (assoc config :content-path dir :base-url "https://example.com")))
+        index (content/build-index
+               (make {"a.md" "---\npublished: 2026-07-10T09:00:00-03:00\n---\nA"
+                      "b.md" "---\npublished: \"2026-07-10T21:30:05-03:00\"\n---\nB"
+                      "c.md" "C"
+                      "z.md" "---\npublished: 2026-07-10T08:00:00Z\n---\nZ"}))
+        by-slug (into {} (map (juxt :slug identity)) (:entries index))]
+    (testing "both YAML spellings of the stamp read as the same kind of instant"
+      (is (= (java.time.Instant/parse "2026-07-10T12:00:00Z") (:published (by-slug "a"))))
+      (is (= (java.time.Instant/parse "2026-07-11T00:30:05Z") (:published (by-slug "b")))))
+    (testing "an entry without a stamp has none, rather than a made-up one"
+      (is (not (contains? (by-slug "c") :published))))
+    (testing "within a day, newest first by when each went out; no stamp counts as noon UTC"
+      ;; a (12:00Z) ties c's noon fallback, and the slug breaks the tie
+      (is (= ["b" "c" "a" "z"] (map :slug (:entries index))))))
+  (testing "an unparseable stamp fails indexing"
+    (let [dir (str (Files/createTempDirectory "content-test" (into-array FileAttribute [])))
+          day (io/file dir "2026" "07" "10")]
+      (.mkdirs day)
+      (spit (io/file day "a.md") "---\npublished: around lunch\n---\nA")
+      (is (thrown-with-msg? Exception #"Unparseable published"
+                            (content/build-index (assoc config :content-path dir)))))))

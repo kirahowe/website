@@ -55,6 +55,12 @@ entity Entry {
     published_date: Timestamp when status = published
                                     -- day precision; realised as the YYYY/MM/DD folder
                                     -- path, the site's authoritative date for the entry
+    published_at: Timestamp?        -- `published`: the moment the author pressed publish,
+                                    -- to the second with its offset, written by the admin
+                                    -- app. Absent on entries filed before it recorded one,
+                                    -- and never inferred for them. Independent of
+                                    -- published_date: a backdated entry went out later
+                                    -- than the day it is filed under
 
     transitions status {
         draft -> queued             -- the author marks the draft as ready to publish

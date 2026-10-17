@@ -130,6 +130,22 @@
     (throw (ex-info (str "Unparseable date property in " file ": " (pr-str v))
                     {:file file :value v}))))
 
+(defn- parse-published
+  "The `published` stamp → Instant. The admin app writes it unquoted
+  (2026-10-17T11:25:07-03:00), which clj-yaml reads as a java.util.Date;
+  a quoted one arrives as a string. Either way the instant survives, and
+  an unparseable one fails indexing instead of silently reordering."
+  [v file]
+  (cond
+    (nil? v) nil
+    (instance? java.util.Date v) (.toInstant ^java.util.Date v)
+    (string? v) (try (.toInstant (java.time.OffsetDateTime/parse (str/trim v)))
+                     (catch Exception e
+                       (throw (ex-info (str "Unparseable published property in " file ": " (pr-str v))
+                                       {:file file :value v} e))))
+    :else (throw (ex-info (str "Unparseable published property in " file ": " (pr-str v))
+                          {:file file :value v}))))
+
 (defn workflow-properties
   "Authoring-workflow data ({:date LocalDate-or-nil :publish boolean}) from
   raw YAML frontmatter — the two properties normalize-yaml-meta deliberately
@@ -215,7 +231,7 @@
           date {:year (parse-long y) :month (parse-long m) :day (parse-long d)}]
       (when-not (and (<= 1 (:month date) 12) (<= 1 (:day date) 31))
         (throw (ex-info (str "Invalid date in path: " rp) {:file rp :date date})))
-      (let [entry (merge (dissoc meta :slug)
+      (let [entry (merge (dissoc meta :slug :published)
                          {:type type
                           :title (title-for meta fname)
                           :slug (or (:slug meta) (util/slugify fname))
@@ -223,7 +239,9 @@
                           :date date
                           :tags (normalize-tags (:tags meta))
                           :body body
-                          :file rp})]
+                          :file rp}
+                         (when-let [t (parse-published (:published meta) rp)]
+                           {:published t}))]
         (assoc entry :path (util/entry-url entry))))))
 
 (defn load-draft
@@ -287,8 +305,13 @@
                               [(:slug p) p])))
                   (:page classified))}))
 
-(defn- date-key [{:keys [date slug]}]
-  [(:year date) (:month date) (:day date) slug])
+(defn- date-key
+  "Newest-first order: by the day the entry is filed under, then, within a
+  day, by when it went out. An entry with no publish stamp counts as noon
+  UTC, the same instant its feed item carries. The slug breaks any tie so
+  the order never depends on the filesystem."
+  [{:keys [date slug] :as entry}]
+  [(:year date) (:month date) (:day date) (util/published-at entry) slug])
 
 (defn- link-neighbors
   "Adds :newer/:older pointers (path + title + type + date) to each entry.

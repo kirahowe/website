@@ -204,7 +204,9 @@ surface EntryPage {
         -- point out to link_url and credit via_url on the cite line. A
         -- tool credits its source code (attribution_url) as a (source)
         -- link after the title, styled like the via credit. Each
-        -- entry links its newer and older neighbours in date order.
+        -- entry links its newer and older neighbours in date order:
+        -- newest published_date first, and within a day newest
+        -- published_at first, an entry without one counting as noon UTC.
 }
 
 -- Date, type and tag listings.
@@ -295,7 +297,10 @@ surface Feed {
         -- metadata, so neither can carry a fact the other doesn't.
     @guidance
         -- Atom 1.0; the config.feed_entries most recent entries,
-        -- newest first. Every feed — the site's, a type's, a tag's —
+        -- newest first. An item's published and updated times are its
+        -- entry's published_at, or noon UTC on published_date for an
+        -- entry without one; the feed's own updated is the latest of
+        -- those, which a backdated entry can make other than the first. Every feed — the site's, a type's, a tag's —
         -- is the same channel over a different set of entries, so all
         -- of the above holds equally of each. An item's body is the
         -- entry as the site renders it: a quote travels as its
