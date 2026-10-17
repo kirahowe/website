@@ -128,19 +128,23 @@
 (defn- header [config home?]
   [:header.site-header
    [:a {:class (if home? "brand" "brand brand-sm") :href "/" :aria-label "Kira Howe — home"} (h/raw @wordmark)]
+   ;; Two groups, types then pages, so a narrow screen can break the nav
+   ;; between them rather than wherever the width runs out.
    [:nav.site-nav
-    ;; :nav-types, not :entry-types — only types with at least one
-    ;; published entry get a link, so an unused type is never a
-    ;; permanent dead link to a 404.
-    (for [t (:nav-types config)]
-      [:a {:class (str "type " (name t)) :href (str "/" (name t) "s")}
-       (str/capitalize (str (name t) "s"))])
+    [:div.nav-types
+     ;; :nav-types, not :entry-types — only types with at least one
+     ;; published entry get a link, so an unused type is never a
+     ;; permanent dead link to a 404.
+     (for [t (:nav-types config)]
+       [:a {:class (str "type " (name t)) :href (str "/" (name t) "s")}
+        (str/capitalize (str (name t) "s"))])]
     [:span.nav-sep {:aria-hidden "true"}]
-    [:a {:href "/tags"} "Tags"]
-    [:a {:href "/archive"} "Archive"]
-    [:a {:href "/search"} "Search"]
-    [:a {:href "/about"} "About"]
-    [:a {:href "/follow"} "Follow"]]])
+    [:div.nav-pages
+     [:a {:href "/tags"} "Tags"]
+     [:a {:href "/archive"} "Archive"]
+     [:a {:href "/search"} "Search"]
+     [:a {:href "/about"} "About"]
+     [:a {:href "/follow"} "Follow"]]]])
 
 (defn- footer [config]
   (let [year (.getYear (java.time.LocalDate/now))]

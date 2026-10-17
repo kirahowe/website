@@ -440,6 +440,13 @@ p.quote-cite {
   font: 500 var(--fs) var(--mono);
 }
 .site-nav .type { color: var(--type-color); }
+/* Each group lays out like the nav itself; wide, the three read as one row. */
+.nav-types, .nav-pages {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: inherit;
+}
 
 .nav-sep {
   align-self: stretch;
@@ -945,10 +952,13 @@ p.quote-cite {
   .cols { grid-template-columns: 1fr; }
   .main { border-right: 0; }
   .sidebar { border-top: 1px solid var(--hair); }
-  /* The nav wraps to several rows here; a tighter gap reads better and the
-     vertical divider doesn't survive the wrap, so drop it. */
-  .site-nav { gap: var(--sp2) var(--sp3); }
-  .nav-sep { display: none; }
+  /* The nav stacks by role: the types as a 3-column grid (the legend
+     stays together), a short horizontal rule, then the pages, a size
+     down so all five hold one line on a phone. */
+  .site-nav { flex-direction: column; gap: var(--sp2) var(--sp3); }
+  .nav-types { display: grid; grid-template-columns: repeat(3, auto); justify-items: center; }
+  .nav-pages { font-size: var(--fs-sm); column-gap: var(--sp2); }
+  .nav-sep { align-self: center; width: 4rem; height: 1px; margin: 0; }
   /* Thinner matte where every pixel of width counts */
   .prose img, .entry-thumb img { padding: var(--sp2); }
 }
