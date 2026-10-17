@@ -194,9 +194,9 @@ surface EntryPage {
         -- feed-row copies of the body keep the ids but not the links:
         -- a fragment link is noise inside another document.
     @guidance
-        -- Display follows the type: a post previews its opening in the
-        -- feed and offers the rest behind a reading-time link, while the
-        -- short forms publish whole there — a note, being one thought,
+        -- Display follows the type: a post or a release previews its
+        -- opening in the feed and offers the rest behind a reading-time
+        -- link, while the short forms publish whole there — a note, being one thought,
         -- carries its full body with its links and emphasis intact and
         -- offers no onward link. Quotes render as a large blockquote,
         -- titled by their filename (or explicit_title) like any entry,

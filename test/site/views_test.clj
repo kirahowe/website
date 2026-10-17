@@ -43,7 +43,7 @@
       (is (not (str/includes? body "where code sleeps")))
       ;; ...but quotes are short-form: the whole body publishes to the feed
       (is (str/includes? body "prerequisite for reliability"))
-      ;; ...as do links (and releases/tools): a pull-quote in a link body
+      ;; ...as do links (and tools): a pull-quote in a link body
       ;; survives into the feed as a blockquote, not dropped by the excerpt
       (is (str/includes? body "a lousy data structure"))
       (is (str/includes? body "min read"))                     ; reading-time hint
@@ -159,6 +159,12 @@
     (let [{:keys [body]} (GET "/2025/aug/30/babashka")]
       (is (str/includes? body "https://babashka.org"))
       (is (str/includes? body "via"))))
+
+  (testing "a release previews like a post, with a reading-time link onward"
+    (let [{:keys [body]} (GET "/releases")]
+      (is (str/includes? body "class=\"entry-excerpt\""))
+      (is (str/includes? body "min read]"))
+      (is (str/includes? body "href=\"/2026/apr/18/website-v1\""))))
 
   (testing "release and tool titles link out too"
     (is (str/includes? (:body (GET "/2026/apr/18/website-v1")) "releases/tag/v1.0"))

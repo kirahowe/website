@@ -178,7 +178,7 @@
   (into [:div.entry-body.prose] (rest (markdown/render (:body entry) (:wikilinks entry)))))
 
 (defn- read-more
-  "A post's continuation link, closing its excerpt: the ellipsis into a
+  "A post's or release's continuation link, closing its excerpt: the ellipsis into a
   reading-time estimate for the rest of the entry."
   [entry]
   (list " " [:a.excerpt-more {:href (:path entry)
@@ -190,7 +190,7 @@
 (defn- preview-row
   "The previewing shape: a title, the lede image when the body opens on
   one, and the first paragraph as plain prose. `tail` closes the excerpt
-  (a post's read-more link). Under an active search the prose becomes a
+  (a post's or release's read-more link). Under an active search the prose becomes a
   snippet following the first hit, matches are marked, and the thumb
   drops so results stay compact."
   ([entry opts] (preview-row entry opts nil))
@@ -238,11 +238,15 @@
 (defmethod row-content :note [entry opts]
   (full-body-row entry opts))
 
-;; The outbound types comment on something elsewhere; the comment is the
+;; Links and tools comment on something elsewhere; the comment is the
 ;; whole entry, so it publishes whole (pull-quote included).
 (defmethod row-content :link [entry opts] (full-body-row entry opts))
-(defmethod row-content :release [entry opts] (full-body-row entry opts))
 (defmethod row-content :tool [entry opts] (full-body-row entry opts))
+
+;; Release notes run long, so a release previews like a post and offers
+;; the rest on its own page.
+(defmethod row-content :release [entry opts]
+  (preview-row entry opts (read-more entry)))
 
 ;; A quote is its blockquote and its attribution — no title of its own.
 (defmethod row-content :quote [entry {:keys [terms]}]
