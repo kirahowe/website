@@ -458,24 +458,23 @@ p.quote-cite {
 }
 
 /* Below the width the one-line nav needs (about 57rem), it stacks by role
-   instead of wrapping mid-group: types, then pages. The divider turns
-   horizontal and runs edge to edge through the gutter, like every other
-   rule, so the pages sit in a band above the header's bottom border. */
+   instead of wrapping mid-group: the types, then the pages a size down as
+   the secondary row. Space alone separates the two; a rule between them
+   boxed the pages in like a toolbar. */
 @media (max-width: 58rem) {
-  .site-nav { align-self: stretch; flex-direction: column; }
-  .nav-sep { width: auto; height: 1px; margin: var(--sp1) calc(var(--gutter) * -1) 0; background: var(--hair); }
+  .site-nav { align-self: stretch; flex-direction: column; gap: var(--sp3) var(--sp4); }
+  .nav-pages { font-size: var(--fs-sm); }
+  .nav-sep { display: none; }
 }
 
 /* Below the width the one-line type row needs (about 31rem), the types
-   become a 3-column grid so the legend stays together, and the pages drop
-   a size so all five still hold one line, spread out (up to a phone's
-   width) so they read as five links rather than a sentence. Space alone separates
-   the groups here; a rule boxed the page row in like a toolbar. */
+   become a 3-column grid so the legend stays together, and the pages
+   spread out (up to a phone's width) so they read as five links rather
+   than a sentence. */
 @media (max-width: 32rem) {
   .site-nav { gap: var(--sp4); }
   .nav-types { display: grid; grid-template-columns: repeat(3, auto); justify-content: center; justify-items: center; gap: var(--sp2) var(--sp3); }
-  .nav-pages { width: 100%; max-width: 22rem; justify-content: space-between; font-size: var(--fs-sm); column-gap: var(--sp2); }
-  .nav-sep { display: none; }
+  .nav-pages { width: 100%; max-width: 22rem; justify-content: space-between; column-gap: var(--sp2); }
 }
 
 /* --------------------------------------------------------------------------
