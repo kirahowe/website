@@ -455,6 +455,24 @@ p.quote-cite {
   background: var(--hair2);
 }
 
+/* Below the width the one-line nav needs (about 57rem), it stacks by role
+   instead of wrapping mid-group: types, then pages. The divider turns
+   horizontal and runs edge to edge through the gutter, like every other
+   rule, so the pages sit in a band above the header's bottom border. */
+@media (max-width: 58rem) {
+  .site-nav { align-self: stretch; flex-direction: column; }
+  .nav-sep { width: auto; height: 1px; margin: var(--sp1) calc(var(--gutter) * -1) 0; background: var(--hair); }
+}
+
+/* Below the width the one-line type row needs (about 31rem), the types
+   become a 3-column grid so the legend stays together, and the pages drop
+   a size so all five still hold one line. */
+@media (max-width: 32rem) {
+  .site-nav { gap: var(--sp2) var(--sp3); }
+  .nav-types { display: grid; grid-template-columns: repeat(3, auto); justify-content: center; justify-items: center; }
+  .nav-pages { font-size: var(--fs-sm); column-gap: var(--sp2); }
+}
+
 /* --------------------------------------------------------------------------
    Two-column shell — main feed + right sidebar, with a vertical divider
    -------------------------------------------------------------------------- */
@@ -952,15 +970,6 @@ p.quote-cite {
   .cols { grid-template-columns: 1fr; }
   .main { border-right: 0; }
   .sidebar { border-top: 1px solid var(--hair); }
-  /* The nav stacks by role: the types as a 3-column grid (the legend
-     stays together), then the pages, a size down so all five hold one
-     line on a phone. Between them the divider turns horizontal and runs
-     edge to edge through the gutter, like every other rule, so the pages
-     sit in a band above the header's own bottom border. */
-  .site-nav { align-self: stretch; flex-direction: column; gap: var(--sp2) var(--sp3); }
-  .nav-types { display: grid; grid-template-columns: repeat(3, auto); justify-content: center; justify-items: center; }
-  .nav-pages { font-size: var(--fs-sm); column-gap: var(--sp2); }
-  .nav-sep { width: auto; height: 1px; margin: var(--sp1) calc(var(--gutter) * -1) 0; background: var(--hair); }
   /* Thinner matte where every pixel of width counts */
   .prose img, .entry-thumb img { padding: var(--sp2); }
 }
