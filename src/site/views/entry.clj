@@ -55,10 +55,22 @@
                       {:variant :entry
                        :form-id "follow-post"})]))
 
+(defn- description
+  "A `description` property wins; otherwise the entry's opening paragraph,
+  and for a quote, who said it."
+  [entry]
+  (if-let [d (:description entry)]
+    (str d)
+    (let [by (when (= :quote (:type entry)) (some->> (:source entry) (str " — ")))]
+      (some-> (markdown/summary (:body entry) (- 155 (count by)))
+              (str by)))))
+
 (defn entry-page [config index entry]
   (layout/page config {:title (or (:title entry) (util/format-date (:date entry)))
                        :path (:path entry)
-                       :canonical (:canonical-url entry)}
+                       :canonical (:canonical-url entry)
+                       :description (description entry)
+                       :article {:published (:published entry)}}
                [:article.article.prose
                 (article-head entry)
                 (article-body entry)]

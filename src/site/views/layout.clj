@@ -176,11 +176,16 @@
                 entry whose canonical home is elsewhere points there.
     :feed       {:kind :value} descriptor (see util/feed-scope) of an Atom
                 feed scoped to this page (a type index's, a tag's),
-                advertised for discovery ahead of the site feed."
-  [config {:keys [title path canonical feed]} & content]
+                advertised for discovery ahead of the site feed.
+    :description  what this page is, for search results and link previews;
+                  the site description when absent.
+    :article    {:published Instant-or-nil} on an entry page: og:type
+                becomes article, with its publish time when it has one."
+  [config {:keys [title path canonical feed description article]} & content]
   (let [full-title (if title
                      (str title " — " (:site-title config))
                      (:site-title config))
+        description (or description (:site-description config))
         self-url   (when path (str (:base-url config) path))
         og-image   (str (:base-url config) (asset-url config "/images/og.png"))
         feed       (util/feed-scope feed)]
@@ -201,7 +206,7 @@
                ;; above can paint — see theme-init-script.
                [:script (h/raw theme-init-script)]
                [:title full-title]
-               [:meta {:name "description" :content (:site-description config)}]
+               [:meta {:name "description" :content description}]
                ;; The page's one true URL: an external :canonical wins (the
                ;; content's home is elsewhere), else the page's own address.
                (when-let [href (or canonical self-url)]
@@ -209,10 +214,12 @@
                ;; Open Graph — how the site renders when shared (link previews).
                ;; og:url stays this page's own URL even when rel=canonical
                ;; points elsewhere: a share of this page is about this page.
-               [:meta {:property "og:type" :content "website"}]
+               [:meta {:property "og:type" :content (if article "article" "website")}]
+               (when-let [t (:published article)]
+                 [:meta {:property "article:published_time" :content (str t)}])
                [:meta {:property "og:site_name" :content (:site-title config)}]
                [:meta {:property "og:title" :content full-title}]
-               [:meta {:property "og:description" :content (:site-description config)}]
+               [:meta {:property "og:description" :content description}]
                [:meta {:property "og:url" :content (or self-url (:base-url config))}]
                [:meta {:property "og:image" :content og-image}]
                [:meta {:property "og:image:type" :content "image/png"}]
@@ -222,7 +229,7 @@
                ;; Twitter/X uses its own namespace; large summary card
                [:meta {:name "twitter:card" :content "summary_large_image"}]
                [:meta {:name "twitter:title" :content full-title}]
-               [:meta {:name "twitter:description" :content (:site-description config)}]
+               [:meta {:name "twitter:description" :content description}]
                [:meta {:name "twitter:image" :content og-image}]
                [:link {:rel "stylesheet" :href (asset-url config "/css/style.css")}]
                ;; SVG first: a browser that understands image/svg+xml takes it
@@ -254,7 +261,7 @@
                (when (:dev? config) [:script (h/raw livereload-script)])]]))))
 
 (defn static-page [config {:keys [title body path]}]
-  (page config {:title title :path path}
+  (page config {:title title :path path :description (markdown/summary body)}
         [:article.article.prose
          [:h1 title]
          (rest (markdown/render body nil {:anchors? true}))]))

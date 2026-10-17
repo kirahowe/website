@@ -70,6 +70,11 @@
   [label chips]
   (cons label (mapcat (fn [chip] [[:span.sep.filter "/"] chip]) (remove nil? chips))))
 
+(defn- published-in
+  "An archive's description: what the site published in that span."
+  [config span]
+  (str "Everything " (:site-title config) " published " span "."))
+
 (defn year-page [config index year tag entries]
   (let [heading (header-parts (str year)
                               [(when tag (filter-chip (str "#" (name tag)) (str "/" year)))])
@@ -82,7 +87,8 @@
         year-href (fn [y] (str "/" y (when tag (str "?tag=" (name tag)))))
         tag-href (fn [t] (str "/" year "?tag=" (name t)))]
     (layout/page config {:title (cond-> (str year) tag (str " / #" (name tag)))
-                         :path (str "/" year)}
+                         :path (str "/" year)
+                         :description (published-in config (str "in " year))}
                  (c/page-header heading (c/count-label (count entries)))
                  (c/cols (month-index year entries)
                          (c/sidebar config
@@ -140,7 +146,8 @@
         older (when (< (inc i) (count months)) (nth months (inc i)))
         label (str (util/month-name month) " " year)]
     (layout/page config {:title (cond-> label (< 1 page) (str " / Page " page))
-                         :path (month-path year month page)}
+                         :path (month-path year month page)
+                         :description (published-in config (str "in " label))}
                  (c/page-header label (c/count-label total))
                  [:div.type-summary (c/type-summary all-entries true)]
                  (c/cols (list (c/feed entries)
@@ -155,7 +162,8 @@
 (defn day-page [config year month day {:keys [entries page pages]}]
   (let [label (util/format-date {:year year :month month :day day})]
     (layout/page config {:title (cond-> label (< 1 page) (str " / Page " page))
-                         :path (day-path year month day page)}
+                         :path (day-path year month day page)
+                         :description (published-in config (str "on " label))}
                  (c/feed entries)
                  (c/pagination page pages #(day-path year month day %)))))
 
@@ -191,7 +199,8 @@
                          ;; the query-free form remains canonical when a tag
                          ;; facet is applied.
                          :path (path year nil page)
-                         :feed feed}
+                         :feed feed
+                         :description (get-in config [:type-descriptions type])}
                  (c/page-header heading (c/count-label total))
                  (c/cols (list (c/feed entries)
                                (c/pagination page pages #(path year tag %)))
@@ -215,7 +224,11 @@
     (layout/page config {:title (cond-> (str "#" (name tag) (when year (str " / " year)))
                                  (< 1 page) (str " / Page " page))
                          :path (tag-path tag year page)
-                         :feed feed}
+                         :feed feed
+                         :description (str "Everything " (:site-title config)
+                                           " has written about #" (name tag)
+                                           (when year (str " in " year))
+                                           ": " (c/type-counts-text all-entries) ".")}
                  (c/page-header heading (c/count-label total))
                  (c/cols (list (c/feed entries)
                                (c/pagination page pages #(tag-path tag year %)))

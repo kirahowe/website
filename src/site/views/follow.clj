@@ -22,7 +22,8 @@
         blocks (when (:body page)
                  (rest (markdown/render (:body page) nil {:anchors? true})))
         [intro detail] (split-at 3 blocks)]
-    (layout/page config {:title title :path "/follow"}
+    (layout/page config {:title title :path "/follow"
+                         :description (some-> (:body page) markdown/summary)}
                  [:article.article.prose
                   [:h1 title]
                   intro

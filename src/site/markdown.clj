@@ -173,3 +173,16 @@
        (map plain)
        (remove str/blank?)
        first))
+
+(defn summary
+  "`excerpt`, cut at a word to at most `n` characters (ellipsis included)
+  — the length search results show before truncating a description."
+  ([s] (summary s 155))
+  ([s n]
+   (let [text (excerpt s)]
+     (when-not (str/blank? text)
+       (if (<= (count text) n)
+         text
+         (let [cut (subs text 0 (dec n))
+               space (str/last-index-of cut " ")]
+           (str (str/trimr (subs cut 0 (or space (count cut)))) "…")))))))

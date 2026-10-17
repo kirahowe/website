@@ -197,4 +197,5 @@
                {:title (str (:site-title config) " / " (str/capitalize label))
                 :path (util/type-url type)
                 :feed-path (util/type-feed-url type)
-                :description (str "All " label " published on " (:site-title config))})))
+                :description (or (get-in config [:type-descriptions type])
+                                 (str "All " label " published on " (:site-title config)))})))

@@ -11,6 +11,7 @@
 (def config
   {:site-title "Test Site"
    :site-description "Testing"
+   :type-descriptions {:post "Long form writing."}
    :base-url "https://example.com"
    :content-path "example-content"
    :entry-types [:post :note :link :quote :release :tool]})
@@ -807,6 +808,38 @@
     (let [{:keys [body]} (GET "/2026/jul/4/hello-world")]
       (is (str/includes? body "id=\"theme-toggle\""))
       (is (str/includes? body "class=\"i-light\"")))))
+
+(defn- meta-content [body attr]
+  (second (re-find (re-pattern (str "<meta content=\"([^\"]*)\" " attr ">")) body)))
+
+(deftest page-descriptions
+  (testing "an entry is described by its opening paragraph, as an article"
+    (let [{:keys [body]} (GET "/2026/jul/4/hello-world")]
+      (is (= "This site is a folder of markdown files served by a small babashka program."
+             (meta-content body "name=\"description\"")))
+      (is (= (meta-content body "name=\"description\"")
+             (meta-content body "property=\"og:description\"")
+             (meta-content body "name=\"twitter:description\"")))
+      (is (= "article" (meta-content body "property=\"og:type\"")))
+      (testing "with no publish stamp, no published_time is claimed"
+        (is (nil? (meta-content body "property=\"article:published_time\""))))))
+  (testing "a quote's description names who said it, clipped to leave room for the name"
+    (let [d (meta-content (:body (GET "/2026/jun/21/rich-hickey-on-simplicity")) "name=\"description\"")]
+      (is (str/starts-with? d "Simplicity is a choice. It requires vigilance"))
+      (is (str/ends-with? d "… — Rich Hickey, Simple Made Easy"))
+      (is (<= (count d) 155))))
+  (testing "a type listing uses its configured description"
+    (is (= "Long form writing." (meta-content (:body (GET "/posts")) "name=\"description\""))))
+  (testing "a tag page counts what it holds"
+    (is (re-matches #"Everything Test Site has written about #clojure: \d+ posts?(, | and ).*\."
+                    (meta-content (:body (GET "/tags/clojure")) "name=\"description\""))))
+  (testing "an archive says what span it covers"
+    (is (= "Everything Test Site published in July 2026."
+           (meta-content (:body (GET "/2026/jul")) "name=\"description\""))))
+  (testing "pages with nothing better fall back to the site description"
+    (let [{:keys [body]} (GET "/search")]
+      (is (= "Testing" (meta-content body "name=\"description\"")))
+      (is (= "website" (meta-content body "property=\"og:type\""))))))
 
 (deftest sitemap-and-robots
   (testing "robots.txt allows crawling except search, and names the sitemap"

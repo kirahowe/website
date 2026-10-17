@@ -2,9 +2,19 @@
  ;; specifics (where the content lives, git syncing) are in dev.edn and
  ;; prod.edn; `bb dev` and `bb prod` pick the right one.
 
- ;; Displayed in the site header and the feed
+ ;; Displayed in the site header and the feed. The description is every
+ ;; page's <meta name="description"> unless the page has a better one of
+ ;; its own (an entry, a listing, an archive).
  :site-title "Kira Howe"
- :site-description "My personal space on the internet"
+ :site-description "Kira Howe's space on the internet, where she writes about building software with care in the age of AI"
+
+ ;; Each type listing's description (and its feed's subtitle).
+ :type-descriptions {:post "Long form writing by Kira Howe."
+                     :note "Short notes by Kira Howe."
+                     :link "Interesting links, with commentary by Kira Howe."
+                     :quote "Insightful quotes, by Kira Howe."
+                     :release "Discussion and commentary about release notes for my open source projects."
+                     :tool "Small tools I built."}
 
  ;; Absolute base URL, no trailing slash — used for the feed and canonical links
  :base-url "https://kirahowe.com"

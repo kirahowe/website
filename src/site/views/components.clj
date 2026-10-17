@@ -5,6 +5,7 @@
   sections, page-header, type-summary)."
   (:require [clojure.java.io :as io]
             [clojure.set :as set]
+            [clojure.string :as str]
             [hiccup2.core :as h]
             [site.entry-meta :as m]
             [site.markdown :as markdown]
@@ -310,6 +311,18 @@
      [:span.pagination-older
       (when (< page pages)
         [:a {:href (href (inc page)) :rel "next"} "Older →"])]]))
+
+(defn type-counts-text
+  "The same breakdown as plain prose, for a page description:
+  \"16 posts, 3 links and 1 tool\"."
+  [entries]
+  (let [counts (frequencies (map :type entries))
+        parts (for [t type-order :when (counts t)
+                    :let [n (counts t)]]
+                (str n " " (name t) (when (> n 1) "s")))]
+    (if (< (count parts) 2)
+      (first parts)
+      (str (str/join ", " (butlast parts)) " and " (last parts)))))
 
 (defn type-summary
   "A per-type breakdown line — \"4 posts / 1 quote / 9 links\" — in nav
