@@ -468,11 +468,14 @@ p.quote-cite {
 
 /* Below the width the one-line type row needs (about 31rem), the types
    become a 3-column grid so the legend stays together, and the pages drop
-   a size so all five still hold one line. */
+   a size so all five still hold one line, spread out (up to a phone's
+   width) so they read as five links rather than a sentence. Space alone separates
+   the groups here; a rule boxed the page row in like a toolbar. */
 @media (max-width: 32rem) {
-  .site-nav { gap: var(--sp2) var(--sp3); }
-  .nav-types { display: grid; grid-template-columns: repeat(3, auto); justify-content: center; justify-items: center; }
-  .nav-pages { font-size: var(--fs-sm); column-gap: var(--sp2); }
+  .site-nav { gap: var(--sp4); }
+  .nav-types { display: grid; grid-template-columns: repeat(3, auto); justify-content: center; justify-items: center; gap: var(--sp2) var(--sp3); }
+  .nav-pages { width: 100%; max-width: 22rem; justify-content: space-between; font-size: var(--fs-sm); column-gap: var(--sp2); }
+  .nav-sep { display: none; }
 }
 
 /* --------------------------------------------------------------------------
