@@ -23,6 +23,8 @@
   /search?q=...            search
   /follow                  email follow page (Buttondown signup)
   /feed.xml                Atom
+  /sitemap.xml             sitemap of every canonical page
+  /robots.txt              crawler rules, pointing at the sitemap
   /drafts/<name>?preview=  token-gated draft preview
   /<slug>                  static page (pages/<slug>.md), e.g. /about"
   (:require [clojure.string :as str]
@@ -62,6 +64,8 @@
 
       1 (cond
           (= a "feed.xml") {:handler :feed}
+          (= a "sitemap.xml") {:handler :sitemap}
+          (= a "robots.txt") {:handler :robots}
           (= a "search") {:handler :search}
           (= a "archive") {:handler :archive}
           (= a "tags") {:handler :tags}

@@ -5,7 +5,8 @@
             [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
             [site.app :as app]
-            [site.content :as content]))
+            [site.content :as content]
+            [site.sitemap :as sitemap]))
 
 (def config
   {:site-title "Test Site"
@@ -806,6 +807,34 @@
     (let [{:keys [body]} (GET "/2026/jul/4/hello-world")]
       (is (str/includes? body "id=\"theme-toggle\""))
       (is (str/includes? body "class=\"i-light\"")))))
+
+(deftest sitemap-and-robots
+  (testing "robots.txt allows crawling except search, and names the sitemap"
+    (let [{:keys [status headers body]} (GET "/robots.txt")]
+      (is (= 200 status))
+      (is (str/starts-with? (get headers "Content-Type") "text/plain"))
+      (is (str/includes? body "User-agent: *\nDisallow: /search\n"))
+      (is (str/includes? body "Sitemap: https://example.com/sitemap.xml"))))
+  (let [{:keys [status headers body]} (GET "/sitemap.xml")
+        locs (map #(first (:content %))
+                  (mapcat :content (:content (xml/parse-str body))))]
+    (is (= 200 status))
+    (is (str/starts-with? (get headers "Content-Type") "application/xml"))
+    (is (some #{"https://example.com/2026/jul/4/hello-world"} locs))
+    (is (not-any? #(str/includes? % "/search") locs))
+    (testing "every listed URL serves 200 and calls itself canonical"
+      (doseq [loc locs
+              :let [path (subs loc (count "https://example.com"))
+                    {:keys [status body]} (GET path)]]
+        (is (= 200 status) loc)
+        (is (str/includes? body (str "<link href=\"" loc "\" rel=\"canonical\">")) loc)))))
+
+(deftest sitemap-skips-cross-posts
+  (let [config {:base-url "https://example.com"}
+        index {:entries [{:path "/2026/jul/4/mine"}
+                         {:path "/2026/jul/4/copy" :canonical-url "https://elsewhere.example/post"}]}]
+    (is (some #{"/2026/jul/4/mine"} (sitemap/paths config index)))
+    (is (not (some #{"/2026/jul/4/copy"} (sitemap/paths config index))))))
 
 (deftest one-h1-per-page
   (doseq [[uri query] [["/"] ["/search"] ["/search" "q=babashka"] ["/tags/clojure"]

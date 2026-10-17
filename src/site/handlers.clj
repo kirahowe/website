@@ -4,6 +4,7 @@
   (:require [clojure.string :as str]
             [site.feed :as feed]
             [site.search :as search]
+            [site.sitemap :as sitemap]
             [site.util :as util]
             [site.views.archive :as v.archive]
             [site.views.entry :as v.entry]
@@ -183,6 +184,18 @@
 
     :feed
     (atom-ok (feed/atom-feed config index))
+
+    :sitemap
+    {:status 200
+     :headers {"Content-Type" "application/xml; charset=utf-8"
+               "Cache-Control" public-cache}
+     :body (sitemap/sitemap config index)}
+
+    :robots
+    {:status 200
+     :headers {"Content-Type" "text/plain; charset=utf-8"
+               "Cache-Control" public-cache}
+     :body (sitemap/robots config)}
 
     :type-feed
     ;; Configured but unused types have no listing and therefore no feed.
