@@ -89,38 +89,70 @@
   Consulted only after normal routing 404s, so an old URL can never shadow
   live content."
   [index uri]
-  (let [trimmed (str/replace (str uri) #"/+$" "")
-        uri (if (str/blank? trimmed) uri trimmed)]
-    (when-let [target (get (:redirects index) uri)]
+  (when-let [target (get (:redirects index) uri)]
+    {:status 301
+     :headers {"Location" target
+               "Cache-Control" handlers/public-cache}}))
+
+(defn- slash-redirect
+  "301 to the URI with doubled slashes collapsed and any trailing slash
+  dropped, keeping the query string. Routing ignores empty segments, so
+  without this /tags/clojure/ and /tags//clojure would each serve a
+  duplicate of /tags/clojure. Collapsing first also means the Location
+  can never start with // (a protocol-relative URL to another host)."
+  [uri query-string]
+  (let [clean (-> (str uri)
+                  (str/replace #"/{2,}" "/")
+                  (str/replace #"(?<=.)/$" ""))]
+    (when (not= clean uri)
       {:status 301
-       :headers {"Location" target
+       :headers {"Location" (cond-> clean (seq query-string) (str "?" query-string))
                  "Cache-Control" handlers/public-cache}})))
+
+(defn- method-not-allowed
+  "Every resource here is read-only, so a method other than GET or HEAD on
+  one that exists gets 405 with the Allow header RFC 9110 requires. A URL
+  that doesn't exist stays a 404, whatever the method: that's the more
+  precise answer. The discarded response's body may be an open stream."
+  [resp]
+  (when (instance? java.io.Closeable (:body resp))
+    (.close ^java.io.Closeable (:body resp)))
+  {:status 405
+   :headers {"Allow" "GET, HEAD"
+             "Content-Type" "text/plain; charset=utf-8"
+             "Cache-Control" "no-store"}
+   :body "Method not allowed"})
 
 (defn make-app
   "→ Ring handler. In :dev? mode the content index is rebuilt on every
   request (edits show up on refresh) and drafts are viewable. POST
-  /refresh — the content repo's push webhook — is answered here too,
-  before routing, like the other non-page responses."
+  /refresh — the content repo's push webhook — is answered first, since
+  it's the one resource that takes anything but GET or HEAD."
   [config index-atom]
   (let [refresh-state (sync/make-refresh-state)]
     (fn [req]
       (try
         (let [uri (:uri req)]
-          (or (static-response uri (:query-string req))
-              (attachment-response config uri)
-              (refresh-response config index-atom refresh-state req)
-              (let [index (if (:dev? config)
-                            (content/build-index config)
-                            @index-atom)
-                    ;; The header renders from config alone, but which nav
-                    ;; links exist depends on the content — hand it along.
-                    config (assoc config :nav-types (:nav-types index))
-                    match (routes/match-route config (routes/path-segments uri))
-                    resp (if match
-                           (handlers/handle config index match req)
-                           (handlers/not-found config))]
-                (if (= 404 (:status resp))
-                  (or (previous-url-redirect index uri) resp)
+          (or (refresh-response config index-atom refresh-state req)
+              (let [resp (or (slash-redirect uri (:query-string req))
+                             (static-response uri (:query-string req))
+                             (attachment-response config uri)
+                             (let [index (if (:dev? config)
+                                           (content/build-index config)
+                                           @index-atom)
+                                   ;; The header renders from config alone, but which nav
+                                   ;; links exist depends on the content — hand it along.
+                                   config (assoc config :nav-types (:nav-types index))
+                                   match (routes/match-route config (routes/path-segments uri))
+                                   resp (if match
+                                          (handlers/handle config index match req)
+                                          (handlers/not-found config))]
+                               (if (= 404 (:status resp))
+                                 (or (previous-url-redirect index uri) resp)
+                                 resp)))]
+                (if (and (not (#{:get :head} (:request-method req)))
+                         (not= 404 (:status resp)))
+                  (method-not-allowed resp)
                   resp))))
         (catch Exception e
           (binding [*out* *err*]

@@ -438,8 +438,8 @@
       (is (= 301 status))
       (is (= "/2025/nov/12/repl-driven" (get headers "Location")))
       (is (str/includes? (get headers "Cache-Control") "public")))
-    (testing "with a trailing slash too"
-      (is (= 301 (:status (GET "/blog/repl-driven/")))))
+    (testing "with a trailing slash too, by way of the slashless URL"
+      (is (= "/blog/repl-driven" (get-in (GET "/blog/repl-driven/") [:headers "Location"]))))
     (testing "an own-host absolute previous URL redirects by its path"
       (let [{:keys [status headers]} (GET "/notes/repl.html")]
         (is (= 301 status))
@@ -806,6 +806,28 @@
     (let [{:keys [body]} (GET "/2026/jul/4/hello-world")]
       (is (str/includes? body "id=\"theme-toggle\""))
       (is (str/includes? body "class=\"i-light\"")))))
+
+(deftest one-url-per-resource
+  (testing "a trailing slash 301s to the slashless URL, query intact"
+    (let [{:keys [status headers]} (GET "/tags/clojure/" "year=1")]
+      (is (= 301 status))
+      (is (= "/tags/clojure?year=1" (get headers "Location")))))
+  (testing "so do doubled slashes, which never yield a protocol-relative Location"
+    (is (= "/tags/clojure" (get-in (GET "/tags//clojure") [:headers "Location"])))
+    (is (= "/evil.example/x" (get-in (GET "//evil.example/x/") [:headers "Location"]))))
+  (testing "the root is left alone"
+    (is (= 200 (:status (GET "/"))))))
+
+(deftest read-only-methods
+  (testing "a non-read method on an existing resource is 405, with Allow"
+    (doseq [uri ["/about" "/feed.xml" "/css/style.css"]]
+      (let [{:keys [status headers]} (handler {:request-method :post :uri uri})]
+        (is (= 405 status) uri)
+        (is (= "GET, HEAD" (get headers "Allow")) uri))))
+  (testing "HEAD is a read"
+    (is (= 200 (:status (handler {:request-method :head :uri "/about"})))))
+  (testing "a missing resource is 404 whatever the method"
+    (is (= 404 (:status (handler {:request-method :delete :uri "/nope"}))))))
 
 (deftest no-admin-http-surface
   (testing "there is no reindex endpoint — the server has no admin routes"
