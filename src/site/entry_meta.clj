@@ -18,10 +18,11 @@
     :description accessible phrasing for when the link text alone doesn't
                  name what it's a credit for (e.g. \"via\" doesn't say via
                  what); nil means the link's own text already says enough
-    :placement   :head when the entry's own metadata line carries the
-                 credit (beside its title on the page, in a feed item's
-                 metadata line), :cite when a quote's attribution line
-                 carries it instead"
+    :placement   :title when the entry's title is itself the link (a
+                 link's or tool's outbound target); :head when the
+                 entry's own metadata line carries the credit (beside its
+                 title on the page, in a feed item's metadata line);
+                 :cite when a quote's attribution line carries it instead"
   (:require [site.util :as util]))
 
 (def ^:private credit-order
@@ -53,7 +54,12 @@
   :source-url would just be noise — nothing else on the site claims a
   \"source\" the way a tool or a quote does — so it earns no credit, and no
   Atom <link> or feed's meta line mentions it, no matter what the
-  frontmatter says."
+  frontmatter says.
+
+  :link is the outbound target, which a link's or tool's title links
+  to. A release's title leads to its own page instead, because its notes
+  there are the entry, so its outbound target trails the title as a
+  credit like any other."
   [entry kind]
   (case kind
     :via (if (= :quote (:type entry)) :cite :head)
@@ -61,15 +67,17 @@
               :quote :cite
               :tool :head
               nil)
-    (:link :canonical) :head))
+    :link (if (= :release (:type entry)) :head :title)
+    :canonical :head))
 
 (defn- description
   "Accessible phrasing for a credit whose link text alone (\"via\",
-  \"source\") doesn't say what it's a credit for. :link and :canonical
-  need none — their surrounding text already names them (the title itself
-  for :link; \"originally published at\" for :canonical)."
+  \"source\", a release's \"link\") doesn't say what it's a credit for.
+  :canonical needs none, since \"originally published at\" names it, and
+  neither does a :link that is the title itself."
   [entry kind url]
   (case kind
+    :link (when (= :release (:type entry)) (str "Release notes at " (util/host url)))
     :via (str "via " (util/host url))
     :source (when (= :tool (:type entry)) (str "Source code at " (util/host url)))
     nil))
@@ -112,6 +120,13 @@
   [entry kind]
   (let [c (credit entry kind)]
     (when (= :head (:placement c)) c)))
+
+(defn title-url
+  "The URL the entry's title links out to, or nil when the title leads to
+  the entry's own page."
+  [entry]
+  (let [c (credit entry :link)]
+    (when (= :title (:placement c)) (:url c))))
 
 (defn tags
   "An entry's tags in display order (by name) — the order the chips, the

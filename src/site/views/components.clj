@@ -37,12 +37,6 @@
                  :title "Permalink"}
    @link-icon])
 
-(defn- outbound
-  "Links, releases and tools point at their source; everything else at its
-  own page."
-  [entry]
-  (or (:link-url entry) (:path entry)))
-
 (defn entry-label
   "A one-line label for an entry in a dense list: its title — every entry
   has one now — falling back to the date only if one were ever missing."
@@ -67,15 +61,17 @@
   [:span.via " (" [:a (cond-> {:href url} description (assoc :aria-label description)) label] ")"])
 
 (defn title-credits
-  "The credits that trail an entry's title wherever it appears — “(via)”
-  where it was found, “(source)” where a tool's code lives — in the shared
-  credit order. A quote's credits are not among them: entry-meta places
-  those on its cite line (see `quote-source`). In a feed item, whose
+  "The credits that trail an entry's title wherever it appears — “(link)”
+  to a release's published notes, “(via)” where it was found, “(source)”
+  where a tool's code lives — in the shared credit order. A quote's
+  credits are not among them: entry-meta places those on its cite line
+  (see `quote-source`), and a cross-post's canonical home gets a note of
+  its own (see `canonical-note`). In a feed item, whose
   <title> is plain text, the metadata line stands in for the title and
   carries these instead."
   [entry]
   (->> (m/head-credits entry)
-       (filter #(#{:via :source} (:kind %)))
+       (remove #(= :canonical (:kind %)))
        (map credit-link)))
 
 (defn quote-source
@@ -147,7 +143,7 @@
   Every other row needs the foot's permalink to be reachable at all: a
   quote shows no title, and an outbound type's title points at its
   source."
-  #{:post :note})
+  #{:post :note :release})
 
 (defn- entry-foot
   "The dense foot under a feed row: a permalink to the entry's own page
@@ -165,7 +161,7 @@
 (defn- entry-title [entry terms]
   (when (:title entry)
     [:h3.entry-title
-     [:a {:href (outbound entry)} (highlight (:title entry) terms)]
+     [:a {:href (or (m/title-url entry) (:path entry))} (highlight (:title entry) terms)]
      (title-credits entry)]))
 
 (defn entry-body
@@ -245,7 +241,8 @@
 (defmethod row-content :tool [entry opts] (full-body-row entry opts))
 
 ;; Release notes run long, so a release previews like a post and offers
-;; the rest on its own page.
+;; the rest on its own page; its title leads there too, with the
+;; published release notes as a (link) credit beside it.
 (defmethod row-content :release [entry opts]
   (preview-row entry opts (read-more entry)))
 

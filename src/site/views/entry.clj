@@ -1,8 +1,9 @@
 (ns site.views.entry
   "The single-entry page: a full reading article, then a footer of tag
   chips, a dense related grid, and a short bio. Quotes render as a large
-  blockquote; outbound types (links, releases, tools) title-link to source."
+  blockquote; outbound types (links, tools) title-link to source."
   (:require [clojure.string :as str]
+            [site.entry-meta :as m]
             [site.markdown :as markdown]
             [site.util :as util]
             [site.views.components :as c]
@@ -17,8 +18,8 @@
 (defn- article-head [entry]
   (list
    (when-let [title (:title entry)]
-     [:h1 (if (:link-url entry)
-            [:a {:href (:link-url entry)} title]
+     [:h1 (if-let [url (m/title-url entry)]
+            [:a {:href url} title]
             title)
       (c/title-credits entry)])
    [:div.article-meta

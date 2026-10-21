@@ -168,9 +168,16 @@
       (is (str/includes? body "min read]"))
       (is (str/includes? body "href=\"/2026/apr/18/website-v1\""))))
 
-  (testing "release and tool titles link out too"
-    (is (str/includes? (:body (GET "/2026/apr/18/website-v1")) "releases/tag/v1.0"))
+  (testing "tool titles link out too"
     (is (str/includes? (:body (GET "/2026/mar/7/vault-publish")) "tools.example.com/vault-publish")))
+
+  (testing "a release title leads to its own page, with a (link) to the release notes"
+    (let [{:keys [body]} (GET "/releases")]
+      (is (re-find #"<h3 class=\"entry-title\"><a href=\"/2026/apr/18/website-v1\">" body))
+      (is (re-find #"\(<a aria-label=\"Release notes at [^\"]+\" href=\"[^\"]*releases/tag/v1.0\">link</a>\)" body)))
+    (let [{:keys [body]} (GET "/2026/apr/18/website-v1")]
+      (is (re-find #">link</a>\)" body))
+      (is (not (re-find #"<h1><a " body)))))
 
   (testing "a tool credits its source code after the title, styled like a via credit"
     (let [{:keys [body]} (GET "/2026/mar/7/vault-publish")]

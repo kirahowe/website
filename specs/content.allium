@@ -203,7 +203,10 @@ surface EntryPage {
         -- with an attribution cite line linking to attribution_url; links
         -- point out to link_url and credit via_url on the cite line. A
         -- tool credits its source code (attribution_url) as a (source)
-        -- link after the title, styled like the via credit. Each
+        -- link after the title, styled like the via credit. A release
+        -- titles itself to its own page, like a post, and credits its
+        -- published release notes (link_url) as a (link) after the
+        -- title. Each
         -- entry links its newer and older neighbours in date order:
         -- newest published_date first, and within a day newest
         -- published_at first, an entry without one counting as noon UTC.

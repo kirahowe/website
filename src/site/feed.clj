@@ -89,11 +89,11 @@
 
 (defn- item-meta
   "The facts most feed readers show only inside <content>, never in their
-  own chrome: the type, the outbound target (a feed item's <title> is
-  plain text, so this is the only place that link is clickable), the
-  credits that trail a title on the site, a cross-post's canonical note,
-  and the entry's tags — the same run of slashed parts as
-  site.views.entry/article-head's meta line.
+  own chrome: the type, the target a link's or tool's title links out to
+  (a feed item's <title> is plain text, so this is the only place that
+  link is clickable), the credits that trail a title on the site, a
+  cross-post's canonical note, and the entry's tags — the same run of
+  slashed parts as site.views.entry/article-head's meta line.
 
   The spacing is in the markup rather than left to CSS, unlike every
   other line on the site: a reader renders this HTML in its own document,
@@ -105,13 +105,12 @@
   has no intrinsic size outside the site's own CSS."
   [entry]
   (let [sep (list " " [:span.sep "/"] " ")
-        link (m/head-credit entry :link)
         ;; the type, what the entry points at, and the credits that trail
         ;; a title on the site — one part, because the credits are
         ;; parentheticals on what precedes them, not items in the run
         lead (list (name (:type entry))
-                   (when link
-                     (list sep [:a {:href (:url link)} (util/host (:url link))]))
+                   (when-let [url (m/title-url entry)]
+                     (list sep [:a {:href url} (util/host url)]))
                    (c/title-credits entry))
         parts (remove nil?
                       [lead
